@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export const GlobalNavigation: React.FC = () => {
     const navigate = useNavigate()
@@ -8,8 +8,6 @@ export const GlobalNavigation: React.FC = () => {
     // トップ画面の場合は表示しない
     const isTop = location.pathname === '/'
 
-    // 患者詳細、または手技選択画面かどうかを判定
-    const isPatientContext = location.pathname.startsWith('/patient/') || location.pathname.startsWith('/treatment-scan/')
 
     // 現在の画面が「患者トップ（ステータス画面）」かどうか。手技選択などの子画面なら患者トップに戻るボタンを出す。
     const isInsidePatient = location.pathname.startsWith('/treatment-scan/')

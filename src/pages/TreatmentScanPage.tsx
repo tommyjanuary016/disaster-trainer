@@ -3,21 +3,29 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchPatient, startTreatmentTimer } from '../lib/firestore'
 import { Patient } from '../types/patient'
+import { parseQRCode, ParsedQRCode } from '../types/qr'
+import { getMedicalItemById } from '../data/items'
 import { mockPatients } from '../data/mockData'
-
-interface SelectedTreatment {
-    id: string
-    name: string
-    defaultMinutes: number
-    isCorrect: boolean
-}
+import QRConfirmModal from '../components/QRConfirmModal'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
 
+// 手技IDと表示名のマッピング
+const PROCEDURE_NAMES: Record<string, string> = {
+    vitals:             'バイタルサイン測定',
+    head_and_neck:      '頭頸部診察',
+    chest:              '胸部診察',
+    abdomen_and_pelvis: '腹部・骨盤診察',
+    limbs:              '四肢診察',
+    fast:               'FAST',
+    ample:              'AMPLE',
+    background:         '背景聴取',
+    diagnosis:          '診断',
+}
+
 // 全患者から動的に治療処置リストを生成（将来的な拡張に対応）
 const allTreatmentsMap = new Map<string, string>()
-// 共通のダミーやベースとなる処置を先に追加
 const BASE_TREATMENTS = [
     { id: 'iv_access', name: 'ルート確保' },
     { id: 'oxygen', name: '酸素投与' },
@@ -26,12 +34,9 @@ const BASE_TREATMENTS = [
     { id: 'cpr', name: 'CPR' },
 ]
 BASE_TREATMENTS.forEach(t => allTreatmentsMap.set(t.id, t.name))
-
 mockPatients.forEach(p => {
     p.required_treatments?.forEach(rt => {
-        // まだ登録されていなければ追加（既存のものがある場合は上書きしない）
         if (!allTreatmentsMap.has(rt.treatment_id)) {
-            // 長すぎる処置名は少し短くするなどの工夫も可能だが、今回はそのまま登録
             allTreatmentsMap.set(rt.treatment_id, rt.treatment_name)
         }
     })
@@ -42,25 +47,39 @@ const isTreatmentOption = (id: string) => {
     return id !== 'vitals' && id !== 'diagnosis' && !EXAM_IDS.includes(id)
 }
 
+interface ResolvedProcedure {
+    treatment_id: string
+    treatment_name: string
+    defaultMinutes: number
+    isCorrect: boolean
+    /** QRの種別（手技QR / 物品QR） */
+    qrType: 'procedure' | 'item'
+    /** 物品QR の場合の物品名 */
+    itemName?: string
+}
+
 const TreatmentScanPage: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>()
     const navigate = useNavigate()
     const [manualTreatmentId, setManualTreatmentId] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [patient, setPatient] = useState<Patient | null>(null)
-    const [selectedTreatment, setSelectedTreatment] = useState<SelectedTreatment | null>(null)
-    const [timerMinutes, setTimerMinutes] = useState<number>(0)
     const [hasVitalsOrExams, setHasVitalsOrExams] = useState(false)
+
+    // 確認モーダル用の状態
+    const [pendingProcedure, setPendingProcedure] = useState<ResolvedProcedure | null>(null)
+    const [pendingParsed, setPendingParsed] = useState<ParsedQRCode | null>(null)
+    const [timerMinutes, setTimerMinutes] = useState<number>(0)
+    const [showModal, setShowModal] = useState(false)
 
     useEffect(() => {
         if (patientId) {
             fetchPatient(parseInt(patientId)).then(p => {
                 if (p) {
                     setPatient(p)
-                    // バイタルサイン測定または診察手技のいずれかを実施済みか判定
                     const done = p.completed_treatments?.some(
                         id => id === 'vitals' || EXAM_IDS.includes(id)
-                    ) || false;
+                    ) || false
                     setHasVitalsOrExams(done)
                 }
             })
@@ -68,7 +87,7 @@ const TreatmentScanPage: React.FC = () => {
     }, [patientId])
 
     useEffect(() => {
-        if (selectedTreatment) return // 処置選択済みの場合はスキャナーを起動しない
+        if (showModal) return // モーダル表示中はスキャナーを起動しない
 
         const scanner = new Html5QrcodeScanner(
             'treatment-reader',
@@ -82,127 +101,131 @@ const TreatmentScanPage: React.FC = () => {
                 scanner.clear()
             },
             () => {
-                // ignore errors during scanning
+                // スキャン中のエラーは無視
             }
         )
 
         return () => {
-            scanner.clear().catch(e => console.error("Error clearing scanner", e))
+            scanner.clear().catch(e => console.error('Error clearing scanner', e))
         }
-    }, [patientId, selectedTreatment, hasVitalsOrExams])
+    }, [patientId, showModal, hasVitalsOrExams])
 
-    const handleScan = async (text: string) => {
-        // format: treatment:[treatment_id]
-        if (text.startsWith('treatment:')) {
-            const treatmentId = text.split(':')[1]
-            await prepareTreatment(treatmentId)
+    /** QR文字列をパースして手技として解決する */
+    const resolveQR = (text: string): { resolved: ResolvedProcedure; parsed: ParsedQRCode } | null => {
+        const parsed = parseQRCode(text)
+        if (!parsed) return null
+
+        let treatmentId: string
+        let qrType: 'procedure' | 'item' = 'procedure'
+        let itemName: string | undefined
+
+        if (parsed.type === 'procedure') {
+            treatmentId = parsed.id
+        } else if (parsed.type === 'item') {
+            const item = getMedicalItemById(parsed.id)
+            if (!item) return null
+            treatmentId = item.maps_to_treatment_id
+            qrType = 'item'
+            itemName = item.name
         } else {
-            setError('無効なQRコードです。「treatment:[ID]」の形式である必要があります。')
+            return null // 患者QRは処置スキャン画面では無効
+        }
+
+        // 手技名を決定
+        let treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
+        let initialMinutes = 5
+
+        if (patient) {
+            const matched = patient.required_treatments?.find(rt => rt.treatment_id === treatmentId)
+            if (matched) {
+                treatmentName = matched.treatment_name
+                initialMinutes = matched.lock_timer_minutes
+            } else {
+                const found = DYNAMIC_TREATMENTS.find(t => t.id === treatmentId)
+                if (found) treatmentName = found.name
+            }
+        }
+
+        return {
+            parsed,
+            resolved: {
+                treatment_id: treatmentId,
+                treatment_name: treatmentName,
+                defaultMinutes: initialMinutes,
+                isCorrect: !!patient?.required_treatments?.find(rt => rt.treatment_id === treatmentId),
+                qrType,
+                itemName,
+            },
         }
     }
 
-    const prepareTreatment = async (treatmentId: string) => {
+    const handleScan = (text: string) => {
         if (!patient) return
+        const result = resolveQR(text)
 
-        // 治療処置の場合、バイタル・診察を行っていないとブロックする
-        if (isTreatmentOption(treatmentId) && !hasVitalsOrExams) {
+        if (!result) {
+            setError('無効なQRコードです。手技QRまたは物品QRを読み取ってください。')
+            return
+        }
+
+        const { resolved, parsed } = result
+
+        // 治療処置の場合、バイタル・診察未実施ならブロック
+        if (isTreatmentOption(resolved.treatment_id) && !hasVitalsOrExams) {
             setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。')
-            setManualTreatmentId('')
             return
         }
 
         setError(null)
-
-        // 処置IDが推奨処置スキャンか確認し、デフォルトタイマー時間を取得
-        const matchedTreatment = patient.required_treatments?.find(rt => rt.treatment_id === treatmentId)
-        
-        let initialMinutes = 5
-        let treatmentName = '各種処置'
-
-        if (matchedTreatment) {
-            initialMinutes = matchedTreatment.lock_timer_minutes
-            treatmentName = matchedTreatment.treatment_name
-        } else if (treatmentId === 'vitals') {
-            treatmentName = 'バイタルサイン測定'
-        } else if (treatmentId === 'head_and_neck') {
-            treatmentName = '頭頸部診察'
-        } else if (treatmentId === 'chest') {
-            treatmentName = '胸部診察'
-        } else if (treatmentId === 'abdomen_and_pelvis') {
-            treatmentName = '腹部・骨盤診察'
-        } else if (treatmentId === 'limbs') {
-            treatmentName = '四肢診察'
-        } else if (treatmentId === 'fast') {
-            treatmentName = 'FAST'
-        } else if (treatmentId === 'ample') {
-            treatmentName = 'AMPLE'
-        } else if (treatmentId === 'background') {
-            treatmentName = '背景聴取'
-        } else if (treatmentId === 'diagnosis') {
-            treatmentName = '診断'
-        } else {
-            // どれにも該当しない場合は、全処置リストから名前を探す
-            const found = DYNAMIC_TREATMENTS.find(t => t.id === treatmentId)
-            if (found) {
-                treatmentName = found.name
-            }
-        }
-
-        setSelectedTreatment({
-            id: treatmentId,
-            name: treatmentName,
-            defaultMinutes: initialMinutes,
-            isCorrect: !!matchedTreatment
-        })
-        setTimerMinutes(initialMinutes)
+        setPendingProcedure(resolved)
+        setPendingParsed(parsed)
+        setTimerMinutes(resolved.defaultMinutes)
+        setShowModal(true)
     }
 
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (manualTreatmentId) {
-            prepareTreatment(manualTreatmentId)
+            handleScan(`procedure:${manualTreatmentId}`)
         }
     }
 
-    const confirmTreatment = async () => {
-        if (!patientId || !selectedTreatment) return
-        const pStr = parseInt(patientId)
-        await startTreatmentTimer(pStr, selectedTreatment.id, timerMinutes)
+    const handleConfirm = async () => {
+        if (!patientId || !pendingProcedure) return
+        await startTreatmentTimer(parseInt(patientId), pendingProcedure.treatment_id, timerMinutes)
         navigate(`/patient/${patientId}`)
     }
 
-    const cancelTreatment = () => {
-        setSelectedTreatment(null)
+    const handleCancel = () => {
+        setShowModal(false)
+        setPendingProcedure(null)
+        setPendingParsed(null)
         setManualTreatmentId('')
         setError(null)
     }
 
     return (
         <div className="page treatment-scan-page">
+            {/* QR確認モーダル */}
+            {showModal && pendingParsed && pendingProcedure && (
+                <QRConfirmModal
+                    parsed={pendingParsed}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
+
             <header className="treatment-header">
                 <div className="treatment-header__label">TREATMENT FOR</div>
                 <h1 className="treatment-header__name">
                     {patient ? `${Math.floor(patient.age / 10) * 10}代 ${patient.gender === 'M' ? '男性' : '女性'}` : '読み込み中...'}
                 </h1>
             </header>
-            <main className="page__content">
-                {selectedTreatment ? (
-                    <div className="treatment-confirmation card card--elevated">
-                        <h2 className="card__title">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            処置の確認
-                        </h2>
-                        <div className="info-row">
-                            <span className="info-row__label">処置ID</span>
-                            <span className="info-row__value">{selectedTreatment.id}</span>
-                        </div>
-                        <div className="info-row">
-                            <span className="info-row__label">処置名</span>
-                            <span className="info-row__value">{selectedTreatment.name}</span>
-                        </div>
 
+            <main className="page__content">
+                {/* タイマー時間調整（モーダルは上に出るが、念のため確認後の調整UIも残す） */}
+                {showModal && pendingProcedure && (
+                    <div className="card card--elevated" style={{ marginBottom: '1rem' }}>
                         <div className="timer-input-wrapper">
                             <label className="timer-input-label">拘束時間（分）を変更できます</label>
                             <input
@@ -213,102 +236,93 @@ const TreatmentScanPage: React.FC = () => {
                                 min="0"
                             />
                         </div>
-
-                        <div className="actions">
-                            <button className="button button--danger" onClick={confirmTreatment}>
-                                タイマーを開始
-                            </button>
-                            <button className="button button--secondary" onClick={cancelTreatment}>
-                                やり直す
-                            </button>
-                        </div>
                     </div>
-                ) : (
-                    <>
-                        <p className="instruction-text">実施する処置の物品QRコードをスキャンしてください。</p>
-
-                        <div className="qr-reader-wrapper">
-                            <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
-                        </div>
-
-                        {error && <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>{error}</div>}
-
-                        <div className="divider">
-                            <span>OR</span>
-                        </div>
-
-                        <div className="manual-entry">
-                            <form onSubmit={handleManualSubmit} className="manual-entry__form">
-                                <div className="form-group">
-                                    <label>手技・処置選択</label>
-                                    <select
-                                        className="input"
-                                        value={manualTreatmentId}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setManualTreatmentId(val);
-                                            // 即座にエラーチェックを行う
-                                            if (val && isTreatmentOption(val) && !hasVitalsOrExams) {
-                                                setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。');
-                                                setManualTreatmentId('');
-                                            } else {
-                                                setError(null);
-                                            }
-                                        }}
-                                    >
-                                        <option value="">-- 手技を選択 --</option>
-
-                                        {/* バイタル */}
-                                        <optgroup label="バイタル">
-                                            <option value="vitals">バイタルサイン測定</option>
-                                        </optgroup>
-
-                                        {/* 診察手技 */}
-                                        <optgroup label="診察手技">
-                                            <option value="head_and_neck">頭頸部診察</option>
-                                            <option value="chest">胸部診察</option>
-                                            <option value="abdomen_and_pelvis">腹部・骨盤診察</option>
-                                            <option value="limbs">四肢診察</option>
-                                            <option value="fast">FAST</option>
-                                            <option value="ample">AMPLE</option>
-                                            <option value="background">背景聴取</option>
-                                        </optgroup>
-
-                                        {/* 治療処置（全患者共通の動的リスト） */}
-                                        <optgroup label="治療処置（※要バイタル/診察）" disabled={!hasVitalsOrExams}>
-                                            {DYNAMIC_TREATMENTS.map(t => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.name}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    </select>
-                                    {!hasVitalsOrExams && (
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.5rem' }}>
-                                            ※ 治療処置はバイタルまたは診察を実施後に選択可能になります。
-                                        </p>
-                                    )}
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="button button--primary"
-                                    disabled={!manualTreatmentId}
-                                >
-                                    確認
-                                </button>
-                            </form>
-                        </div>
-
-                        <div className="actions">
-                            <button
-                                className="button button--secondary"
-                                onClick={() => navigate(`/patient/${patientId}`)}
-                            >
-                                キャンセル
-                            </button>
-                        </div>
-                    </>
                 )}
+
+                <>
+                    <p className="instruction-text">手技QRまたは物品QRコードをスキャンしてください。</p>
+
+                    <div className="qr-reader-wrapper">
+                        <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
+                    </div>
+
+                    {error && (
+                        <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="divider">
+                        <span>OR</span>
+                    </div>
+
+                    <div className="manual-entry">
+                        <form onSubmit={handleManualSubmit} className="manual-entry__form">
+                            <div className="form-group">
+                                <label>手技・処置選択</label>
+                                <select
+                                    className="input"
+                                    value={manualTreatmentId}
+                                    onChange={(e) => {
+                                        const val = e.target.value
+                                        setManualTreatmentId(val)
+                                        if (val && isTreatmentOption(val) && !hasVitalsOrExams) {
+                                            setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。')
+                                            setManualTreatmentId('')
+                                        } else {
+                                            setError(null)
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- 手技を選択 --</option>
+
+                                    <optgroup label="バイタル">
+                                        <option value="vitals">バイタルサイン測定</option>
+                                    </optgroup>
+
+                                    <optgroup label="診察手技">
+                                        <option value="head_and_neck">頭頸部診察</option>
+                                        <option value="chest">胸部診察</option>
+                                        <option value="abdomen_and_pelvis">腹部・骨盤診察</option>
+                                        <option value="limbs">四肢診察</option>
+                                        <option value="fast">FAST</option>
+                                        <option value="ample">AMPLE</option>
+                                        <option value="background">背景聴取</option>
+                                    </optgroup>
+
+                                    <optgroup label="治療処置（※要バイタル/診察）" disabled={!hasVitalsOrExams}>
+                                        {DYNAMIC_TREATMENTS.map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                </select>
+                                {!hasVitalsOrExams && (
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.5rem' }}>
+                                        ※ 治療処置はバイタルまたは診察を実施後に選択可能になります。
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                className="button button--primary"
+                                disabled={!manualTreatmentId}
+                            >
+                                確認
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="actions">
+                        <button
+                            className="button button--secondary"
+                            onClick={() => navigate(`/patient/${patientId}`)}
+                        >
+                            キャンセル
+                        </button>
+                    </div>
+                </>
             </main>
         </div>
     )

@@ -1,13 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
+import { parseQRCode } from '../types/qr'
+import { fetchPatient } from '../lib/firestore'
+import { Patient } from '../types/patient'
+import QRConfirmModal from '../components/QRConfirmModal'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
     const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
+    // 確認モーダル用の状態
+    const [pendingPatientId, setPendingPatientId] = useState<string | null>(null)
+    const [pendingPatient, setPendingPatient] = useState<Patient | null>(null)
+    const [showModal, setShowModal] = useState(false)
 
     useEffect(() => {
+        if (showModal) return // モーダル表示中はスキャナーを起動しない
+
         const scanner = new Html5QrcodeScanner(
             'reader',
             { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -20,34 +30,63 @@ const QRScannerPage: React.FC = () => {
                 scanner.clear()
             },
             () => {
-                // ignore errors during scanning
+                // スキャン中のエラーは無視
             }
         )
 
         return () => {
-            scanner.clear().catch(e => console.error("Error clearing scanner", e))
+            scanner.clear().catch(e => console.error('Error clearing scanner', e))
         }
-    }, [])
+    }, [showModal])
 
-    const handleScan = (text: string) => {
-        // format: patient:[ID]
-        if (text.startsWith('patient:')) {
-            const id = text.split(':')[1]
-            navigate(`/patient/${id}`)
-        } else {
-            setError('無効なQRコードです。「patient:[ID]」の形式である必要があります。')
+    const handleScan = async (text: string) => {
+        const parsed = parseQRCode(text)
+
+        if (!parsed || parsed.type !== 'patient') {
+            setError('無効なQRコードです。患者QR（病着に貼付）を読み取ってください。')
+            return
         }
+
+        setError(null)
+        // 患者情報を取得して確認モーダルを表示
+        const patientId = parsed.id
+        const patient = await fetchPatient(parseInt(patientId))
+        setPendingPatientId(patientId)
+        setPendingPatient(patient)
+        setShowModal(true)
     }
 
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (manualId) {
-            navigate(`/patient/${manualId}`)
+            handleScan(`patient:${manualId}`)
         }
+    }
+
+    const handleConfirm = () => {
+        if (pendingPatientId) {
+            navigate(`/patient/${pendingPatientId}`)
+        }
+    }
+
+    const handleCancel = () => {
+        setShowModal(false)
+        setPendingPatientId(null)
+        setPendingPatient(null)
     }
 
     return (
         <div className="page qr-scanner-page">
+            {/* QR確認モーダル */}
+            {showModal && pendingPatientId && (
+                <QRConfirmModal
+                    parsed={{ type: 'patient', id: pendingPatientId }}
+                    patient={pendingPatient}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
+
             <div className="scanner-hero">
                 <div className="scanner-hero__icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -89,16 +128,16 @@ const QRScannerPage: React.FC = () => {
                     <button type="submit" className="button button--primary" disabled={!manualId}>
                         ID検索
                     </button>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         className="button button--secondary"
                         onClick={() => navigate('/admin')}
                         style={{ marginTop: '0.5rem' }}
                     >
                         管理画面
                     </button>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         className="button button--secondary"
                         onClick={() => navigate('/actor')}
                         style={{ marginTop: '0.5rem' }}

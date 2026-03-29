@@ -44,9 +44,18 @@ const AdminPage: React.FC = () => {
         <div className="page admin-page">
             <header className="admin-header">
                 <h1>管理画面 (Admin)</h1>
-                <button onClick={() => navigate('/')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
-                    ホームへ
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        onClick={() => navigate('/qr-generator')}
+                        className="button button--primary"
+                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                    >
+                        QR生成
+                    </button>
+                    <button onClick={() => navigate('/')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
+                        ホームへ
+                    </button>
+                </div>
             </header>
 
             <main className="page__content">

@@ -21,9 +21,9 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '骨盤骨折',
     required_treatments: [
-      { treatment_id: 'iv_fluid', treatment_name: '2ﾙｰﾄ、輸液2L負荷', lock_timer_minutes: 0 },
-      { treatment_id: 'blood_transfusion', treatment_name: 'RBC4単位+FFP4単位輸血で安定化', lock_timer_minutes: 0 },
-      { treatment_id: 'ct', treatment_name: 'CT（E）が必須', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_fluid', treatment_name: '外液急速投与 (2L負荷)', lock_timer_minutes: 0 },
+      { treatment_id: 'blood_transfusion', treatment_name: '緊急輸血 (RBC4/FFP4)', lock_timer_minutes: 0 },
+      { treatment_id: 'pelvic_binder', treatment_name: 'サムスリング装着 (骨盤固定)', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -52,7 +52,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '右緊張性気胸',
     required_treatments: [
-      { treatment_id: 'chest_tube', treatment_name: '右胸腔内へトロッカーカテーテル留置で安定化', lock_timer_minutes: 0 }
+      { treatment_id: 'chest_tube', treatment_name: '胸腔ドレーン挿入', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -81,8 +81,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '過換気症候群',
     required_treatments: [
-      { treatment_id: 'sedation', treatment_name: 'ｱﾀﾗｯｸｽPまたは鎮静剤投与', lock_timer_minutes: 0 },
-      { treatment_id: 'breathing_support', treatment_name: '緩徐な呼吸誘導で安定化', lock_timer_minutes: 0 }
+      { treatment_id: 'sedation', treatment_name: '鎮静・鎮痛薬投与', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -111,9 +110,8 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '左腎損傷 GradeⅣ',
     required_treatments: [
-      { treatment_id: 'iv_fluid', treatment_name: '2ﾙｰﾄ、輸液2L負荷', lock_timer_minutes: 0 },
-      { treatment_id: 'blood_transfusion', treatment_name: 'RBC4単位+FFP4単位輸血で安定化', lock_timer_minutes: 0 },
-      { treatment_id: 'ct', treatment_name: 'CT（E）が必須', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_fluid', treatment_name: '外液急速投与', lock_timer_minutes: 0 },
+      { treatment_id: 'blood_transfusion', treatment_name: '緊急輸血 (RBC/FFP)', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -142,9 +140,8 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '下顎骨折 気道閉塞',
     required_treatments: [
-      { treatment_id: 'iv_fluid', treatment_name: '2ﾙｰﾄ、輸液急速投与', lock_timer_minutes: 0 },
-      { treatment_id: 'intubation', treatment_name: '鎮静剤または全身麻酔下で経口挿管で安定化', lock_timer_minutes: 0 },
-      { treatment_id: 'ct', treatment_name: 'CT撮影', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_fluid', treatment_name: '外液急速投与', lock_timer_minutes: 0 },
+      { treatment_id: 'intubation', treatment_name: '気管挿管', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -173,10 +170,9 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '右頭蓋内血腫',
     required_treatments: [
-      { treatment_id: 'iv_access', treatment_name: 'ﾙｰﾄｷｰﾌﾟ', lock_timer_minutes: 0 },
-      { treatment_id: 'intubation', treatment_name: '気管内挿管', lock_timer_minutes: 0 },
-      { treatment_id: 'medication', treatment_name: 'ニカルジピン持続投与で安定化', lock_timer_minutes: 0 },
-      { treatment_id: 'ct', treatment_name: 'CT撮影', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_access', treatment_name: '静脈路確保(末梢)', lock_timer_minutes: 0 },
+      { treatment_id: 'intubation', treatment_name: '気管挿管', lock_timer_minutes: 0 },
+      { treatment_id: 'antihypertensive', treatment_name: '降圧剤投与', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -205,8 +201,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '左外傷性気胸',
     required_treatments: [
-      { treatment_id: 'chest_tube', treatment_name: '左胸腔内にトロッカーカテーテル留置で安定化', lock_timer_minutes: 0 },
-      { treatment_id: 'xray_ct', treatment_name: 'Ｘ-ＰまたはCT', lock_timer_minutes: 0 }
+      { treatment_id: 'chest_tube', treatment_name: '胸腔ドレーン挿入', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -235,7 +230,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '右大腿骨頸部骨折',
     required_treatments: [
-      { treatment_id: 'xray_ct', treatment_name: 'Ｘ-ＰまたはCT', lock_timer_minutes: 0 }
+      { treatment_id: 'splint', treatment_name: 'シーネ固定', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -264,9 +259,8 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '外傷性SAH',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'iv_access', treatment_name: 'ルートキープ', lock_timer_minutes: 0 },
-      { treatment_id: 'medication', treatment_name: '降圧剤投与で安定', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_access', treatment_name: '静脈路確保(末梢)', lock_timer_minutes: 0 },
+      { treatment_id: 'antihypertensive', treatment_name: '降圧剤投与', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -295,9 +289,8 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '脳挫傷',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'iv_access', treatment_name: 'ルートキープ', lock_timer_minutes: 0 },
-      { treatment_id: 'medication', treatment_name: '降圧剤投与で安定', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_access', treatment_name: '静脈路確保(末梢)', lock_timer_minutes: 0 },
+      { treatment_id: 'antihypertensive', treatment_name: '降圧剤投与', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -326,8 +319,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '全身打撲傷',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 }
+      { treatment_id: 'iv_access', treatment_name: '静脈路確保(末梢)', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -356,8 +348,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '胸腰椎圧迫骨折',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 }
+      { treatment_id: 'splint', treatment_name: 'シーネ固定', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -386,9 +377,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '右大腿骨幹部骨折',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 },
-      { treatment_id: 'traction', treatment_name: '鋼線牽引', lock_timer_minutes: 0 }
+      { treatment_id: 'traction', treatment_name: '直達牽引', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -417,9 +406,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '左大腿骨顆上骨折、左脛腓骨骨折',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 },
-      { treatment_id: 'traction', treatment_name: '鋼線牽引', lock_timer_minutes: 0 }
+      { treatment_id: 'traction', treatment_name: '直達牽引', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -448,8 +435,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '右膝蓋骨骨折',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 }
+      { treatment_id: 'splint', treatment_name: 'シーネ固定', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -505,7 +491,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '両肩、右上肢打撲傷',
     required_treatments: [
-      { treatment_id: 'xray', treatment_name: 'X-P', lock_timer_minutes: 0 }
+      { treatment_id: 'splint', treatment_name: 'シーネ固定', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,
@@ -534,8 +520,7 @@ export const mockPatients: Patient[] = [
     },
     diagnosis: '頭部挫創',
     required_treatments: [
-      { treatment_id: 'ct', treatment_name: 'CT', lock_timer_minutes: 0 },
-      { treatment_id: 'suture', treatment_name: '縫合', lock_timer_minutes: 0 }
+      { treatment_id: 'suture', treatment_name: '挫創処置 (洗浄縫合)', lock_timer_minutes: 0 }
     ],
     status: '初期状態',
     assessment_completed: false,

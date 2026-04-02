@@ -144,6 +144,24 @@ const QRScannerPage: React.FC = () => {
                     >
                         模擬患者モード
                     </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button
+                            type="button"
+                            className="button button--secondary"
+                            onClick={() => navigate('/radiology')}
+                            style={{ flex: 1, backgroundColor: '#e2e8f0' }}
+                        >
+                            放射線科
+                        </button>
+                        <button
+                            type="button"
+                            className="button button--secondary"
+                            onClick={() => navigate('/lab')}
+                            style={{ flex: 1, backgroundColor: '#e2e8f0' }}
+                        >
+                            検査科
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

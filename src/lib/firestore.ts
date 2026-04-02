@@ -16,6 +16,9 @@ const mockStore: Map<number, Patient> = new Map(
     mockPatients.map((p) => [p.id, { ...p }])
 )
 
+// セッション管理用
+export let activeSessionId: string | null = null
+
 // モックのリスナー登録（疑似リアルタイム同期）
 const mockListeners: Map<number, Set<(patient: Patient) => void>> = new Map()
 
@@ -83,13 +86,21 @@ export async function fetchPatient(patientId: number): Promise<Patient | null> {
 // ------------------------------------------------------------------
 import { collection, getDocs } from 'firebase/firestore'
 
-export async function fetchAllPatients(): Promise<Patient[]> {
+export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]> {
     if (USE_MOCK || !db) {
-        return Array.from(mockStore.values())
+        const all = Array.from(mockStore.values())
+        if (sessionIdOnly && activeSessionId) {
+            return all.filter(p => p.session_id === activeSessionId)
+        }
+        return all
     }
     const collRef = collection(db, 'patients')
     const snap = await getDocs(collRef)
-    return snap.docs.map(doc => doc.data() as Patient)
+    let docs = snap.docs.map(doc => doc.data() as Patient)
+    if (sessionIdOnly && activeSessionId) {
+        docs = docs.filter(p => p.session_id === activeSessionId)
+    }
+    return docs
 }
 
 // ------------------------------------------------------------------
@@ -137,7 +148,23 @@ export async function updateAssessmentCompleted(
 }
 
 // ------------------------------------------------------------------
-// タイマーを開始する（全端末に同期される）
+// 患者の特定フラグを更新する（放射線科・検査科・各種完了等）
+// ------------------------------------------------------------------
+export async function updatePatientFlags(
+    patientId: number,
+    flags: Partial<Patient>
+): Promise<void> {
+    if (USE_MOCK || !db) {
+        const patient = mockStore.get(patientId)
+        if (patient) {
+            Object.assign(patient, flags)
+            notifyMockListeners(patientId)
+        }
+        return
+    }
+    const docRef = doc(db, 'patients', String(patientId))
+    await updateDoc(docRef, flags as Record<string, unknown>)
+}
 // ------------------------------------------------------------------
 export async function startTreatmentTimer(
     patientId: number,
@@ -182,6 +209,16 @@ export async function completeTreatment(
             patient.timer_started_at = null
             patient.timer_duration_ms = null
             patient.applied_treatment_id = null
+
+            // 必須処置がすべて完了したか判定
+            if (patient.required_treatments && patient.required_treatments.length > 0) {
+                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
+                const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
+                if (allRequiredMet) {
+                    patient.stabilization_completed = true
+                }
+            }
+
             notifyMockListeners(patientId)
         }
         return
@@ -195,12 +232,23 @@ export async function completeTreatment(
         const currentCompleted = p.completed_treatments || []
         const newCompleted = [...currentCompleted, addedId]
 
+        // 必須処置がすべて完了したか判定
+        let isStabilized = p.stabilization_completed || false
+        if (p.required_treatments && p.required_treatments.length > 0) {
+            const requiredIds = p.required_treatments.map(rt => rt.treatment_id)
+            const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
+            if (allRequiredMet) {
+                isStabilized = true
+            }
+        }
+
         await updateDoc(docRef, {
             status: 'アセスメント完了',
             timer_started_at: null,
             timer_duration_ms: null,
             applied_treatment_id: null,
-            completed_treatments: newCompleted
+            completed_treatments: newCompleted,
+            stabilization_completed: isStabilized
         })
     }
 }
@@ -219,6 +267,96 @@ export async function seedPatientsToFirestore(patients: Patient[]): Promise<void
 export function resetMockStore(): void {
     mockStore.clear()
     mockPatients.forEach((p) => mockStore.set(p.id, { ...p }))
+    activeSessionId = null
+}
+
+// ------------------------------------------------------------------
+// セッション（訓練シナリオ）作成ロジック
+// ------------------------------------------------------------------
+export interface SessionConfig {
+    totalPatients: number
+    redRatio: number
+    yellowRatio: number
+    greenRatio: number
+    blackRatio: number
+    sortBySeverity: boolean // トリアージ順搬入
+}
+
+export async function createTrainingSession(config: SessionConfig): Promise<string> {
+    const sessionId = 'session_' + Date.now()
+    
+    // 全マスターデータから取得
+    const masterData = await fetchAllPatients(false) 
+    // すでにセッションに属しているものは除外してマスタープールとする
+    const pool = masterData.filter(p => !p.session_id)
+
+    // 重症度ごとに分類
+    const reds = pool.filter(p => p.triage_color === '赤')
+    const yellows = pool.filter(p => p.triage_color === '黄')
+    const greens = pool.filter(p => p.triage_color === '緑')
+    const blacks = pool.filter(p => p.triage_color === '黒')
+
+    // Fisher-Yates shuffle
+    const shuffle = (array: any[]) => {
+        const arr = [...array]
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]]
+        }
+        return arr
+    }
+
+    const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
+    const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
+    const targetGreen = Math.floor(config.totalPatients * (config.greenRatio / 100))
+    let targetBlack = config.totalPatients - (targetRed + targetYellow + targetGreen)
+    if (targetBlack < 0) targetBlack = 0
+
+    const selected: Patient[] = [
+        ...shuffle(reds).slice(0, targetRed),
+        ...shuffle(yellows).slice(0, targetYellow),
+        ...shuffle(greens).slice(0, targetGreen),
+        ...shuffle(blacks).slice(0, targetBlack)
+    ]
+
+    // 人数が足りない場合は全カテゴリーからランダムに追加
+    if (selected.length < config.totalPatients) {
+        const remainingPool = shuffle(pool.filter(p => !selected.includes(p)))
+        selected.push(...remainingPool.slice(0, config.totalPatients - selected.length))
+    }
+
+    // 順序の決定
+    if (config.sortBySeverity) {
+        const order = { '赤': 1, '黄': 2, '緑': 3, '黒': 4 }
+        selected.sort((a, b) => order[a.triage_color] - order[b.triage_color])
+    } else {
+        shuffle(selected)
+    }
+
+    // セッションに登録（新しいIDを付与して複製）
+    activeSessionId = sessionId
+    const sessionPatients = selected.map((p, index) => ({
+        ...p,
+        id: Date.now() + index, // 新規一意ID
+        session_id: sessionId,
+        status: '初期状態' as any,
+        assessment_completed: false,
+        reception_time_ms: Date.now(),
+        timer_started_at: null,
+        timer_duration_ms: null,
+        applied_treatment_id: null,
+        completed_treatments: []
+    }))
+
+    for (const p of sessionPatients) {
+        await createPatient(p)
+    }
+
+    return sessionId
+}
+
+export function setActiveSession(sessionId: string | null) {
+    activeSessionId = sessionId
 }
 
 // モックかどうかを外部に公開

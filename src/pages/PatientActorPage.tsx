@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getMockPatientById } from '../data/mockData'
+import { usePatient } from '../hooks/usePatient'
+import { useDeterioration } from '../hooks/useDeterioration'
 import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
 
@@ -8,8 +9,8 @@ const PatientActorPage: React.FC = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const patientId = parseInt(id || '0', 10)
-    const patient = getMockPatientById(patientId)
-
+    const { patient } = usePatient(patientId)
+    const { currentVitalsText } = useDeterioration(patient)
     const [activeAnimation, setActiveAnimation] = useState<'pulse' | 'breathing' | null>(null)
 
     if (!patient) {
@@ -45,7 +46,7 @@ const PatientActorPage: React.FC = () => {
         return { hr, rr }
     }
 
-    const { hr, rr } = parseVitals(patient.vitals_initial || patient.vitals_triage || '')
+    const { hr, rr } = parseVitals(currentVitalsText || patient.vitals_initial || patient.vitals_triage || '')
 
     return (
         <div className="actor-page">
@@ -61,9 +62,7 @@ const PatientActorPage: React.FC = () => {
 
             <div className="actor-page__content">
                 <div className="actor-patient-info">
-                    <div className="actor-patient-info__header">
-                        <h3>ID: {patient.id}</h3>
-                    </div>
+
                     <div className="actor-patient-info__demo">
                         {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
                     </div>
@@ -76,7 +75,7 @@ const PatientActorPage: React.FC = () => {
                         <p>{patient.findings.background || '特記事項なし'}</p>
                         
                         <h4>バイタルサイン・全身所見</h4>
-                        <p className="instruction-vitals">{patient.vitals_initial}</p>
+                        <p className="instruction-vitals">{currentVitalsText || patient.vitals_initial}</p>
                         <p>頭頚部: {patient.findings.head_and_neck}</p>
                         <p>胸部: {patient.findings.chest}</p>
                         <p>腹部・骨盤: {patient.findings.abdomen_and_pelvis}</p>
@@ -84,6 +83,8 @@ const PatientActorPage: React.FC = () => {
                         
                         <h4>演技のポイント</h4>
                         <p className="instruction-highlight">
+                            {patient.acting_instructions || '特になし'}
+                            <br/><br/>
                             診察役が「脈をみます」「呼吸をみます」と言ったら、下のボタンをタップして端末を診察役に見せ（聞かせ）てください。
                         </p>
                     </div>

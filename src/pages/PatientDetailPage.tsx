@@ -1,7 +1,7 @@
-import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatient } from '../hooks/usePatient'
 import { useTimer } from '../hooks/useTimer'
+import { useDeterioration } from '../hooks/useDeterioration'
 import VitalsCard from '../components/VitalsCard'
 import FindingsCard from '../components/FindingsCard'
 import LockTimerOverlay from '../components/LockTimerOverlay'
@@ -29,6 +29,7 @@ const PatientDetailPage: React.FC = () => {
     const patientId = id ? parseInt(id) : null
     const { patient, loading, error } = usePatient(patientId)
     const { isLocked, remainingDisplay } = useTimer(patient)
+    const { currentVitalsText } = useDeterioration(patient)
 
     if (loading) return <div className="loading">読み込み中...</div>
     if (error || !patient) return <div className="error">{error || '患者が見つかりません'}</div>
@@ -54,13 +55,10 @@ const PatientDetailPage: React.FC = () => {
     // 全ての必須処置が完了しているか
     const allRequiredCompleted = treatmentTotal > 0 && treatmentCount === treatmentTotal
 
-    // vitals_post 表示条件: 全必須処置完了
-    const isVitalsPostReady = allRequiredCompleted
-
     // --- 全体進捗ステータス ---
-    const totalDone = (vitalsAny ? 1 : 0) + examCount + treatmentCount
-    const totalAll = 1 + examTotal + treatmentTotal
-    const progressPct = Math.round((totalDone / totalAll) * 100)
+    const totalDone = (vitalsAny ? 1 : 0) + examCount + treatmentCount + (patient.tests_completed ? 1 : 0) + (patient.stabilization_completed ? 1 : 0)
+    const totalAll = 1 + examTotal + treatmentTotal + (patient.image_urls && patient.image_urls.length > 0 ? 1 : 0) + (patient.blood_test_data ? 1 : 0)
+    const progressPct = Math.round((totalDone / Math.max(totalAll, 1)) * 100)
 
     const overallStatus =
         allRequiredCompleted && vitalsAny && examCount === examTotal
@@ -89,9 +87,7 @@ const PatientDetailPage: React.FC = () => {
 
             {/* シンプルヘッダー（トリアージカラーなし） */}
             <header className="patient-header">
-                <div className="patient-header__meta">
-                    <span className="patient-header__id">PATIENT ID: {String(patient.id).padStart(4, '0')}</span>
-                </div>
+
                 <div className="patient-header__identity">
                     <PatientPictogram age={patient.age} gender={patient.gender} size={52} className="patient-header__pictogram" />
                     <h1 className="patient-header__name">
@@ -218,13 +214,45 @@ const PatientDetailPage: React.FC = () => {
                 <div className="vitals-section">
                     <VitalsCard
                         title="バイタルサイン"
-                        vitals={isVitalsPostReady ? patient.vitals_post : patient.vitals_initial}
+                        vitals={currentVitalsText || patient.vitals_initial}
                         isBlurred={!vitalsAny}
                     />
                 </div>
 
                 {/* ===== 所見詳細 ===== */}
                 <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} />
+
+                {/* ===== 特別検査結果 ===== */}
+                {((patient.tests_completed && patient.image_urls && patient.image_urls.length > 0) || 
+                  (patient.stabilization_completed && patient.blood_test_data)) && (
+                    <div className="test-results-section" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '0.8rem', color: 'var(--gray-900)', borderBottom: '1px solid var(--gray-200)', paddingBottom: '0.5rem' }}>
+                            専門検査結果
+                        </h3>
+                        
+                        {patient.tests_completed && patient.image_urls && patient.image_urls.length > 0 && (
+                            <div className="card" style={{ marginBottom: '0.8rem', borderLeft: '4px solid #3b82f6' }}>
+                                <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem 0', color: '#1d4ed8' }}>画像検査結果</h4>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {patient.image_urls.map((url, i) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="button button--secondary" style={{ width: 'auto', fontSize: '0.8rem', padding: '0.4rem 0.8rem', margin: 0 }}>
+                                            画像 {i + 1} を確認する
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {patient.stabilization_completed && patient.blood_test_data && (
+                            <div className="card" style={{ marginBottom: '0.8rem', borderLeft: '4px solid #8b5cf6' }}>
+                                <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem 0', color: '#6d28d9' }}>血液検査結果</h4>
+                                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', margin: 0, color: 'var(--gray-800)', backgroundColor: '#f8fafc', padding: '0.8rem', borderRadius: '4px', fontFamily: 'monospace' }}>
+                                    {patient.blood_test_data}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="actions">
                     <button

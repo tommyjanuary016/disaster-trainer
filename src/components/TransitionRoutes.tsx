@@ -7,6 +7,8 @@ import AdminPage from '../pages/AdminPage'
 import PatientActorListPage from '../pages/PatientActorListPage'
 import PatientActorPage from '../pages/PatientActorPage'
 import QRGeneratorPage from '../pages/QRGeneratorPage'
+import RadiologyScanPage from '../pages/RadiologyScanPage'
+import LabScanPage from '../pages/LabScanPage'
 
 const PREFIX = '/@fs/Users/tominaganaoki/.gemini/antigravity/brain/bf741cb1-4338-4192-8b2a-3b615d890951'
 
@@ -65,6 +67,8 @@ export const TransitionRoutes: React.FC = () => {
                 <Route path="/qr-generator" element={<QRGeneratorPage />} />
                 <Route path="/actor" element={<PatientActorListPage />} />
                 <Route path="/actor/:id" element={<PatientActorPage />} />
+                <Route path="/radiology" element={<RadiologyScanPage />} />
+                <Route path="/lab" element={<LabScanPage />} />
             </Routes>
         </>
     )

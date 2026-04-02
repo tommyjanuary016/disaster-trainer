@@ -5,14 +5,13 @@ import { fetchPatient, startTreatmentTimer } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import { parseQRCode, ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
-import { mockPatients } from '../data/mockData'
 import QRConfirmModal from '../components/QRConfirmModal'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
 
-// 手技IDと表示名のマッピング
-const PROCEDURE_NAMES: Record<string, string> = {
+// 手技IDと表示名のマッピング（全臨床リスト）
+export const PROCEDURE_NAMES: Record<string, string> = {
     vitals:             'バイタルサイン測定',
     head_and_neck:      '頭頸部診察',
     chest:              '胸部診察',
@@ -22,26 +21,43 @@ const PROCEDURE_NAMES: Record<string, string> = {
     ample:              'AMPLE',
     background:         '背景聴取',
     diagnosis:          '診断',
+    // 気道・呼吸
+    oxygen: '酸素投与',
+    hfnc: 'ハイフロー開始 (HFNC)',
+    intubation: '気管挿管',
+    surgical_airway: '外科的気道確保',
+    ventilator: '人工呼吸器開始',
+    needle_decompression: '胸腔穿刺 (緊急脱気)',
+    chest_tube: '胸腔ドレーン挿入',
+    // 循環・輸液・輸血
+    iv_access: '静脈路確保(末梢)',
+    iv_access_2: '静脈路確保(2本目)',
+    cv_access: '中心静脈路確保',
+    quinton_catheter: '血管アクセスカテーテル挿入 (クイントン)',
+    iv_fluid: '外液急速投与',
+    blood_transfusion: '緊急輸血 (RBC/FFP/PC)',
+    // 薬剤投与
+    vasopressor: '昇圧剤投与',
+    antihypertensive: '降圧剤投与',
+    antibiotics: '抗菌薬投与',
+    sedation: '鎮静・鎮痛薬投与',
+    // 蘇生・外科的介入・高度医療
+    pelvic_binder: 'サムスリング装着 (骨盤固定)',
+    cpr: '胸骨圧迫 / ACLS',
+    fasciotomy: '減張切開',
+    open_cardiac_massage: '開胸心マ',
+    aortic_cross_clamping: '開胸大動脈クランプ',
+    exploratory_laparotomy: '試験開腹',
+    emergency_c_section: '緊急帝王切開',
+    iabo: 'IABO (大動脈内バルーン閉塞)',
+    iabp: 'IABP (大動脈内バルーンポンピング)',
+    pcps: 'PCPS (VA-ECMO)',
+    // 整形・その他
+    pericardiocentesis: '心嚢穿刺ドレナージ',
+    splint: 'シーネ固定',
+    traction: '直達牽引',
+    suture: '挫創処置 (洗浄縫合)',
 }
-
-// 全患者から動的に治療処置リストを生成（将来的な拡張に対応）
-const allTreatmentsMap = new Map<string, string>()
-const BASE_TREATMENTS = [
-    { id: 'iv_access', name: 'ルート確保' },
-    { id: 'oxygen', name: '酸素投与' },
-    { id: 'pelvic_binder', name: '骨盤固定' },
-    { id: 'tourniquet', name: '止血帯' },
-    { id: 'cpr', name: 'CPR' },
-]
-BASE_TREATMENTS.forEach(t => allTreatmentsMap.set(t.id, t.name))
-mockPatients.forEach(p => {
-    p.required_treatments?.forEach(rt => {
-        if (!allTreatmentsMap.has(rt.treatment_id)) {
-            allTreatmentsMap.set(rt.treatment_id, rt.treatment_name)
-        }
-    })
-})
-const DYNAMIC_TREATMENTS = Array.from(allTreatmentsMap.entries()).map(([id, name]) => ({ id, name }))
 
 const isTreatmentOption = (id: string) => {
     return id !== 'vitals' && id !== 'diagnosis' && !EXAM_IDS.includes(id)
@@ -141,8 +157,7 @@ const TreatmentScanPage: React.FC = () => {
                 treatmentName = matched.treatment_name
                 initialMinutes = matched.lock_timer_minutes
             } else {
-                const found = DYNAMIC_TREATMENTS.find(t => t.id === treatmentId)
-                if (found) treatmentName = found.name
+                treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
             }
         }
 
@@ -176,12 +191,32 @@ const TreatmentScanPage: React.FC = () => {
             return
         }
 
+        // 必須IVルートの有無判定
+        const completed = patient.completed_treatments || []
+        const hasAnyIvAccess = completed.includes('iv_access') || completed.includes('cv_access') || completed.includes('quinton_catheter') || completed.includes('iv_access_2')
+
+        const requireIvMeds = ['vasopressor', 'antihypertensive', 'antibiotics', 'sedation', 'iv_fluid', 'blood_transfusion']
+        if (requireIvMeds.includes(resolved.treatment_id) && !hasAnyIvAccess) {
+            setError('※ 薬剤や輸液の投与には、事前に静脈路(末梢/中心)またはカテーテルの確保が必要です。')
+            return
+        }
+
+        if (resolved.treatment_id === 'iv_access_2' && !completed.includes('iv_access')) {
+            setError('※ 静脈路確保(2本目)は、静脈路確保(末梢)が既に完了している場合のみ実施可能です。')
+            return
+        }
+
         setError(null)
         setPendingProcedure(resolved)
         setPendingParsed(parsed)
         setTimerMinutes(resolved.defaultMinutes)
         setShowModal(true)
     }
+
+    // 依存関係チェックヘルパー（手動入力画面用）
+    const completedList = patient?.completed_treatments || []
+    const hasAnyIvAccess = completedList.includes('iv_access') || completedList.includes('cv_access') || completedList.includes('quinton_catheter') || completedList.includes('iv_access_2')
+
 
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -290,17 +325,62 @@ const TreatmentScanPage: React.FC = () => {
                                         <option value="background">背景聴取</option>
                                     </optgroup>
 
-                                    <optgroup label="治療処置（※要バイタル/診察）" disabled={!hasVitalsOrExams}>
-                                        {DYNAMIC_TREATMENTS.map(t => (
-                                            <option key={t.id} value={t.id}>
-                                                {t.name}
-                                            </option>
-                                        ))}
+                                    <optgroup label="治療処置: 気道・呼吸" disabled={!hasVitalsOrExams}>
+                                        <option value="oxygen">{PROCEDURE_NAMES.oxygen}</option>
+                                        <option value="hfnc">{PROCEDURE_NAMES.hfnc}</option>
+                                        <option value="intubation">{PROCEDURE_NAMES.intubation}</option>
+                                        <option value="surgical_airway">{PROCEDURE_NAMES.surgical_airway}</option>
+                                        <option value="ventilator">{PROCEDURE_NAMES.ventilator}</option>
+                                        <option value="needle_decompression">{PROCEDURE_NAMES.needle_decompression}</option>
+                                        <option value="chest_tube">{PROCEDURE_NAMES.chest_tube}</option>
+                                    </optgroup>
+
+                                    <optgroup label="治療処置: 循環・輸液・輸血" disabled={!hasVitalsOrExams}>
+                                        <option value="iv_access">{PROCEDURE_NAMES.iv_access}</option>
+                                        {completedList.includes('iv_access') && <option value="iv_access_2">{PROCEDURE_NAMES.iv_access_2}</option>}
+                                        <option value="cv_access">{PROCEDURE_NAMES.cv_access}</option>
+                                        <option value="quinton_catheter">{PROCEDURE_NAMES.quinton_catheter}</option>
+                                        
+                                        <option value="iv_fluid" disabled={!hasAnyIvAccess}>{PROCEDURE_NAMES.iv_fluid}</option>
+                                        <option value="blood_transfusion" disabled={!hasAnyIvAccess}>{PROCEDURE_NAMES.blood_transfusion}</option>
+                                        <option value="tourniquet">{PROCEDURE_NAMES.tourniquet}</option>
+                                    </optgroup>
+
+                                    <optgroup label="治療処置: 薬剤投与 (※ルート確保必須)" disabled={!hasVitalsOrExams || !hasAnyIvAccess}>
+                                        <option value="vasopressor">{PROCEDURE_NAMES.vasopressor}</option>
+                                        <option value="antihypertensive">{PROCEDURE_NAMES.antihypertensive}</option>
+                                        <option value="antibiotics">{PROCEDURE_NAMES.antibiotics}</option>
+                                        <option value="sedation">{PROCEDURE_NAMES.sedation}</option>
+                                    </optgroup>
+
+                                    <optgroup label="治療処置: 蘇生・外科的介入・高度医療" disabled={!hasVitalsOrExams}>
+                                        <option value="pelvic_binder">{PROCEDURE_NAMES.pelvic_binder}</option>
+                                        <option value="cpr">{PROCEDURE_NAMES.cpr}</option>
+                                        <option value="fasciotomy">{PROCEDURE_NAMES.fasciotomy}</option>
+                                        <option value="open_cardiac_massage">{PROCEDURE_NAMES.open_cardiac_massage}</option>
+                                        <option value="aortic_cross_clamping">{PROCEDURE_NAMES.aortic_cross_clamping}</option>
+                                        <option value="exploratory_laparotomy">{PROCEDURE_NAMES.exploratory_laparotomy}</option>
+                                        <option value="emergency_c_section">{PROCEDURE_NAMES.emergency_c_section}</option>
+                                        <option value="iabo">{PROCEDURE_NAMES.iabo}</option>
+                                        <option value="iabp">{PROCEDURE_NAMES.iabp}</option>
+                                        <option value="pcps">{PROCEDURE_NAMES.pcps}</option>
+                                    </optgroup>
+
+                                    <optgroup label="治療処置: 整形・その他" disabled={!hasVitalsOrExams}>
+                                        <option value="pericardiocentesis">{PROCEDURE_NAMES.pericardiocentesis}</option>
+                                        <option value="splint">{PROCEDURE_NAMES.splint}</option>
+                                        <option value="traction">{PROCEDURE_NAMES.traction}</option>
+                                        <option value="suture">{PROCEDURE_NAMES.suture}</option>
                                     </optgroup>
                                 </select>
                                 {!hasVitalsOrExams && (
                                     <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.5rem' }}>
                                         ※ 治療処置はバイタルまたは診察を実施後に選択可能になります。
+                                    </p>
+                                )}
+                                {hasVitalsOrExams && !hasAnyIvAccess && (
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--amber-600)', marginTop: '0.5rem' }}>
+                                        ※ 薬剤や輸液の投与には、事前に静脈路またはカテーテルの確保が必要です。
                                     </p>
                                 )}
                             </div>

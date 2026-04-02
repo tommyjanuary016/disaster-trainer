@@ -41,8 +41,8 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
         badgeClass: 'qr-modal__badge--patient',
         title: patient
           ? `${Math.floor(patient.age / 10) * 10}代 ${patient.gender === 'M' ? '男性' : '女性'}`
-          : `患者ID: ${parsed.id}`,
-        detail: patient ? `ID: ${String(patient.id).padStart(4, '0')} ／ トリアージ: ${patient.triage_color}` : '',
+          : `患者データ`,
+        detail: patient ? `トリアージ: ${patient.triage_color}` : '',
       }
     }
 

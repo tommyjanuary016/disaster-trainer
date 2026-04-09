@@ -6,7 +6,7 @@ import { GlobalNavigation } from './components/GlobalNavigation'
 const Header: React.FC = () => {
     const navigate = useNavigate()
     const location = useLocation()
-    const isTop = location.pathname === '/'
+    const isTop = location.pathname === '/' || location.pathname === '/training'
 
     return (
         <header className="app-header">

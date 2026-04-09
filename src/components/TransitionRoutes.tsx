@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
+import LauncherPage from '../pages/LauncherPage'
 import QRScannerPage from '../pages/QRScannerPage'
 import PatientDetailPage from '../pages/PatientDetailPage'
 import TreatmentScanPage from '../pages/TreatmentScanPage'
@@ -12,13 +13,16 @@ import LabScanPage from '../pages/LabScanPage'
 
 const PREFIX = '/@fs/Users/tominaganaoki/.gemini/antigravity/brain/bf741cb1-4338-4192-8b2a-3b615d890951'
 
-// AI生成画像のパスリスト
+// AI生成画像のパスリスト（画面遷移エフェクト用）
 const TRANSITION_IMAGES = [
     `${PREFIX}/ambulance_arrival_1774248316337.png`,
     `${PREFIX}/vitals_monitor_1774248410493.png`,
     `${PREFIX}/medical_procedure_1774248435337.png`,
     `${PREFIX}/er_examination_1774248470389.png`
 ]
+
+// 起動画面（ランチャー）は遷移エフェクトを出さない
+const NO_TRANSITION_PATHS = ['/']
 
 export const TransitionRoutes: React.FC = () => {
     const location = useLocation()
@@ -27,26 +31,25 @@ export const TransitionRoutes: React.FC = () => {
     const [bgImage, setBgImage] = useState('')
 
     useEffect(() => {
-        // 現在表示している画面と、ルーターの実際の場所が違う場合＝画面遷移が発生した
-        if (location.pathname !== displayLocation.pathname) {
-            setIsTransitioning(true)
+        if (location.pathname === displayLocation.pathname) return
 
-            // ランダムに画像を1枚選ぶ
-            const randomImage = TRANSITION_IMAGES[Math.floor(Math.random() * TRANSITION_IMAGES.length)]
-            setBgImage(randomImage)
-
-            // 1.2秒間オーバーレイを表示した後に、内部のコンポーネントを本命のルーティングに切り替える
-            const timer = setTimeout(() => {
-                setDisplayLocation(location)
-                
-                // フェードアウト用の少しの遅延
-                setTimeout(() => {
-                    setIsTransitioning(false)
-                }, 300)
-            }, 1200)
-
-            return () => clearTimeout(timer)
+        // ランチャーへの遷移はエフェクトなし
+        const skipTransition = NO_TRANSITION_PATHS.includes(location.pathname)
+        if (skipTransition) {
+            setDisplayLocation(location)
+            return
         }
+
+        setIsTransitioning(true)
+        const randomImage = TRANSITION_IMAGES[Math.floor(Math.random() * TRANSITION_IMAGES.length)]
+        setBgImage(randomImage)
+
+        const timer = setTimeout(() => {
+            setDisplayLocation(location)
+            setTimeout(() => setIsTransitioning(false), 300)
+        }, 1200)
+
+        return () => clearTimeout(timer)
     }, [location, displayLocation])
 
     return (
@@ -58,17 +61,22 @@ export const TransitionRoutes: React.FC = () => {
                 </div>
             </div>
 
-            {/* displayLocationに指定したルートのみを描画することで、遷移前の画面を維持する */}
             <Routes location={displayLocation}>
-                <Route path="/" element={<QRScannerPage />} />
-                <Route path="/patient/:id" element={<PatientDetailPage />} />
-                <Route path="/treatment-scan/:patientId" element={<TreatmentScanPage />} />
+                {/* 起動画面 */}
+                <Route path="/" element={<LauncherPage />} />
+
+                {/* 訓練系ルート（/training/ プレフィックス） */}
+                <Route path="/training" element={<QRScannerPage />} />
+                <Route path="/training/patient/:id" element={<PatientDetailPage />} />
+                <Route path="/training/treatment-scan/:patientId" element={<TreatmentScanPage />} />
+                <Route path="/training/actor" element={<PatientActorListPage />} />
+                <Route path="/training/actor/:id" element={<PatientActorPage />} />
+                <Route path="/training/radiology" element={<RadiologyScanPage />} />
+                <Route path="/training/lab" element={<LabScanPage />} />
+
+                {/* 管理系ルート */}
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/qr-generator" element={<QRGeneratorPage />} />
-                <Route path="/actor" element={<PatientActorListPage />} />
-                <Route path="/actor/:id" element={<PatientActorPage />} />
-                <Route path="/radiology" element={<RadiologyScanPage />} />
-                <Route path="/lab" element={<LabScanPage />} />
             </Routes>
         </>
     )

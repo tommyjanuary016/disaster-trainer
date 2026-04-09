@@ -65,7 +65,7 @@ const QRScannerPage: React.FC = () => {
 
     const handleConfirm = () => {
         if (pendingPatientId) {
-            navigate(`/patient/${pendingPatientId}`)
+            navigate(`/training/patient/${pendingPatientId}`)
         }
     }
 
@@ -131,15 +131,7 @@ const QRScannerPage: React.FC = () => {
                     <button
                         type="button"
                         className="button button--secondary"
-                        onClick={() => navigate('/admin')}
-                        style={{ marginTop: '0.5rem' }}
-                    >
-                        管理画面
-                    </button>
-                    <button
-                        type="button"
-                        className="button button--secondary"
-                        onClick={() => navigate('/actor')}
+                        onClick={() => navigate('/training/actor')}
                         style={{ marginTop: '0.5rem' }}
                     >
                         模擬患者モード
@@ -148,7 +140,7 @@ const QRScannerPage: React.FC = () => {
                         <button
                             type="button"
                             className="button button--secondary"
-                            onClick={() => navigate('/radiology')}
+                            onClick={() => navigate('/training/radiology')}
                             style={{ flex: 1, backgroundColor: '#e2e8f0' }}
                         >
                             放射線科
@@ -156,7 +148,7 @@ const QRScannerPage: React.FC = () => {
                         <button
                             type="button"
                             className="button button--secondary"
-                            onClick={() => navigate('/lab')}
+                            onClick={() => navigate('/training/lab')}
                             style={{ flex: 1, backgroundColor: '#e2e8f0' }}
                         >
                             検査科

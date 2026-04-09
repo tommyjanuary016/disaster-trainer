@@ -2232,3 +2232,292 @@ select.input {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* ======================================================
+   ランチャーページ (起動画面)
+   ====================================================== */
+.launcher-page {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 50%, #0f2744 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装飾（グリッドライン） */
+.launcher-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.launcher-content {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  position: relative;
+  z-index: 1;
+  animation: slideUp 0.5s ease both;
+}
+
+/* ヒーローエリア（アイコン・タイトル） */
+.launcher-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.launcher-hero__icon-wrapper {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.4);
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.launcher-hero__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.launcher-hero__title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.launcher-hero__subtitle {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.04em;
+}
+
+/* ボタンエリア */
+.launcher-buttons {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.launcher-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.launcher-btn:active {
+  transform: scale(0.97);
+}
+
+/* 訓練スタートボタン（赤系） */
+.launcher-btn--training {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  box-shadow: 0 4px 20px rgba(220,38,38,0.4), 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.launcher-btn--training:hover {
+  box-shadow: 0 6px 28px rgba(220,38,38,0.55), 0 2px 6px rgba(0,0,0,0.25);
+  filter: brightness(1.05);
+}
+
+/* 管理画面ボタン（グレー系） */
+.launcher-btn--admin {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.launcher-btn--admin:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.launcher-btn__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.launcher-btn__label {
+  flex: 1;
+  text-align: left;
+}
+
+.launcher-btn__arrow {
+  font-size: 1rem;
+  opacity: 0.6;
+}
+
+/* バージョン表示 */
+.launcher-version {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+}
+
+/* パスワードモーダル オーバーレイ */
+.launcher-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+  animation: fadeIn 0.2s ease both;
+}
+
+/* パスワードモーダル本体 */
+.launcher-modal {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px 20px 0 0;
+  padding: 2rem 1.5rem 2.5rem;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  animation: slideUp 0.3s ease both;
+}
+
+.launcher-modal__icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 0.25rem;
+}
+
+.launcher-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.launcher-modal__subtitle {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 0.5rem;
+}
+
+.launcher-modal__form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.launcher-modal__input {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 1rem;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.launcher-modal__input:focus {
+  border-color: rgba(255,255,255,0.35);
+}
+
+.launcher-modal__input--error {
+  border-color: #dc2626;
+  animation: borderPulse 0.5s ease;
+}
+
+.launcher-modal__input::placeholder {
+  color: rgba(255,255,255,0.3);
+}
+
+.launcher-modal__error {
+  font-size: 0.8rem;
+  color: #f87171;
+  text-align: center;
+}
+
+.launcher-modal__btn {
+  width: 100%;
+  padding: 0.9rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.launcher-modal__btn--primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+}
+
+.launcher-modal__btn--primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.launcher-modal__btn--primary:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+.launcher-modal__btn--secondary {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.launcher-modal__btn--secondary:hover {
+  background: rgba(255,255,255,0.1);
+}

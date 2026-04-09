@@ -104,6 +104,33 @@ export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]>
 }
 
 // ------------------------------------------------------------------
+// 施設独自の追加患者（custom_patients）を取得する
+// ------------------------------------------------------------------
+export async function fetchCustomPatients(): Promise<Patient[]> {
+    if (USE_MOCK || !db) {
+        // モックモードではカスタム患者は0件（基礎25名のみ）
+        return []
+    }
+    const collRef = collection(db, 'custom_patients')
+    const snap = await getDocs(collRef)
+    return snap.docs.map(doc => doc.data() as Patient)
+}
+
+// ------------------------------------------------------------------
+// 施設独自の追加患者を保存する
+// ------------------------------------------------------------------
+export async function saveCustomPatient(patient: Patient): Promise<void> {
+    if (USE_MOCK || !db) {
+        // モックモードではメモリ上に保存
+        mockStore.set(patient.id, { ...patient })
+        notifyMockListeners(patient.id)
+        return
+    }
+    const docRef = doc(db, 'custom_patients', String(patient.id))
+    await setDoc(docRef, patient)
+}
+
+// ------------------------------------------------------------------
 // 患者データを新規作成（初期データ投入用）
 // ------------------------------------------------------------------
 export async function createPatient(patient: Patient): Promise<void> {
@@ -279,23 +306,13 @@ export interface SessionConfig {
     yellowRatio: number
     greenRatio: number
     blackRatio: number
-    sortBySeverity: boolean // トリアージ順搬入
+    sortBySeverity: boolean      // トリアージ順搬入
+    useBasePatients: boolean     // 基礎25名（アプリ内蔵）を使用するか
 }
 
 export async function createTrainingSession(config: SessionConfig): Promise<string> {
     const sessionId = 'session_' + Date.now()
     
-    // 全マスターデータから取得
-    const masterData = await fetchAllPatients(false) 
-    // すでにセッションに属しているものは除外してマスタープールとする
-    const pool = masterData.filter(p => !p.session_id)
-
-    // 重症度ごとに分類
-    const reds = pool.filter(p => p.triage_color === '赤')
-    const yellows = pool.filter(p => p.triage_color === '黄')
-    const greens = pool.filter(p => p.triage_color === '緑')
-    const blacks = pool.filter(p => p.triage_color === '黒')
-
     // Fisher-Yates shuffle
     const shuffle = (array: any[]) => {
         const arr = [...array]
@@ -305,6 +322,32 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
         }
         return arr
     }
+
+    // 患者プールの構築
+    // 1. 基礎患者（25名）： mockPatientsから（useBasePatients=trueの場合）
+    // 2. 施設独自追加分： Firestore custom_patientsコレクションから
+    const basePool: Patient[] = config.useBasePatients
+        ? mockPatients.map(p => ({ ...p, is_base_patient: true } as any))
+        : []
+    
+    // Firestoreでのカスタム患者取得
+    const customPool: Patient[] = await fetchCustomPatients()
+    const allPool = [...basePool, ...customPool]
+    
+    // マスターデータ（Firestore）からも取得する（既にセッションに属しているものは除外）
+    const masterData = await fetchAllPatients(false)
+    const firestorePool = masterData.filter(p => !p.session_id)
+    
+    // プール = allPool に firestorePool を追加（両方にある場合は重複排除）
+    const idSet = new Set(allPool.map(p => p.id))
+    const merged = [...allPool, ...firestorePool.filter(p => !idSet.has(p.id))]
+    const pool = merged
+
+    // 重症度ごとに分類
+    const reds = pool.filter(p => p.triage_color === '赤')
+    const yellows = pool.filter(p => p.triage_color === '黄')
+    const greens = pool.filter(p => p.triage_color === '緑')
+    const blacks = pool.filter(p => p.triage_color === '黒')
 
     const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
     const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
@@ -327,7 +370,7 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
 
     // 順序の決定
     if (config.sortBySeverity) {
-        const order = { '赤': 1, '黄': 2, '緑': 3, '黒': 4 }
+        const order: Record<string, number> = { '赤': 1, '黄': 2, '緑': 3, '黒': 4 }
         selected.sort((a, b) => order[a.triage_color] - order[b.triage_color])
     } else {
         shuffle(selected)
@@ -350,6 +393,17 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
 
     for (const p of sessionPatients) {
         await createPatient(p)
+    }
+
+    // Firestoreにセッションメタデータを保存
+    if (!USE_MOCK && db) {
+        const sessionRef = doc(db, 'sessions', sessionId)
+        await setDoc(sessionRef, {
+            id: sessionId,
+            createdAt: Date.now(),
+            config,
+            patientCount: sessionPatients.length
+        })
     }
 
     return sessionId

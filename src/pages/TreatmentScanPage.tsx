@@ -228,7 +228,7 @@ const TreatmentScanPage: React.FC = () => {
     const handleConfirm = async () => {
         if (!patientId || !pendingProcedure) return
         await startTreatmentTimer(parseInt(patientId), pendingProcedure.treatment_id, timerMinutes)
-        navigate(`/patient/${patientId}`)
+        navigate(`/training/patient/${patientId}`)
     }
 
     const handleCancel = () => {
@@ -397,7 +397,7 @@ const TreatmentScanPage: React.FC = () => {
                     <div className="actions">
                         <button
                             className="button button--secondary"
-                            onClick={() => navigate(`/patient/${patientId}`)}
+                            onClick={() => navigate(`/training/patient/${patientId}`)}
                         >
                             キャンセル
                         </button>

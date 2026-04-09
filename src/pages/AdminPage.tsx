@@ -4,6 +4,8 @@ import { Patient } from '../types/patient'
 import PatientForm from '../components/PatientForm'
 import { useNavigate } from 'react-router-dom'
 import { parseCSV, mapCSVToPatients, exportCSV } from '../lib/csv'
+import DashboardTab from '../components/DashboardTab'
+import { exportToGoogleSheets } from '../lib/sheetsExport'
 
 const AdminPage: React.FC = () => {
     const [patients, setPatients] = useState<Patient[]>([])
@@ -16,9 +18,13 @@ const AdminPage: React.FC = () => {
         yellowRatio: 30,
         greenRatio: 40,
         blackRatio: 10,
-        sortBySeverity: true
+        sortBySeverity: true,
+        useBasePatients: true      // デフォルトは基礎患者を使用
     })
     const navigate = useNavigate()
+    const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>('patients')
+    const [webhookUrl, setWebhookUrl] = useState(localStorage.getItem('gas_webhook_url') || '')
+    const [isExporting, setIsExporting] = useState(false)
 
     const loadPatients = async () => {
         const data = await fetchAllPatients()
@@ -134,7 +140,7 @@ const AdminPage: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => navigate('/')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
-                            ホームへ
+                            ランチャーへ
                         </button>
                     </div>
                 </div>
@@ -194,6 +200,23 @@ const AdminPage: React.FC = () => {
                                     <option value="no">完全ランダム</option>
                                 </select>
                             </div>
+                            <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <label className="form-label">基礎患者（25名）の使用</label>
+                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0'}}>
+                                    <input
+                                        type="checkbox"
+                                        checked={sessionConfig.useBasePatients}
+                                        onChange={e => setSessionConfig({...sessionConfig, useBasePatients: e.target.checked})}
+                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                    />
+                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>アプリ内蔵の基礎患者25名をプールに含める</span>
+                                </label>
+                                {!sessionConfig.useBasePatients && (
+                                    <p style={{fontSize: '0.78rem', color: 'var(--warning)', marginTop: '0.2rem'}}>
+                                        ⚠ Firestoreのカスタム患者のみが対象になります
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
                         <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
@@ -228,15 +251,83 @@ const AdminPage: React.FC = () => {
                     />
                 ) : (
                     <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                            <h2 style={{fontSize: '1.1rem', fontWeight: '700'}}>患者データ一覧</h2>
-                            <button onClick={handleAddClick} className="button button--primary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '4px'}}>
-                                    <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                                追加
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)' }}>
+                            <button
+                                onClick={() => setActiveTab('patients')}
+                                style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'patients' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'patients' ? 'bold' : 'normal', color: activeTab === 'patients' ? 'var(--primary)' : 'var(--gray-600)' }}
+                            >
+                                患者データ一覧
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('dashboard')}
+                                style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'dashboard' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'dashboard' ? 'bold' : 'normal', color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--gray-600)' }}
+                            >
+                                ダッシュボード
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('settings')}
+                                style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'settings' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'settings' ? 'bold' : 'normal', color: activeTab === 'settings' ? 'var(--primary)' : 'var(--gray-600)' }}
+                            >
+                                設定
                             </button>
                         </div>
+
+                        {activeTab === 'dashboard' ? (
+                            <DashboardTab patients={patients} />
+                        ) : activeTab === 'settings' ? (
+                            <div className="card card--elevated">
+                                <h3 className="card__title">Google Sheets 連携 (GAS Webhook)</h3>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--gray-600)', marginBottom: '1rem' }}>
+                                    Google Apps Script の Web アプリURLを設定することで、現在の患者データをスプレッドシートへエクスポートできます。
+                                </p>
+                                <div className="form-group">
+                                    <label className="form-label">Webhook URL</label>
+                                    <input 
+                                        type="url" 
+                                        className="input" 
+                                        placeholder="https://script.google.com/macros/s/.../exec"
+                                        value={webhookUrl}
+                                        onChange={(e) => {
+                                            setWebhookUrl(e.target.value)
+                                            localStorage.setItem('gas_webhook_url', e.target.value)
+                                        }}
+                                    />
+                                </div>
+                                <button 
+                                    className="button button--primary" 
+                                    onClick={async () => {
+                                        if (!webhookUrl) {
+                                            alert('Webhook URLを入力してください。')
+                                            return
+                                        }
+                                        setIsExporting(true)
+                                        document.body.style.cursor = 'wait'
+                                        const success = await exportToGoogleSheets(webhookUrl, patients)
+                                        document.body.style.cursor = 'default'
+                                        setIsExporting(false)
+                                        if (success) {
+                                            alert('Google Sheets へのデータ送信が完了しました。')
+                                        } else {
+                                            alert('データ送信に失敗しました。URLやネットワーク環境を確認してください。')
+                                        }
+                                    }}
+                                    disabled={isExporting}
+                                    style={{ width: 'auto', padding: '0.5rem 1.5rem', opacity: isExporting ? 0.7 : 1 }}
+                                >
+                                    {isExporting ? '送信中...' : 'データをエクスポートする'}
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                    <h2 style={{fontSize: '1.1rem', fontWeight: '700'}}>患者データ一覧</h2>
+                                    <button onClick={handleAddClick} className="button button--primary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '4px'}}>
+                                            <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                        追加
+                                    </button>
+                                </div>
 
                         <div className="patient-list">
                             {patients.length === 0 ? (
@@ -282,6 +373,8 @@ const AdminPage: React.FC = () => {
                                 ))
                             )}
                         </div>
+                            </>
+                        )}
                     </>
                 )}
             </main>

@@ -257,7 +257,7 @@ const PatientDetailPage: React.FC = () => {
                 <div className="actions">
                     <button
                         className="button button--primary button--large"
-                        onClick={() => navigate(`/treatment-scan/${patientId}`)}
+                        onClick={() => navigate(`/training/treatment-scan/${patientId}`)}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                             <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -266,7 +266,7 @@ const PatientDetailPage: React.FC = () => {
                     </button>
                     <button
                         className="button button--secondary"
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/training')}
                     >
                         トップに戻る
                     </button>

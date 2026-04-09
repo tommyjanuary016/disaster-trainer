@@ -13,7 +13,7 @@ const PatientActorListPage: React.FC = () => {
                     <button
                         key={patient.id}
                         className="patient-list-card"
-                        onClick={() => navigate(`/actor/${patient.id}`)}
+                        onClick={() => navigate(`/training/actor/${patient.id}`)}
                     >
                         <div className="patient-list-card__header">
                             <span className="patient-list-card__id">ID: {patient.id}</span>

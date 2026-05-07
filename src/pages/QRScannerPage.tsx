@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatient } from '../lib/firestore'
-import { Patient } from '../types/patient'
+import { fetchPatient, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession } from '../lib/firestore'
+import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 
 const QRScannerPage: React.FC = () => {
@@ -14,6 +14,41 @@ const QRScannerPage: React.FC = () => {
     const [pendingPatientId, setPendingPatientId] = useState<string | null>(null)
     const [pendingPatient, setPendingPatient] = useState<Patient | null>(null)
     const [showModal, setShowModal] = useState(false)
+    const [sessionTitle, setSessionTitle] = useState<string>('')
+    // セッション選択モーダル
+    const [showSessionModal, setShowSessionModal] = useState(false)
+    const [activeSessions, setActiveSessions] = useState<TrainingSession[]>([])
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false)
+
+    useEffect(() => {
+        if (activeSessionId) {
+            fetchTrainingSession(activeSessionId).then(session => {
+                if (session) setSessionTitle(session.title)
+            }).catch(e => console.error(e))
+        } else {
+            // セッション未選択ならセッション一覧を取得してモーダルを表示
+            openSessionModal()
+        }
+    }, [])
+
+    const openSessionModal = async () => {
+        setIsLoadingSessions(true)
+        setShowSessionModal(true)
+        try {
+            const sessions = await fetchActiveSessions()
+            setActiveSessions(sessions)
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsLoadingSessions(false)
+        }
+    }
+
+    const handleSelectSession = (session: TrainingSession) => {
+        setActiveSession(session.id)
+        setSessionTitle(session.title)
+        setShowSessionModal(false)
+    }
 
     useEffect(() => {
         if (showModal) return // モーダル表示中はスキャナーを起動しない
@@ -51,6 +86,18 @@ const QRScannerPage: React.FC = () => {
         // 患者情報を取得して確認モーダルを表示
         const patientId = parsed.id
         const patient = await fetchPatient(parseInt(patientId))
+        
+        if (!patient) {
+            setError('該当する患者が見つかりません。')
+            return
+        }
+
+        // アクティブなセッションがある場合、そのセッションに属しているかチェック
+        if (activeSessionId && patient.session_id !== activeSessionId) {
+            setError('この患者は現在のセッションに参加していません。')
+            return
+        }
+
         setPendingPatientId(patientId)
         setPendingPatient(patient)
         setShowModal(true)
@@ -77,6 +124,40 @@ const QRScannerPage: React.FC = () => {
 
     return (
         <div className="page qr-scanner-page">
+            {/* セッション選択モーダル */}
+            {showSessionModal && (
+                <div className="launcher-modal-overlay" onClick={() => {}}>
+                    <div className="launcher-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                        <h2 className="launcher-modal__title">訓練セッション選択</h2>
+                        <p className="launcher-modal__subtitle" style={{ marginBottom: '1rem' }}>参加するセッションを選んでください</p>
+                        {isLoadingSessions ? (
+                            <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--gray-500)' }}>読み込み中...</div>
+                        ) : activeSessions.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--status-red)' }}>
+                                現在アクティブなセッションはありません。<br />管理画面から新しく開始してください。
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', marginBottom: '1.5rem' }}>
+                                {activeSessions.map(session => (
+                                    <button
+                                        key={session.id}
+                                        onClick={() => handleSelectSession(session)}
+                                        className="button button--secondary"
+                                        style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '100%' }}
+                                    >
+                                        <span style={{ fontWeight: 'bold' }}>{session.title || '無題のセッション'}</span>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>患者数: {session.totalPatients}名</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <button type="button" className="launcher-modal__btn launcher-modal__btn--secondary" onClick={() => navigate('/')}>
+                            アプリトップに戻る
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* QR確認モーダル */}
             {showModal && pendingPatientId && (
                 <QRConfirmModal
@@ -86,6 +167,18 @@ const QRScannerPage: React.FC = () => {
                     onCancel={handleCancel}
                 />
             )}
+
+            <div style={{ padding: '1rem 1rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button onClick={() => navigate('/')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    アプリトップへ戻る
+                </button>
+                {sessionTitle && (
+                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                        {sessionTitle}
+                    </span>
+                )}
+            </div>
 
             <div className="scanner-hero">
                 <div className="scanner-hero__icon">
@@ -119,8 +212,16 @@ const QRScannerPage: React.FC = () => {
                         <label>患者ID（開発用手入力）</label>
                         <input
                             type="number"
+                            min="1"
                             value={manualId}
-                            onChange={(e) => setManualId(e.target.value)}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value)
+                                if (val < 1) {
+                                    setManualId('')
+                                } else {
+                                    setManualId(e.target.value)
+                                }
+                            }}
                             placeholder="例: 101"
                             className="input"
                         />

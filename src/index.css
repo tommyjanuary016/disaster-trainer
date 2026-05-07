@@ -322,6 +322,65 @@ body {
 }
 
 /* ======================================================
+   構造化バイタルグリッド
+   ====================================================== */
+.vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.vitals-grid__cell {
+  background: var(--gray-50);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.625rem 0.5rem;
+  text-align: center;
+  transition: border-color var(--transition-fast);
+}
+
+.vitals-grid__label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-400);
+  margin-bottom: 0.25rem;
+}
+
+.vitals-grid__value {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.vitals-grid__value--danger {
+  color: var(--danger);
+  animation: borderPulse 2s ease-in-out infinite;
+}
+
+.vitals-grid__cell:has(.vitals-grid__value--danger) {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: #fff8f8;
+}
+
+.vitals-grid__sep {
+  font-size: 0.9rem;
+  color: var(--gray-400);
+  margin: 0 0.1rem;
+}
+
+.vitals-grid__unit {
+  font-size: 0.6rem;
+  color: var(--gray-400);
+  margin-top: 0.2rem;
+  letter-spacing: 0.02em;
+}
+
+/* ======================================================
    所見カード
    ====================================================== */
 .findings-card {
@@ -1606,6 +1665,18 @@ select.input {
   color: var(--gray-500);
 }
 
+.nav-button--home svg, .nav-button--home span {
+  color: var(--gray-600);
+}
+
+.nav-button--training svg, .nav-button--training span {
+  color: #059669;
+}
+
+.nav-button--training:active {
+  background: #f0fdf4;
+}
+
 /* 余白調整のため、メインコンテンツの下部にパディングを追加 */
 .app-main {
   padding-bottom: 80px;
@@ -2520,4 +2591,44 @@ select.input {
 
 .launcher-modal__btn--secondary:hover {
   background: rgba(255,255,255,0.1);
+}
+/* ======================================================
+   トリアージ V/S 色設定ボタン
+   ====================================================== */
+.triage-btn-black {
+  background: var(--triage-black) !important;
+  color: var(--white) !important;
+  border: none !important;
+}
+
+.triage-btn-stripe {
+  background: repeating-linear-gradient(
+    45deg,
+    #000000,
+    #000000 10px,
+    #dc2626 10px,
+    #dc2626 20px
+  ) !important;
+  color: var(--white) !important;
+  border: none !important;
+  font-weight: 700 !important;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.triage-btn-red {
+  background: var(--triage-red) !important;
+  color: var(--white) !important;
+  border: none !important;
+}
+
+.triage-btn-yellow {
+  background: var(--triage-yellow) !important;
+  color: #111111 !important;
+  border: none !important;
+}
+
+.triage-btn-green {
+  background: var(--triage-green) !important;
+  color: var(--white) !important;
+  border: none !important;
 }

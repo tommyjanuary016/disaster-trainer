@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { fetchAllPatients, createPatient, seedPatientsToFirestore, activeSessionId, setActiveSession, createTrainingSession, SessionConfig } from '../lib/firestore'
+import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import PatientForm from '../components/PatientForm'
-import { useNavigate } from 'react-router-dom'
-import { parseCSV, mapCSVToPatients, exportCSV } from '../lib/csv'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/csv'
 import DashboardTab from '../components/DashboardTab'
 import { exportToGoogleSheets } from '../lib/sheetsExport'
 
@@ -13,27 +13,39 @@ const AdminPage: React.FC = () => {
     const [isFormVisible, setIsFormVisible] = useState(false)
     const [isSessionModalOpen, setIsSessionModalOpen] = useState(false)
     const [sessionConfig, setSessionConfig] = useState<SessionConfig>({
+        title: '',
         totalPatients: 20,
         redRatio: 20,
-        yellowRatio: 30,
+        yellowRatio: 40,
         greenRatio: 40,
-        blackRatio: 10,
+        blackRatio: 0,
         sortBySeverity: true,
-        useBasePatients: true      // デフォルトは基礎患者を使用
+        useBasePatients: true,
+        examLockTimeMinutes: 3,
+        treatmentLockTimeMinutes: 5,
+        isTestMode: false,
     })
     const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>('patients')
     const [webhookUrl, setWebhookUrl] = useState(localStorage.getItem('gas_webhook_url') || '')
     const [isExporting, setIsExporting] = useState(false)
-
-    const loadPatients = async () => {
-        const data = await fetchAllPatients()
-        setPatients(data)
-    }
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(activeSessionId)
+    const location = useLocation()
 
     useEffect(() => {
-        loadPatients()
-    }, [])
+        if (location.state?.action === 'new_session') {
+            setIsSessionModalOpen(true)
+            // clear state so it doesn't reopen on refresh
+            window.history.replaceState({}, document.title)
+        }
+    }, [location.state?.action])
+
+    useEffect(() => {
+        const unsubscribe = subscribeToAllPatients((data) => {
+            setPatients(data)
+        })
+        return () => unsubscribe()
+    }, [currentSessionId])
 
     const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -52,7 +64,6 @@ const AdminPage: React.FC = () => {
                             await seedPatientsToFirestore(newPatients)
                             document.body.style.cursor = 'default'
                             alert('CSVインポートが完了しました。')
-                            loadPatients()
                         }
                     } else {
                         alert('有効なデータが見つかりませんでした。ヘッダー行を確認してください。')
@@ -69,7 +80,31 @@ const AdminPage: React.FC = () => {
     }
 
     const handleAddClick = () => {
-        setEditingPatient(null)
+        // IDの自動連番 (現在の最大ID + 1)
+        const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
+        const nextId = maxId >= 1000000000000 ? 101 : maxId + 1 // 古いDate.nowのIDがあればリセット気味に
+        
+        // フォームにはまだ initialPatient を渡さない設計になっているため、PatientForm側で props を受け取るか、
+        // 編集モードとして渡す形になりますが、新規追加であることがわかるようにします。
+        // ここでは新規追加用のダミー患者オブジェクトを渡します。
+        setEditingPatient({
+            id: nextId,
+            name: '',
+            age: 30,
+            gender: 'M',
+            triage_color: '緑',
+            vitals_triage: '',
+            vitals_initial: '',
+            vitals_post: '',
+            findings: { head_and_neck: '', chest: '', abdomen_and_pelvis: '', limbs: '', fast: '', ample: '', background: '' },
+            diagnosis: '',
+            required_treatments: [],
+            status: '初期状態',
+            assessment_completed: false,
+            timer_started_at: null,
+            timer_duration_ms: null,
+            applied_treatment_id: null
+        } as unknown as Patient)
         setIsFormVisible(true)
     }
 
@@ -81,7 +116,6 @@ const AdminPage: React.FC = () => {
     const handleFormSubmit = async (patient: Patient) => {
         await createPatient(patient)
         setIsFormVisible(false)
-        loadPatients()
     }
 
     const handleFormCancel = () => {
@@ -95,20 +129,23 @@ const AdminPage: React.FC = () => {
             alert('重症度の割合の合計は100%にしてください')
             return
         }
-        if (window.confirm('新しい訓練セッションを開始しますか？現在進行中のセッション患者はクリアされます。')) {
+        if (window.confirm('新しい訓練セッションを開始しますか？（現在のセッションも保持されます）')) {
             document.body.style.cursor = 'wait'
-            await createTrainingSession(sessionConfig)
+            const newSessionId = await createTrainingSession(sessionConfig)
+            setCurrentSessionId(newSessionId)
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
-            loadPatients()
             alert('新しいセッションを作成しました。')
         }
     }
 
-    const handleClearSession = () => {
-        if (window.confirm('現在のセッションを終了し、全マスターデータを表示しますか？')) {
+    const handleClearSession = async () => {
+        if (window.confirm('現在のセッションを終了し、全マスターデータを表示しますか？\n（このセッションは以降「訓練スタート」画面に表示されなくなります）')) {
+            if (activeSessionId) {
+                await endTrainingSession(activeSessionId)
+            }
             setActiveSession(null)
-            loadPatients()
+            setCurrentSessionId(null)
         }
     }
 
@@ -128,6 +165,22 @@ const AdminPage: React.FC = () => {
         document.body.removeChild(link)
     }
 
+    const handleExportMasterCSV = () => {
+        if (patients.length === 0) {
+            alert('エクスポートするデータがありません。')
+            return
+        }
+        const csvContent = exportMasterCSV(patients)
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `patient_master_template_${new Date().toISOString().slice(0, 10)}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     return (
         <div className="page admin-page">
             <header className="admin-header" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '1rem'}}>
@@ -135,24 +188,20 @@ const AdminPage: React.FC = () => {
                     <div>
                         <h1>管理画面 (Admin)</h1>
                         <p style={{fontSize: '0.8rem', color: 'var(--gray-500)', margin: 0}}>
-                            現在の状態: {activeSessionId ? `訓練中 (${activeSessionId})` : 'マスターデータ編集中'}
+                            現在の状態: {currentSessionId ? `訓練中 (${currentSessionId})` : 'マスターデータ編集中'}
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => navigate('/training')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
+                            訓練トップ
+                        </button>
                         <button onClick={() => navigate('/')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
-                            ランチャーへ
+                            アプリトップ
                         </button>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => setIsSessionModalOpen(true)}
-                        className="button button--primary"
-                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                    >
-                        新規訓練セッション開始
-                    </button>
-                    {activeSessionId && (
+                    {currentSessionId ? (
                         <>
                             <button
                                 onClick={handleExportCSV}
@@ -166,12 +215,20 @@ const AdminPage: React.FC = () => {
                                 className="button button--secondary"
                                 style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                             >
-                                セッション終了 (全データ表示)
+                                訓練終了 (全データ表示に戻る)
                             </button>
                         </>
+                    ) : (
+                        <button
+                            onClick={handleExportMasterCSV}
+                            className="button button--secondary"
+                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#8b5cf6', color: '#6d28d9' }}
+                        >
+                            ↓ 患者CSVを一括作成するためのマスターCSV出力
+                        </button>
                     )}
                     <label className="button button--secondary" style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center' }}>
-                        マスターCSVインポート
+                        患者CSV一括インポート
                         <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVUpload} />
                     </label>
                     <button
@@ -189,6 +246,10 @@ const AdminPage: React.FC = () => {
                     <div className="card card--elevated" style={{ marginBottom: '2rem' }}>
                         <h3 className="card__title">新規訓練セッション設定</h3>
                         <div className="form-grid">
+                            <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <label className="form-label">訓練タイトル</label>
+                                <input type="text" placeholder="例: 2026年度 災害時BCP訓練" value={sessionConfig.title} onChange={e => setSessionConfig({...sessionConfig, title: e.target.value})} className="input" />
+                            </div>
                             <div className="form-group">
                                 <label className="form-label">対象患者数</label>
                                 <input type="number" min="1" value={sessionConfig.totalPatients} onChange={e => setSessionConfig({...sessionConfig, totalPatients: parseInt(e.target.value) || 10})} className="input" />
@@ -199,6 +260,16 @@ const AdminPage: React.FC = () => {
                                     <option value="yes">重症度順（優先度高い順）</option>
                                     <option value="no">完全ランダム</option>
                                 </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">検査デフォルト拘束時間 (分)</label>
+                                <input type="number" min="0" value={sessionConfig.examLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, examLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
+                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>X線, CT, 採血などに適用</span>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">手技デフォルト拘束時間 (分)</label>
+                                <input type="number" min="0" value={sessionConfig.treatmentLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, treatmentLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
+                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>点滴や外科処置などに適用</span>
                             </div>
                             <div className="form-group" style={{gridColumn: 'span 2'}}>
                                 <label className="form-label">基礎患者（25名）の使用</label>
@@ -217,8 +288,26 @@ const AdminPage: React.FC = () => {
                                     </p>
                                 )}
                             </div>
+                            <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <label className="form-label">動作確認モード（検証用）</label>
+                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
+                                    <input
+                                        type="checkbox"
+                                        checked={sessionConfig.isTestMode || false}
+                                        onChange={e => setSessionConfig({...sessionConfig, isTestMode: e.target.checked})}
+                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                    />
+                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>全ての拘束時間を一律5秒に短縮する（テスト目的）</span>
+                                </label>
+                            </div>
                         </div>
                         <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
+                        <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
+                            <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
+                            <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
+                            <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
+                            <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
+                        </div>
                         <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
                             <div className="form-group">
                                 <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
@@ -312,21 +401,72 @@ const AdminPage: React.FC = () => {
                                         }
                                     }}
                                     disabled={isExporting}
-                                    style={{ width: 'auto', padding: '0.5rem 1.5rem', opacity: isExporting ? 0.7 : 1 }}
+                                    style={{ width: 'auto', padding: '0.5rem 1.5rem', opacity: isExporting ? 0.7 : 1, marginBottom: '2rem' }}
                                 >
-                                    {isExporting ? '送信中...' : 'データをエクスポートする'}
+                                    {isExporting ? '送信中...' : 'データを今すぐエクスポートする'}
                                 </button>
+
+                                <div className="gas-setup-guide" style={{ background: 'var(--gray-50)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                                    <h4 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                        Google Apps Script (GAS) の設定方法
+                                    </h4>
+                                    <ol style={{ fontSize: '0.85rem', color: 'var(--gray-700)', paddingLeft: '1.25rem', lineHeight: '1.6' }}>
+                                        <li>送信先のスプレッドシートを開き、「拡張機能」→「Apps Script」をクリックします。</li>
+                                        <li>以下のボタンでコードをコピーし、エディタに貼り付けて保存します。</li>
+                                        <li>「デプロイ」→「新しいデプロイ」を選択し、種類を「ウェブアプリ」にします。</li>
+                                        <li>アクセスできるユーザーを「全員」にしてデプロイし、発行されたURLを上の入力欄に貼り付けます。</li>
+                                    </ol>
+                                    <button 
+                                        className="button button--secondary"
+                                        style={{ fontSize: '0.8rem', width: 'auto', padding: '0.4rem 0.8rem', marginTop: '1rem' }}
+                                        onClick={() => {
+                                            const gasCode = `function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  
+  // ヘッダーがなければ作成
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["タイムスタンプ", "患者ID", "名前", "トリアージ", "診断名", "ステータス", "実施処置", "完了済み処置"]);
+  }
+  
+  // 各患者データを追記
+  data.patients.forEach(function(p) {
+    sheet.appendRow([
+      data.timestamp,
+      p.id,
+      p.name,
+      p.triageColor,
+      p.diagnosis,
+      p.status,
+      p.appliedTreatment,
+      p.completedTreatments
+    ]);
+  });
+  
+  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+}`;
+                                            navigator.clipboard.writeText(gasCode);
+                                            alert('GASコードをクリップボードにコピーしました。');
+                                        }}
+                                    >
+                                        GAS用スクリプトをコピー
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                                     <h2 style={{fontSize: '1.1rem', fontWeight: '700'}}>患者データ一覧</h2>
-                                    <button onClick={handleAddClick} className="button button--primary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '4px'}}>
-                                            <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                        追加
-                                    </button>
+                                    {!currentSessionId && (
+                                        <button onClick={handleAddClick} className="button button--primary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '4px'}}>
+                                                <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                            追加
+                                        </button>
+                                    )}
                                 </div>
 
                         <div className="patient-list">
@@ -360,15 +500,23 @@ const AdminPage: React.FC = () => {
                                                 {p.required_treatments?.map(rt => `${rt.lock_timer_minutes}分`).join(', ') || 'なし'}
                                             </span>
                                         </div>
-                                        <div className="actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: 'var(--border)' }}>
-                                            <button
-                                                className="button button--secondary"
-                                                onClick={() => handleEditClick(p)}
-                                                style={{padding: '0.5rem'}}
-                                            >
-                                                編集
-                                            </button>
-                                        </div>
+                                        {!currentSessionId ? (
+                                            <div className="actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: 'var(--border)' }}>
+                                                <button
+                                                    className="button button--secondary"
+                                                    onClick={() => handleEditClick(p)}
+                                                    style={{padding: '0.5rem'}}
+                                                >
+                                                    編集
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: 'var(--border)' }}>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', display: 'block', textAlign: 'center' }}>
+                                                    ※セッション中は編集不可
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             )}

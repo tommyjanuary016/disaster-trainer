@@ -1,15 +1,20 @@
 // LockTimerOverlay - 処置タイマー中に全画面をロックするオーバーレイ
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
     treatmentName: string    // 実施中の処置名
+    patientId: string | number | null // 患者ID（遷移用）
 }
 
 const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
     remainingDisplay,
     treatmentName,
+    patientId,
 }) => {
+    const navigate = useNavigate()
+
     return (
         <div className="lock-overlay">
             <div className="lock-overlay__inner">
@@ -32,6 +37,26 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                 </p>
                 <div className="lock-overlay__progress">
                     <div className="lock-overlay__progress-bar" />
+                </div>
+                
+                {/* 離脱用CTA（下部固定） */}
+                <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%', maxWidth: '300px', marginLeft: 'auto', marginRight: 'auto' }}>
+                    <button 
+                        onClick={() => navigate('/training')} 
+                        className="button button--secondary" 
+                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                    >
+                        訓練トップへ戻る
+                    </button>
+                    {patientId && (
+                        <button 
+                            onClick={() => navigate(`/training/patient/${patientId}`)} 
+                            className="button button--secondary" 
+                            style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                        >
+                            患者ステータス画面へ戻る
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

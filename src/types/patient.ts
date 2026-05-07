@@ -20,12 +20,13 @@ export interface RequiredTreatment {
 }
 
 export interface VitalSignStruct {
-    sbp: number;
-    dbp: number;
-    hr: number;
-    rr: number;
-    spo2: number;
-    temp: number;
+    sbp: number;     // 収縮期血圧 (mmHg)
+    dbp: number;     // 拡張期血圧 (mmHg)
+    hr: number;      // 心拍数 (bpm)
+    rr: number;      // 呼吸数 (/min)
+    spo2: number;    // 動脈血酸素飽和度 (%)
+    temp: number;    // 体温 (℃)
+    jcs?: number;    // Japan Coma Scale（意識レベル）
 }
 
 export interface Patient {
@@ -33,19 +34,23 @@ export interface Patient {
     // マスター（CSV由来）データ
     // ------------------------------------
     id: number
+    base_patient_id?: number // セッション内で複製された場合の大元のマスターID
     name: string
     age: number
     gender: 'M' | 'F'
-    triage_color: TriageColor
+    triage_color: TriageColor // 想定トリアージ区分
+    scene_triage_color?: TriageColor // 災害現場トリアージ区分
     
-    // フリーテキストでのV/S
-    vitals_triage: string
-    vitals_initial: string // 各診療エリアV/S
-    vitals_post: string
+    // フリーテキストでのV/S（下位互換用・新規作成時は不要）
+    vitals_triage: string // 現場トリアージ時V/S（表示フォールバック用）
+    vitals_initial: string // 各診療エリア到着時（初期）V/S（表示フォールバック用）
+    vitals_post: string // 処置後V/S（表示フォールバック用）
 
-    // 線形悪化計算用の構造化V/S（任意）
-    vitals_initial_struct?: VitalSignStruct
-    vitals_post_struct?: VitalSignStruct
+    // 構造化V/S（新UIで入力されたデータ）
+    vitals_triage_struct?: VitalSignStruct  // トリアージ時
+    vitals_initial_struct?: VitalSignStruct // 初期評価時（Primary Survey）
+    vitals_post_struct?: VitalSignStruct    // 処置後V/S
+    vitals_deterioration_struct?: VitalSignStruct // 悪化到達目標バイタル
     
     findings: PatientFindings
     diagnosis: string
@@ -73,6 +78,9 @@ export interface Patient {
     status: PatientStatus
     assessment_completed: boolean // アセスメント完了フラグ
     reception_time_ms?: number // 診療開始・受付時間 (タイマー・悪化の起点)
+    triage_time_ms?: number // トリアージ開始時刻
+    initial_vs_time_ms?: number // 診療初期V/S測定時刻
+    post_vs_time_ms?: number // 処置完了時刻
     timer_started_at: number | null // ロックタイマー開始Unixタイムスタンプ（ms）
     timer_duration_ms: number | null // ロックタイマー合計時間（ms）
     applied_treatment_id: string | null // 実施された処置ID
@@ -90,5 +98,9 @@ export interface TrainingSession {
     date: string;
     isActive: boolean;
     totalPatients: number;
-    // 割合設定など拡張可能
+    examLockTimeMinutes?: number;
+    treatmentLockTimeMinutes?: number;
+    isTestMode?: boolean;         // 動作確認モード（全拘束時間5秒）
+    sessionStartMs?: number;      // セッション作成時のUNIXタイムスタンプ（ms）
+    config?: any;                 // セッションの設定全体
 }

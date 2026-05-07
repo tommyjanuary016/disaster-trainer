@@ -8,7 +8,7 @@ import {
     Unsubscribe,
 } from 'firebase/firestore'
 import { db, USE_MOCK } from './firebase'
-import { Patient } from '../types/patient'
+import { Patient, TrainingSession } from '../types/patient'
 import { mockPatients } from '../data/mockData'
 
 // モック用インメモリストア（モードの場合は変更をここで管理）
@@ -16,8 +16,12 @@ const mockStore: Map<number, Patient> = new Map(
     mockPatients.map((p) => [p.id, { ...p }])
 )
 
-// セッション管理用
-export let activeSessionId: string | null = null
+// セッション管理用（localStorageで永続化）
+const STORAGE_KEY_SESSION = 'disaster_active_session_id'
+export let activeSessionId: string | null = localStorage.getItem(STORAGE_KEY_SESSION)
+
+// モックセッションストア（モックモードでセッション情報を保持）
+const mockSessionStore: Map<string, any> = new Map()
 
 // モックのリスナー登録（疑似リアルタイム同期）
 const mockListeners: Map<number, Set<(patient: Patient) => void>> = new Map()
@@ -101,6 +105,47 @@ export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]>
         docs = docs.filter(p => p.session_id === activeSessionId)
     }
     return docs
+}
+
+// ------------------------------------------------------------------
+// 全患者データをリアルタイム購読する（Admin用）
+// ------------------------------------------------------------------
+import { query, where } from 'firebase/firestore'
+
+export function subscribeToAllPatients(
+    callback: (patients: Patient[]) => void,
+    sessionIdOnly = true
+): Unsubscribe {
+    if (USE_MOCK || !db) {
+        // モックモード: 初回の通知
+        const notify = () => {
+            const all = Array.from(mockStore.values())
+            if (sessionIdOnly && activeSessionId) {
+                callback(all.filter(p => p.session_id === activeSessionId))
+            } else {
+                callback(all)
+            }
+        }
+        notify()
+
+        // すべての患者IDのリスナーを監視するのは効率が悪いため、
+        // モックモードでは簡易的なポーリングまたは更新通知用のグローバルリスナーを想定
+        // 今回はシンプルに、どこかで更新があった際に通知が来るようにする
+        const intervalId = setInterval(notify, 1000)
+        return () => clearInterval(intervalId)
+    }
+
+    // Firestoreモード
+    const collRef = collection(db, 'patients')
+    let q = query(collRef)
+    if (sessionIdOnly && activeSessionId) {
+        q = query(collRef, where('session_id', '==', activeSessionId))
+    }
+
+    return onSnapshot(q, (snap) => {
+        const docs = snap.docs.map(doc => doc.data() as Patient)
+        callback(docs)
+    })
 }
 
 // ------------------------------------------------------------------
@@ -243,6 +288,7 @@ export async function completeTreatment(
                 const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
                 if (allRequiredMet) {
                     patient.stabilization_completed = true
+                    patient.post_vs_time_ms = Date.now()
                 }
             }
 
@@ -261,11 +307,13 @@ export async function completeTreatment(
 
         // 必須処置がすべて完了したか判定
         let isStabilized = p.stabilization_completed || false
+        let postVsTimeMs = p.post_vs_time_ms
         if (p.required_treatments && p.required_treatments.length > 0) {
             const requiredIds = p.required_treatments.map(rt => rt.treatment_id)
             const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
             if (allRequiredMet) {
                 isStabilized = true
+                if (!postVsTimeMs) postVsTimeMs = Date.now()
             }
         }
 
@@ -275,7 +323,8 @@ export async function completeTreatment(
             timer_duration_ms: null,
             applied_treatment_id: null,
             completed_treatments: newCompleted,
-            stabilization_completed: isStabilized
+            stabilization_completed: isStabilized,
+            post_vs_time_ms: postVsTimeMs,
         })
     }
 }
@@ -301,6 +350,7 @@ export function resetMockStore(): void {
 // セッション（訓練シナリオ）作成ロジック
 // ------------------------------------------------------------------
 export interface SessionConfig {
+    title: string                // セッションのタイトル
     totalPatients: number
     redRatio: number
     yellowRatio: number
@@ -308,6 +358,9 @@ export interface SessionConfig {
     blackRatio: number
     sortBySeverity: boolean      // トリアージ順搬入
     useBasePatients: boolean     // 基礎25名（アプリ内蔵）を使用するか
+    examLockTimeMinutes: number  // 検査（画像・採血など）のデフォルト拘束時間
+    treatmentLockTimeMinutes: number // 手技（点滴・外科処置など）のデフォルト拘束時間
+    isTestMode?: boolean         // 動作確認モード：全拘束時間を5秒に短縮
 }
 
 export async function createTrainingSession(config: SessionConfig): Promise<string> {
@@ -377,19 +430,49 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
     }
 
     // セッションに登録（新しいIDを付与して複製）
+    // 動作確認モードの場合、全拘束時間を5秒に短縮する
+    const TEST_MODE_LOCK_MINUTES = 5 / 60 // 5秒 = 0.0833...分
     activeSessionId = sessionId
+    localStorage.setItem(STORAGE_KEY_SESSION, sessionId) // localStorage にも保存
+
+    const sessionStartMs = Date.now()
     const sessionPatients = selected.map((p, index) => ({
         ...p,
-        id: Date.now() + index, // 新規一意ID
+        id: sessionStartMs + index, // 新規一意ID
+        base_patient_id: p.id,
         session_id: sessionId,
         status: '初期状態' as any,
         assessment_completed: false,
-        reception_time_ms: Date.now(),
+        reception_time_ms: sessionStartMs,
         timer_started_at: null,
         timer_duration_ms: null,
         applied_treatment_id: null,
-        completed_treatments: []
+        completed_treatments: [],
+        // 動作確認モード時は拘束時間を一律5秒に強制上書き
+        ...(config.isTestMode && p.required_treatments ? {
+            required_treatments: p.required_treatments.map(rt => ({
+                ...rt,
+                lock_timer_minutes: TEST_MODE_LOCK_MINUTES
+            }))
+        } : {})
     }))
+
+    // セッションメタデータを作成
+    const sessionMeta = {
+        id: sessionId,
+        title: config.title || `訓練セッション ${new Date().toLocaleString('ja-JP')}`,
+        date: new Date().toISOString(),
+        isActive: true,
+        examLockTimeMinutes: config.examLockTimeMinutes,
+        treatmentLockTimeMinutes: config.treatmentLockTimeMinutes,
+        isTestMode: config.isTestMode || false,
+        config,
+        totalPatients: sessionPatients.length,
+        sessionStartMs,
+    }
+
+    // モックストアにも保存（モックモードで fetchActiveSessions が返せるように）
+    mockSessionStore.set(sessionId, sessionMeta)
 
     for (const p of sessionPatients) {
         await createPatient(p)
@@ -397,13 +480,9 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
 
     // Firestoreにセッションメタデータを保存
     if (!USE_MOCK && db) {
+        // sessions コレクションにセッションメタデータを保存
         const sessionRef = doc(db, 'sessions', sessionId)
-        await setDoc(sessionRef, {
-            id: sessionId,
-            createdAt: Date.now(),
-            config,
-            patientCount: sessionPatients.length
-        })
+        await setDoc(sessionRef, sessionMeta as any)
     }
 
     return sessionId
@@ -411,6 +490,68 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
 
 export function setActiveSession(sessionId: string | null) {
     activeSessionId = sessionId
+    if (sessionId) {
+        localStorage.setItem(STORAGE_KEY_SESSION, sessionId)
+    } else {
+        localStorage.removeItem(STORAGE_KEY_SESSION)
+    }
+}
+
+// ------------------------------------------------------------------
+// アクティブな訓練セッション一覧を取得する
+// ------------------------------------------------------------------
+export async function fetchActiveSessions(): Promise<TrainingSession[]> {
+    if (USE_MOCK || !db) {
+        // モックストアからアクティブなセッションを返す
+        const sessions: TrainingSession[] = []
+        mockSessionStore.forEach((meta, _id) => {
+            if (meta.isActive) sessions.push(meta as TrainingSession)
+        })
+        return sessions
+    }
+    const collRef = collection(db, 'sessions')
+    const snap = await getDocs(query(collRef, where('isActive', '==', true)))
+    return snap.docs.map(doc => doc.data() as TrainingSession)
+}
+
+// ------------------------------------------------------------------
+// セッション情報を1件取得する
+// ------------------------------------------------------------------
+export async function fetchTrainingSession(sessionId: string): Promise<TrainingSession | null> {
+    if (USE_MOCK || !db) {
+        // モックストアから取得
+        const meta = mockSessionStore.get(sessionId)
+        if (meta) return meta as TrainingSession
+        return null
+    }
+    const docRef = doc(db, 'sessions', sessionId)
+    const snap = await getDoc(docRef)
+    if (snap.exists()) {
+        return snap.data() as TrainingSession
+    }
+    return null
+}
+
+// ------------------------------------------------------------------
+// セッションを終了する
+// ------------------------------------------------------------------
+export async function endTrainingSession(sessionId: string): Promise<void> {
+    if (USE_MOCK || !db) {
+        // モックストアでも isActive を false に更新
+        const meta = mockSessionStore.get(sessionId)
+        if (meta) mockSessionStore.set(sessionId, { ...meta, isActive: false })
+        if (activeSessionId === sessionId) {
+            activeSessionId = null
+            localStorage.removeItem(STORAGE_KEY_SESSION)
+        }
+        return
+    }
+    const docRef = doc(db, 'sessions', sessionId)
+    await updateDoc(docRef, { isActive: false })
+    if (activeSessionId === sessionId) {
+        activeSessionId = null
+        localStorage.removeItem(STORAGE_KEY_SESSION)
+    }
 }
 
 // モックかどうかを外部に公開

@@ -108,8 +108,9 @@ const RadiologyScanPage: React.FC = () => {
         <div className="page qr-scanner-page">
             <header className="admin-header">
                 <h1>放射線科 受付システム</h1>
-                <button onClick={() => navigate('/')} className="button button--secondary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-                    トップへ戻る
+                <button onClick={() => navigate('/')} className="button button--secondary" style={{width: 'auto', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    アプリトップへ戻る
                 </button>
             </header>
 

@@ -42,7 +42,7 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
         title: patient
           ? `${Math.floor(patient.age / 10) * 10}代 ${patient.gender === 'M' ? '男性' : '女性'}`
           : `患者データ`,
-        detail: patient ? `トリアージ: ${patient.triage_color}` : '',
+        detail: '', // アセスメント防止のためトリアージやID情報を非表示
       }
     }
 

@@ -100,8 +100,8 @@ const LabScanPage: React.FC = () => {
         <div className="page qr-scanner-page">
             <header className="admin-header">
                 <h1>検査科 受付システム</h1>
-                <button onClick={() => navigate('/')} className="button button--secondary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
-                    トップへ戻る
+                <button onClick={() => navigate('/')} className="button button--secondary" style={{width: 'auto', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
+                    ＜ アプリトップへ戻る
                 </button>
             </header>
 

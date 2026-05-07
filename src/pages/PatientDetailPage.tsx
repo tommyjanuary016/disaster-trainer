@@ -29,7 +29,7 @@ const PatientDetailPage: React.FC = () => {
     const patientId = id ? parseInt(id) : null
     const { patient, loading, error } = usePatient(patientId)
     const { isLocked, remainingDisplay } = useTimer(patient)
-    const { currentVitalsText } = useDeterioration(patient)
+    const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
 
     if (loading) return <div className="loading">読み込み中...</div>
     if (error || !patient) return <div className="error">{error || '患者が見つかりません'}</div>
@@ -38,8 +38,12 @@ const PatientDetailPage: React.FC = () => {
     const uniqueCompleted = Array.from(new Set(completed))
 
     // --- バイタル判定 ---
+    const triageVitalsDone = completed.filter(id => id === 'triage').length > 0
     const vitalsCount = completed.filter(id => id === 'vitals').length
-    const vitalsAny = vitalsCount > 0
+    const vitalsAny = vitalsCount > 0 || triageVitalsDone  // トリアージV/Sでもブラー解除
+
+    // バイタル表示に使う struct（診療エリアV/S > トリアージV/S の順で優先）
+    const displayVitalsStruct = patient.vitals_initial_struct || patient.vitals_triage_struct
 
     // --- 診察手技判定 ---
     const completedExams = EXAM_IDS.filter(id => uniqueCompleted.includes(id))
@@ -82,13 +86,19 @@ const PatientDetailPage: React.FC = () => {
                 <LockTimerOverlay
                     remainingDisplay={remainingDisplay}
                     treatmentName={patient.applied_treatment_id || '処置'}
+                    patientId={patientId}
                 />
             )}
 
             {/* シンプルヘッダー（トリアージカラーなし） */}
-            <header className="patient-header">
-
-                <div className="patient-header__identity">
+            <header className="patient-header" style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-0.8rem', left: '0' }}>
+                    <button onClick={() => navigate('/training')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', border: 'none', background: 'transparent', color: 'var(--primary)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        訓練トップへ戻る
+                    </button>
+                </div>
+                <div className="patient-header__identity" style={{ marginTop: '1rem' }}>
                     <PatientPictogram age={patient.age} gender={patient.gender} size={52} className="patient-header__pictogram" />
                     <h1 className="patient-header__name">
                         {getAgeGroup(patient.age)} {getGenderText(patient.gender)}
@@ -215,9 +225,11 @@ const PatientDetailPage: React.FC = () => {
                     <VitalsCard
                         title="バイタルサイン"
                         vitals={currentVitalsText || patient.vitals_initial}
+                        vitalsStruct={currentVitalsStruct || displayVitalsStruct}
                         isBlurred={!vitalsAny}
                     />
                 </div>
+
 
                 {/* ===== 所見詳細 ===== */}
                 <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} />

@@ -51,11 +51,11 @@ const PatientActorPage: React.FC = () => {
     return (
         <div className="actor-page">
             <header className="actor-page__header">
-                <button className="actor-page__back" onClick={() => navigate('/actor')}>
+                <button className="actor-page__back" onClick={() => navigate('/training/actor')}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M15 18l-6-6 6-6" />
                     </svg>
-                    一覧
+                    患者一覧へ戻る
                 </button>
                 <h2>模擬患者モード</h2>
             </header>
@@ -68,6 +68,19 @@ const PatientActorPage: React.FC = () => {
                     </div>
                 </div>
 
+                <div className="card card--elevated" style={{ textAlign: 'center', margin: '1rem 0' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-700)' }}>あなたの患者QRコード</h3>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>診察役がスキャンするときはこの画面を見せてください</p>
+                    <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`patient:${patient.id}`)}`} 
+                        alt="患者QR" 
+                        style={{ width: '160px', height: '160px', margin: '0 auto', display: 'block' }} 
+                    />
+                    <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '0.05em' }}>
+                        ID: {patient.base_patient_id || patient.id}
+                    </div>
+                </div>
+
                 <div className="actor-instruction">
                     <h3 className="section-title">演技指導</h3>
                     <div className="instruction-card">
@@ -75,11 +88,21 @@ const PatientActorPage: React.FC = () => {
                         <p>{patient.findings.background || '特記事項なし'}</p>
                         
                         <h4>バイタルサイン・全身所見</h4>
-                        <p className="instruction-vitals">{currentVitalsText || patient.vitals_initial}</p>
-                        <p>頭頚部: {patient.findings.head_and_neck}</p>
-                        <p>胸部: {patient.findings.chest}</p>
-                        <p>腹部・骨盤: {patient.findings.abdomen_and_pelvis}</p>
-                        <p>四肢: {patient.findings.limbs}</p>
+                        <p className="instruction-vitals" style={{ whiteSpace: 'pre-line' }}>{currentVitalsText || patient.vitals_initial}</p>
+                        
+                        <div style={{ padding: '0.8rem', backgroundColor: 'var(--gray-50)', borderRadius: '4px', fontSize: '0.9rem', marginBottom: '1rem', border: '1px solid var(--gray-200)' }}>
+                            <p><strong>頭頚部:</strong> {patient.findings.head_and_neck || '特記事項なし'}</p>
+                            <p><strong>胸部:</strong> {patient.findings.chest || '特記事項なし'}</p>
+                            <p><strong>腹部・骨盤:</strong> {patient.findings.abdomen_and_pelvis || '特記事項なし'}</p>
+                            <p><strong>四肢:</strong> {patient.findings.limbs || '特記事項なし'}</p>
+                            <p><strong>FAST:</strong> {patient.findings.fast || '特記事項なし'}</p>
+                        </div>
+
+                        <h4>既往歴 (AMPLE)</h4>
+                        <p style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--gray-50)', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--gray-200)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                            {patient.findings.ample || '特記事項なし'}
+                        </p>
+
                         
                         <h4>演技のポイント</h4>
                         <p className="instruction-highlight">

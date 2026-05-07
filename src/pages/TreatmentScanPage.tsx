@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchPatient, startTreatmentTimer } from '../lib/firestore'
+import { fetchPatient, startTreatmentTimer, updatePatientFlags, activeSessionId, fetchTrainingSession } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import { parseQRCode, ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
@@ -12,7 +12,8 @@ const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast
 
 // 手技IDと表示名のマッピング（全臨床リスト）
 export const PROCEDURE_NAMES: Record<string, string> = {
-    vitals:             'バイタルサイン測定',
+    vitals:             '診療エリアV/S測定',
+    triage:             'トリアージエリアV/S測定',
     head_and_neck:      '頭頸部診察',
     chest:              '胸部診察',
     abdomen_and_pelvis: '腹部・骨盤診察',
@@ -60,7 +61,7 @@ export const PROCEDURE_NAMES: Record<string, string> = {
 }
 
 const isTreatmentOption = (id: string) => {
-    return id !== 'vitals' && id !== 'diagnosis' && !EXAM_IDS.includes(id)
+    return id !== 'vitals' && id !== 'triage' && id !== 'diagnosis' && !EXAM_IDS.includes(id)
 }
 
 interface ResolvedProcedure {
@@ -81,6 +82,17 @@ const TreatmentScanPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null)
     const [patient, setPatient] = useState<Patient | null>(null)
     const [hasVitalsOrExams, setHasVitalsOrExams] = useState(false)
+    const [isTestMode, setIsTestMode] = useState(false)
+    const TEST_LOCK_MIN = 5 / 60 // 5秒
+
+    useEffect(() => {
+        // セッションの isTestMode フラグを取得
+        if (activeSessionId) {
+            fetchTrainingSession(activeSessionId).then(session => {
+                if (session?.isTestMode) setIsTestMode(true)
+            }).catch(e => console.error(e))
+        }
+    }, [])
 
     // 確認モーダル用の状態
     const [pendingProcedure, setPendingProcedure] = useState<ResolvedProcedure | null>(null)
@@ -94,7 +106,7 @@ const TreatmentScanPage: React.FC = () => {
                 if (p) {
                     setPatient(p)
                     const done = p.completed_treatments?.some(
-                        id => id === 'vitals' || EXAM_IDS.includes(id)
+                        id => id === 'vitals' || id === 'triage' || EXAM_IDS.includes(id)
                     ) || false
                     setHasVitalsOrExams(done)
                 }
@@ -149,15 +161,19 @@ const TreatmentScanPage: React.FC = () => {
 
         // 手技名を決定
         let treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
-        let initialMinutes = 5
+        let initialMinutes = isTestMode ? TEST_LOCK_MIN : 5
 
         if (patient) {
             const matched = patient.required_treatments?.find(rt => rt.treatment_id === treatmentId)
             if (matched) {
                 treatmentName = matched.treatment_name
-                initialMinutes = matched.lock_timer_minutes
+                // テストモードは必須処置の拘束時間も上書き
+                initialMinutes = isTestMode ? TEST_LOCK_MIN : matched.lock_timer_minutes
             } else {
                 treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
+                if (!isTestMode && (treatmentId === 'triage' || treatmentId === 'vitals')) {
+                    initialMinutes = 0.5
+                }
             }
         }
 
@@ -227,7 +243,21 @@ const TreatmentScanPage: React.FC = () => {
 
     const handleConfirm = async () => {
         if (!patientId || !pendingProcedure) return
-        await startTreatmentTimer(parseInt(patientId), pendingProcedure.treatment_id, timerMinutes)
+        const pid = parseInt(patientId)
+        const treatId = pendingProcedure.treatment_id
+        const now = Date.now()
+
+        // トリアージ手技完了時 → triage_time_ms を記録
+        if (treatId === 'triage' && patient && !patient.triage_time_ms) {
+            await updatePatientFlags(pid, { triage_time_ms: now })
+        }
+
+        // バイタルサイン測定手技完了時 → initial_vs_time_ms を記録
+        if (treatId === 'vitals' && patient && !patient.initial_vs_time_ms) {
+            await updatePatientFlags(pid, { initial_vs_time_ms: now })
+        }
+
+        await startTreatmentTimer(pid, treatId, timerMinutes)
         navigate(`/training/patient/${patientId}`)
     }
 
@@ -250,11 +280,19 @@ const TreatmentScanPage: React.FC = () => {
                 />
             )}
 
-            <header className="treatment-header">
-                <div className="treatment-header__label">TREATMENT FOR</div>
-                <h1 className="treatment-header__name">
-                    {patient ? `${Math.floor(patient.age / 10) * 10}代 ${patient.gender === 'M' ? '男性' : '女性'}` : '読み込み中...'}
-                </h1>
+            <header className="treatment-header" style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-0.8rem', left: '0' }}>
+                    <button onClick={() => navigate(`/training/patient/${patientId}`)} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', border: 'none', background: 'transparent', color: 'var(--primary)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        患者ステータスへ戻る
+                    </button>
+                </div>
+                <div style={{ marginTop: '1rem' }}>
+                    <div className="treatment-header__label">TREATMENT FOR</div>
+                    <h1 className="treatment-header__name">
+                        {patient ? `${Math.floor(patient.age / 10) * 10}代 ${patient.gender === 'M' ? '男性' : '女性'}` : '読み込み中...'}
+                    </h1>
+                </div>
             </header>
 
             <main className="page__content">
@@ -311,8 +349,12 @@ const TreatmentScanPage: React.FC = () => {
                                 >
                                     <option value="">-- 手技を選択 --</option>
 
+                                    <optgroup label="トリアージ">
+                                        <option value="triage">{PROCEDURE_NAMES.triage}</option>
+                                    </optgroup>
+
                                     <optgroup label="バイタル">
-                                        <option value="vitals">バイタルサイン測定</option>
+                                        <option value="vitals">{PROCEDURE_NAMES.vitals}</option>
                                     </optgroup>
 
                                     <optgroup label="診察手技">

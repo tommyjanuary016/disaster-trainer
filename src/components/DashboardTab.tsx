@@ -237,9 +237,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients }) => {
                                 <td style={{ padding: '0.6rem 0.75rem' }}>
                                     <span style={{
                                         display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
-                                        background: p.status === '初期状態' ? 'var(--gray-100)' : p.status === '処置中' ? '#fef3c7' :
-                                                    p.status === 'アセスメント完了' ? '#d1fae5' : p.status === '悪化' ? '#fee2e2' : 'var(--gray-100)',
-                                        color: p.status === '悪化' ? '#991b1b' : p.status === '処置中' ? '#92400e' : p.status === 'アセスメント完了' ? '#065f46' : 'var(--gray-600)',
+                                        backgroundColor: p.status === '処置完了' ? '#dbeafe' : p.status === '処置中' ? '#fef3c7' :
+                                            p.status === 'アセスメント完了' ? '#d1fae5' : p.status === '悪化' ? '#fee2e2' : 'var(--gray-100)',
+                                        color: p.status === '処置完了' ? '#1e40af' : p.status === '悪化' ? '#991b1b' : p.status === '処置中' ? '#92400e' : p.status === 'アセスメント完了' ? '#065f46' : 'var(--gray-600)',
                                     }}>
                                         {p.status}
                                     </span>

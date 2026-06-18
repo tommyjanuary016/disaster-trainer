@@ -15,25 +15,21 @@ const isAbnormal = (key: keyof VitalSignStruct, val: number): boolean => {
         case 'hr':   return val < 50 || val > 120
         case 'rr':   return val < 10 || val > 25
         case 'spo2': return val < 94
-        case 'jcs':  return val > 0
+        case 'gcs_e': return val < 4
+        case 'gcs_v': return val < 5
+        case 'gcs_m': return val < 6
         default:     return false
     }
 }
 
 const VitalsGrid: React.FC<{ s: VitalSignStruct }> = ({ s }) => {
-    // 表示項目の定義
-    const items: { label: string; unit: string; key: keyof VitalSignStruct; value: number | undefined; separator?: string }[] = [
-        { label: 'SBP',  unit: 'mmHg', key: 'sbp',  value: s.sbp  },
-        { label: 'DBP',  unit: 'mmHg', key: 'dbp',  value: s.dbp, separator: '/' },
-        { label: 'HR',   unit: 'bpm',  key: 'hr',   value: s.hr   },
-        { label: 'RR',   unit: '/min', key: 'rr',   value: s.rr   },
-        { label: 'SpO2', unit: '%',    key: 'spo2', value: s.spo2 },
-        { label: 'Temp', unit: '℃',   key: 'temp', value: s.temp  },
-    ]
-    // JCSは存在する場合のみ追加
-    if (s.jcs !== undefined && s.jcs !== null) {
-        items.push({ label: 'JCS', unit: '', key: 'jcs', value: s.jcs })
-    }
+    const hasGCS = s.gcs_e !== undefined || s.gcs_v !== undefined || s.gcs_m !== undefined
+    const gcsTotal = (s.gcs_e ?? 4) + (s.gcs_v ?? 5) + (s.gcs_m ?? 6)
+    const isGcsAbnormal = hasGCS && (
+        (s.gcs_e !== undefined && s.gcs_e < 4) ||
+        (s.gcs_v !== undefined && s.gcs_v < 5) ||
+        (s.gcs_m !== undefined && s.gcs_m < 6)
+    )
 
     return (
         <div className="vitals-grid">
@@ -41,7 +37,7 @@ const VitalsGrid: React.FC<{ s: VitalSignStruct }> = ({ s }) => {
             <div className="vitals-grid__cell">
                 <div className="vitals-grid__label">血圧</div>
                 <div className={`vitals-grid__value ${isAbnormal('sbp', s.sbp) ? 'vitals-grid__value--danger' : ''}`}>
-                    {s.sbp}<span className="vitals-grid__sep">/</span>{s.dbp}
+                     {s.sbp}<span className="vitals-grid__sep">/</span>{s.dbp}
                 </div>
                 <div className="vitals-grid__unit">mmHg</div>
             </div>
@@ -76,11 +72,14 @@ const VitalsGrid: React.FC<{ s: VitalSignStruct }> = ({ s }) => {
                 <div className="vitals-grid__unit">℃</div>
             </div>
 
-            {s.jcs !== undefined && s.jcs !== null && (
+            {hasGCS && (
                 <div className="vitals-grid__cell">
-                    <div className="vitals-grid__label">JCS</div>
-                    <div className={`vitals-grid__value ${isAbnormal('jcs', s.jcs) ? 'vitals-grid__value--danger' : ''}`}>
-                        {s.jcs}
+                    <div className="vitals-grid__label">GCS</div>
+                    <div className={`vitals-grid__value ${isGcsAbnormal ? 'vitals-grid__value--danger' : ''}`} style={{ whiteSpace: 'nowrap' }}>
+                        E{s.gcs_e ?? 4}V{s.gcs_v ?? 5}M{s.gcs_m ?? 6}
+                        <span style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginLeft: '0.2rem', fontWeight: 'normal' }}>
+                            ({gcsTotal})
+                        </span>
                     </div>
                     <div className="vitals-grid__unit">意識</div>
                 </div>

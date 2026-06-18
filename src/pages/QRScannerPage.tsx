@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatient, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession } from '../lib/firestore'
+import { fetchPatient, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, fetchAllPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
+    const [activeTab, setActiveTab] = useState<'qr' | 'list'>('qr')
     const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
     // 確認モーダル用の状態
@@ -19,6 +20,12 @@ const QRScannerPage: React.FC = () => {
     const [showSessionModal, setShowSessionModal] = useState(false)
     const [activeSessions, setActiveSessions] = useState<TrainingSession[]>([])
     const [isLoadingSessions, setIsLoadingSessions] = useState(false)
+    // 患者リスト用の状態
+    const [sessionPatients, setSessionPatients] = useState<Patient[]>([])
+    const [isLoadingPatients, setIsLoadingPatients] = useState(false)
+    // 連続トリアージモード
+    const [continuousMode, setContinuousMode] = useState(false)
+    const [continuousDoneCount, setContinuousDoneCount] = useState(0)
 
     useEffect(() => {
         if (activeSessionId) {
@@ -30,6 +37,24 @@ const QRScannerPage: React.FC = () => {
             openSessionModal()
         }
     }, [])
+
+    useEffect(() => {
+        if (activeTab === 'list') {
+            loadPatients()
+        }
+    }, [activeTab, activeSessionId])
+
+    const loadPatients = async () => {
+        setIsLoadingPatients(true)
+        try {
+            const patients = await fetchAllPatients(true) // true: 現在のセッションの患者のみ
+            setSessionPatients(patients)
+        } catch (e) {
+            console.error('Failed to fetch patients', e)
+        } finally {
+            setIsLoadingPatients(false)
+        }
+    }
 
     const openSessionModal = async () => {
         setIsLoadingSessions(true)
@@ -51,7 +76,7 @@ const QRScannerPage: React.FC = () => {
     }
 
     useEffect(() => {
-        if (showModal) return // モーダル表示中はスキャナーを起動しない
+        if (showModal || activeTab !== 'qr') return // モーダル表示中や別のタブの場合はスキャナーを起動しない
 
         const scanner = new Html5QrcodeScanner(
             'reader',
@@ -72,7 +97,7 @@ const QRScannerPage: React.FC = () => {
         return () => {
             scanner.clear().catch(e => console.error('Error clearing scanner', e))
         }
-    }, [showModal])
+    }, [showModal, activeTab])
 
     const handleScan = async (text: string) => {
         const parsed = parseQRCode(text)
@@ -112,7 +137,15 @@ const QRScannerPage: React.FC = () => {
 
     const handleConfirm = () => {
         if (pendingPatientId) {
-            navigate(`/training/patient/${pendingPatientId}`)
+            if (continuousMode) {
+                // 連続モード：カルテへ遷移せず、モーダルを閉じてカメラを再起動
+                setContinuousDoneCount(c => c + 1)
+                setShowModal(false)
+                setPendingPatientId(null)
+                setPendingPatient(null)
+            } else {
+                navigate(`/training/patient/${pendingPatientId}`)
+            }
         }
     }
 
@@ -120,6 +153,16 @@ const QRScannerPage: React.FC = () => {
         setShowModal(false)
         setPendingPatientId(null)
         setPendingPatient(null)
+    }
+
+    const getStatusColor = (status: Patient['status']) => {
+        switch (status) {
+            case '初期状態': return 'var(--gray-500)'
+            case '処置中': return 'var(--primary)'
+            case 'アセスメント完了': return 'var(--status-green)'
+            case '処置完了': return '#2563eb' // blue-600
+            default: return 'var(--gray-500)'
+        }
     }
 
     return (
@@ -180,7 +223,52 @@ const QRScannerPage: React.FC = () => {
                 )}
             </div>
 
-            <div className="scanner-hero">
+            {/* 連続トリアージモード トグル */}
+            <div style={{ margin: '0.75rem 1rem 0', padding: '0.6rem 1rem', background: continuousMode ? '#eff6ff' : 'var(--gray-50)', borderRadius: '10px', border: `2px solid ${continuousMode ? 'var(--primary)' : 'var(--gray-200)'}`, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', flex: 1, userSelect: 'none' }}>
+                    <input
+                        type="checkbox"
+                        checked={continuousMode}
+                        onChange={e => setContinuousMode(e.target.checked)}
+                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    />
+                    <div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: continuousMode ? 'var(--primary)' : 'var(--gray-700)' }}>🔁 連続トリアージモード</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>ONにすると確認後にカメラが自動再起動します（大量患者対応）</div>
+                    </div>
+                </label>
+                {continuousMode && continuousDoneCount > 0 && (
+                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                        ✅ {continuousDoneCount}名完了
+                    </span>
+                )}
+            </div>
+
+            <div className="admin-tabs" style={{ margin: '1rem 1rem 0.5rem', display: 'flex', gap: '0.5rem' }}>
+                <button
+                    className={`button ${activeTab === 'qr' ? 'button--primary' : 'button--secondary'}`}
+                    style={{ flex: 1, padding: '0.8rem' }}
+                    onClick={() => setActiveTab('qr')}
+                >
+                    QRスキャン
+                </button>
+            </div>
+            
+            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <button
+                    onClick={() => setActiveTab('list')}
+                    style={{ 
+                        background: 'none', border: 'none', color: 'var(--gray-500)', fontSize: '0.85rem', 
+                        textDecoration: 'underline', cursor: 'pointer', padding: '0.5rem' 
+                    }}
+                >
+                    QRコードが読み取れない場合はこちら（患者リストから選択）
+                </button>
+            </div>
+
+            {activeTab === 'qr' ? (
+                <>
+                    <div className="scanner-hero">
                 <div className="scanner-hero__icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M4 4H10V10H4V4Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -209,7 +297,7 @@ const QRScannerPage: React.FC = () => {
             <div className="manual-entry">
                 <form onSubmit={handleManualSubmit} className="manual-entry__form">
                     <div className="form-group">
-                        <label>患者ID（開発用手入力）</label>
+                        <label>患者IDを直接入力（口頭確認用）</label>
                         <input
                             type="number"
                             min="1"
@@ -229,34 +317,93 @@ const QRScannerPage: React.FC = () => {
                     <button type="submit" className="button button--primary" disabled={!manualId}>
                         ID検索
                     </button>
-                    <button
-                        type="button"
-                        className="button button--secondary"
-                        onClick={() => navigate('/training/actor')}
-                        style={{ marginTop: '0.5rem' }}
-                    >
-                        模擬患者モード
-                    </button>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button
-                            type="button"
-                            className="button button--secondary"
-                            onClick={() => navigate('/training/radiology')}
-                            style={{ flex: 1, backgroundColor: '#e2e8f0' }}
-                        >
-                            放射線科
-                        </button>
-                        <button
-                            type="button"
-                            className="button button--secondary"
-                            onClick={() => navigate('/training/lab')}
-                            style={{ flex: 1, backgroundColor: '#e2e8f0' }}
-                        >
-                            検査科
-                        </button>
+                    </form>
+                </div>
+            </>
+            ) : (
+                <div style={{ padding: '0 1rem 1rem' }}>
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">セッション参加患者一覧</h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                患者をタップして詳細・処置画面へ進んでください
+                            </p>
+                        </div>
+                        <div className="card-body">
+                            {!activeSessionId ? (
+                                <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📋</div>
+                                    <p style={{ color: 'var(--gray-600)', fontWeight: '600', marginBottom: '0.5rem' }}>セッションが選択されていません</p>
+                                    <p style={{ color: 'var(--gray-500)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>上のボタンからセッションを選んでください</p>
+                                    <button
+                                        className="button button--primary"
+                                        style={{ width: 'auto', padding: '0.6rem 1.5rem' }}
+                                        onClick={openSessionModal}
+                                    >
+                                        セッションを選択する
+                                    </button>
+                                </div>
+                            ) : isLoadingPatients ? (
+                                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--gray-500)' }}>読み込み中...</div>
+                            ) : sessionPatients.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--gray-500)' }}>
+                                    現在のセッションに患者がいません。
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                    {sessionPatients.map(p => (
+                                        <div
+                                            key={p.id}
+                                            className="list-item"
+                                            style={{
+                                                padding: '1rem',
+                                                border: '1px solid var(--gray-200)',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem',
+                                                transition: 'all 0.2s ease',
+                                                backgroundColor: 'white'
+                                            }}
+                                            onClick={() => navigate(`/training/patient/${p.id}`)}
+                                        >
+                                            <div style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                backgroundColor: `var(--triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'})`,
+                                                flexShrink: 0
+                                            }} />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                    患者 {p.id % 1000} <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {p.base_patient_id || p.id})</span>
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                                    年齢/性別: {p.age}歳 {p.gender} | {p.diagnosis || '（診断未設定）'}
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                padding: '0.3rem 0.6rem',
+                                                borderRadius: '4px',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 'bold',
+                                                backgroundColor: `${getStatusColor(p.status)}20`,
+                                                color: getStatusColor(p.status),
+                                            }}>
+                                                {p.status}
+                                            </div>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M9 18L15 12L9 6" stroke="var(--gray-400)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </form>
-            </div>
+                </div>
+            )}
         </div>
     )
 }

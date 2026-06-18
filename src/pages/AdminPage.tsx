@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore } from '../lib/firestore'
+import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, deleteAllCustomPatients } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import PatientForm from '../components/PatientForm'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -24,13 +24,22 @@ const AdminPage: React.FC = () => {
         examLockTimeMinutes: 3,
         treatmentLockTimeMinutes: 5,
         isTestMode: false,
+        selectedScenarios: [],
+        useExactScenarioMatch: false,
     })
     const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>('patients')
     const [webhookUrl, setWebhookUrl] = useState(localStorage.getItem('gas_webhook_url') || '')
     const [isExporting, setIsExporting] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(activeSessionId)
+    // 訓練終了後もそのセッションの患者のみ表示するために保持するID
+    const [displaySessionId, setDisplaySessionId] = useState<string | null>(activeSessionId)
+    const [currentSessionTitle, setCurrentSessionTitle] = useState<string | null>(null)
+    const [sessionEnded, setSessionEnded] = useState(false) // 訓練終了状態フラグ
     const location = useLocation()
+
+    // 抽出可能なシナリオタグ一覧
+    const availableScenarios = Array.from(new Set(patients.map(p => p.scenario_tag || '基本')))
 
     useEffect(() => {
         if (location.state?.action === 'new_session') {
@@ -41,11 +50,24 @@ const AdminPage: React.FC = () => {
     }, [location.state?.action])
 
     useEffect(() => {
+        // displaySessionId に応じて訪読する患者を制限する
         const unsubscribe = subscribeToAllPatients((data) => {
             setPatients(data)
-        })
+        }, displaySessionId !== null, displaySessionId ?? undefined)
         return () => unsubscribe()
-    }, [currentSessionId])
+    }, [displaySessionId])
+
+    // セッションタイトルを取得する
+    useEffect(() => {
+        const targetId = displaySessionId
+        if (targetId) {
+            fetchTrainingSession(targetId).then(session => {
+                if (session) setCurrentSessionTitle(session.title || null)
+            }).catch(e => console.error('セッション情報取得エラー', e))
+        } else {
+            setCurrentSessionTitle(null)
+        }
+    }, [displaySessionId])
 
     const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -77,6 +99,15 @@ const AdminPage: React.FC = () => {
         reader.readAsText(file)
         // 同じファイルを選び直せるようにリセット
         e.target.value = ''
+    }
+
+    const handleDeleteAllCustom = async () => {
+        if (window.confirm('追加された全てのカスタム患者データを削除しますか？\n(※アプリ内蔵の基本データは削除されません)')) {
+            document.body.style.cursor = 'wait'
+            await deleteAllCustomPatients()
+            document.body.style.cursor = 'default'
+            alert('カスタム患者を全件削除しました。')
+        }
     }
 
     const handleAddClick = () => {
@@ -133,6 +164,8 @@ const AdminPage: React.FC = () => {
             document.body.style.cursor = 'wait'
             const newSessionId = await createTrainingSession(sessionConfig)
             setCurrentSessionId(newSessionId)
+            setDisplaySessionId(newSessionId)
+            setSessionEnded(false)
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
             alert('新しいセッションを作成しました。')
@@ -140,13 +173,23 @@ const AdminPage: React.FC = () => {
     }
 
     const handleClearSession = async () => {
-        if (window.confirm('現在のセッションを終了し、全マスターデータを表示しますか？\n（このセッションは以降「訓練スタート」画面に表示されなくなります）')) {
+        if (window.confirm('訓練を終了しますか？\n（訓練のダッシュボードと結果はそのまま表示されます）')) {
             if (activeSessionId) {
                 await endTrainingSession(activeSessionId)
             }
+            // displaySessionIdはそのまま保持（終了後ダッシュボードも同セッションのみ表示）
             setActiveSession(null)
             setCurrentSessionId(null)
+            setSessionEnded(true)
         }
+    }
+
+    const handleReturnToMaster = () => {
+        // 全マスターデータ表示に戻る（完全にセッションをリセット）
+        setDisplaySessionId(null)
+        setCurrentSessionId(null)
+        setSessionEnded(false)
+        setCurrentSessionTitle(null)
     }
 
     const handleExportCSV = () => {
@@ -187,9 +230,50 @@ const AdminPage: React.FC = () => {
                 <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center'}}>
                     <div>
                         <h1>管理画面 (Admin)</h1>
-                        <p style={{fontSize: '0.8rem', color: 'var(--gray-500)', margin: 0}}>
-                            現在の状態: {currentSessionId ? `訓練中 (${currentSessionId})` : 'マスターデータ編集中'}
-                        </p>
+                        {currentSessionId ? (
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem'}}>
+                                <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+                                    border: '1px solid rgba(5, 150, 105, 0.4)',
+                                    fontSize: '0.82rem', fontWeight: '600', color: '#065f46'
+                                }}>
+                                    <span style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse-beat 1.5s ease-in-out infinite'}} />
+                                    訓練中
+                                </span>
+                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)'}}>
+                                    {currentSessionTitle || '（タイトルなし）'}
+                                </span>
+                                <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace'}}>
+                                    ID: {currentSessionId.replace('session_', '')}
+                                </span>
+                            </div>
+                        ) : sessionEnded && displaySessionId ? (
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem'}}>
+                                <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                    border: '1px solid rgba(37, 99, 235, 0.3)',
+                                    fontSize: '0.82rem', fontWeight: '600', color: '#1d4ed8'
+                                }}>
+                                    訓練終了
+                                </span>
+                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)'}}>
+                                    {currentSessionTitle || '（タイトルなし）'}
+                                </span>
+                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)', marginLeft: '0.3rem'}}>
+                                    — このセッションのまとめを表示中
+                                </span>
+                            </div>
+                        ) : (
+                            <p style={{fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.2rem 0 0'}}>
+                                マスターデータ編集中
+                            </p>
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => navigate('/training')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
@@ -213,9 +297,26 @@ const AdminPage: React.FC = () => {
                             <button
                                 onClick={handleClearSession}
                                 className="button button--secondary"
+                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#ef4444', color: '#b91c1c' }}
+                            >
+                                訓練終了
+                            </button>
+                        </>
+                    ) : sessionEnded && displaySessionId ? (
+                        <>
+                            <button
+                                onClick={handleExportCSV}
+                                className="button button--secondary"
+                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#3b82f6', color: '#1d4ed8' }}
+                            >
+                                ↓ ダウンロード (振り返り用CSV)
+                            </button>
+                            <button
+                                onClick={handleReturnToMaster}
+                                className="button button--secondary"
                                 style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                             >
-                                訓練終了 (全データ表示に戻る)
+                                全マスターデータに戻る
                             </button>
                         </>
                     ) : (
@@ -231,13 +332,15 @@ const AdminPage: React.FC = () => {
                         患者CSV一括インポート
                         <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVUpload} />
                     </label>
-                    <button
-                        onClick={() => navigate('/qr-generator')}
-                        className="button button--secondary"
-                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                    >
-                        QRコード生成
-                    </button>
+                    {!currentSessionId && (
+                        <button
+                            onClick={handleDeleteAllCustom}
+                            className="button button--secondary"
+                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', color: 'var(--status-red)', borderColor: 'var(--status-red)' }}
+                        >
+                            カスタム患者全リセット
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -297,33 +400,70 @@ const AdminPage: React.FC = () => {
                                         onChange={e => setSessionConfig({...sessionConfig, isTestMode: e.target.checked})}
                                         style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                     />
-                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>全ての拘束時間を一律5秒に短縮する（テスト目的）</span>
+                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>検証用モードを有効にする</span>
+                                </label>
+                            </div>
+                            <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <label className="form-label">対象シナリオ (空欄で全て)</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
+                                    {availableScenarios.map(tag => (
+                                        <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={sessionConfig.selectedScenarios?.includes(tag) || false}
+                                                onChange={e => {
+                                                    const current = sessionConfig.selectedScenarios || []
+                                                    if (e.target.checked) {
+                                                        setSessionConfig({...sessionConfig, selectedScenarios: [...current, tag]})
+                                                    } else {
+                                                        setSessionConfig({...sessionConfig, selectedScenarios: current.filter(t => t !== tag)})
+                                                    }
+                                                }}
+                                            />
+                                            {tag}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <label className="form-label">抽出モード</label>
+                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
+                                    <input
+                                        type="checkbox"
+                                        checked={sessionConfig.useExactScenarioMatch || false}
+                                        onChange={e => setSessionConfig({...sessionConfig, useExactScenarioMatch: e.target.checked})}
+                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                    />
+                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>プールにある対象患者を「そのまま全員」使う (割合・人数指定を無視)</span>
                                 </label>
                             </div>
                         </div>
-                        <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
-                        <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
-                            <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
-                            <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
-                            <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
-                            <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
-                        </div>
-                        <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
-                            <div className="form-group">
-                                <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
-                                <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
+                        
+                        <div style={{ opacity: sessionConfig.useExactScenarioMatch ? 0.4 : 1, pointerEvents: sessionConfig.useExactScenarioMatch ? 'none' : 'auto' }}>
+                            <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
+                            <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
+                                <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
+                                <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
+                                <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
+                                <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
                             </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
-                                <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
-                                <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
-                                <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
+                            <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
+                                <div className="form-group">
+                                    <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
+                                    <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
+                                    <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
+                                    <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
+                                    <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
+                                </div>
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -477,7 +617,7 @@ const AdminPage: React.FC = () => {
                                     <div key={p.id} className="patient-list-item" style={{ '--index': index } as React.CSSProperties}>
                                         <div className="patient-list-item__header">
                                             <div>
-                                                <div className="patient-list-item__name">{p.name}</div>
+                                                <div className="patient-list-item__name">{p.name} <span style={{fontSize: '0.75rem', background: 'var(--gray-200)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{p.scenario_tag || '基本'}</span></div>
                                                 <div className="patient-list-item__meta">ID: {String(p.id).padStart(4, '0')}</div>
                                             </div>
                                             <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>

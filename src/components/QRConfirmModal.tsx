@@ -24,6 +24,9 @@ interface QRConfirmModalProps {
   /** OK（確定）ボタン押下時のコールバック */
   onConfirm: () => void
   /** キャンセルボタン押下時のコールバック */
+  /** 警告メッセージ（ロール不一致時など） */
+  warningText?: string
+  /** キャンセルボタン押下時のコールバック */
   onCancel: () => void
 }
 
@@ -32,6 +35,7 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
   patient,
   onConfirm,
   onCancel,
+  warningText,
 }) => {
   // QR種別に応じたラベルと詳細を生成
   const getLabel = (): { badge: string; badgeClass: string; title: string; detail: string } => {
@@ -91,6 +95,11 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
         <div className="qr-modal__body">
           <p className="qr-modal__title">{title}</p>
           {detail && <p className="qr-modal__detail">{detail}</p>}
+          {warningText && (
+            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', color: '#B91C1C', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              {warningText}
+            </div>
+          )}
         </div>
 
         {/* アクション */}

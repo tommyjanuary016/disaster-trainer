@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
 import { TransitionRoutes } from './components/TransitionRoutes'
 import { GlobalNavigation } from './components/GlobalNavigation'
+import { NotificationProvider } from './components/NotificationProvider'
 
 const Header: React.FC = () => {
     return (
@@ -14,13 +15,15 @@ const Header: React.FC = () => {
 const App: React.FC = () => {
     return (
         <Router>
-            <div className="app-container">
-                <Header />
-                <div className="app-main">
-                    <TransitionRoutes />
+            <NotificationProvider>
+                <div className="app-container">
+                    <Header />
+                    <div className="app-main">
+                        <TransitionRoutes />
+                    </div>
+                    <GlobalNavigation />
                 </div>
-                <GlobalNavigation />
-            </div>
+            </NotificationProvider>
         </Router>
     )
 }

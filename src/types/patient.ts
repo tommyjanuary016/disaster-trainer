@@ -1,7 +1,7 @@
 // 患者データのTypeScript型定義
 
 export type TriageColor = '赤' | '黄' | '緑' | '黒'
-export type PatientStatus = '初期状態' | 'アセスメント完了' | '処置中' | '安定化済' | '悪化'
+export type PatientStatus = '初期状態' | 'アセスメント完了' | '処置中' | '安定化済' | '処置完了' | '悪化' | '急変'
 
 export interface PatientFindings {
     head_and_neck: string
@@ -26,7 +26,9 @@ export interface VitalSignStruct {
     rr: number;      // 呼吸数 (/min)
     spo2: number;    // 動脈血酸素飽和度 (%)
     temp: number;    // 体温 (℃)
-    jcs?: number;    // Japan Coma Scale（意識レベル）
+    gcs_e?: number;  // GCS Eye opening (1-4)
+    gcs_v?: number;  // GCS Verbal response (1-5)
+    gcs_m?: number;  // GCS Motor response (1-6)
 }
 
 export interface Patient {
@@ -75,6 +77,7 @@ export interface Patient {
     // トランザクション（動的）データ
     // ------------------------------------
     session_id?: string // セッションID（全体共有プールの場合は未定義）
+    scenario_tag?: string // シナリオタグ（データセット管理用）
     status: PatientStatus
     assessment_completed: boolean // アセスメント完了フラグ
     reception_time_ms?: number // 診療開始・受付時間 (タイマー・悪化の起点)

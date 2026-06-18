@@ -5,7 +5,13 @@ import {
     onSnapshot,
     updateDoc,
     setDoc,
+    runTransaction,
     Unsubscribe,
+    collection,
+    getDocs,
+    writeBatch,
+    query,
+    where,
 } from 'firebase/firestore'
 import { db, USE_MOCK } from './firebase'
 import { Patient, TrainingSession } from '../types/patient'
@@ -88,7 +94,6 @@ export async function fetchPatient(patientId: number): Promise<Patient | null> {
 // ------------------------------------------------------------------
 // すべての患者データを取得する（Admin用）
 // ------------------------------------------------------------------
-import { collection, getDocs } from 'firebase/firestore'
 
 export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]> {
     if (USE_MOCK || !db) {
@@ -110,18 +115,20 @@ export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]>
 // ------------------------------------------------------------------
 // 全患者データをリアルタイム購読する（Admin用）
 // ------------------------------------------------------------------
-import { query, where } from 'firebase/firestore'
+
 
 export function subscribeToAllPatients(
     callback: (patients: Patient[]) => void,
-    sessionIdOnly = true
+    sessionIdOnly = true,
+    explicitSessionId?: string // 明示的に指定する場合（未指定時は activeSessionId を使用）
 ): Unsubscribe {
+    const targetSessionId = explicitSessionId ?? (sessionIdOnly ? activeSessionId : null)
     if (USE_MOCK || !db) {
         // モックモード: 初回の通知
         const notify = () => {
             const all = Array.from(mockStore.values())
-            if (sessionIdOnly && activeSessionId) {
-                callback(all.filter(p => p.session_id === activeSessionId))
+            if (targetSessionId) {
+                callback(all.filter(p => p.session_id === targetSessionId))
             } else {
                 callback(all)
             }
@@ -138,8 +145,8 @@ export function subscribeToAllPatients(
     // Firestoreモード
     const collRef = collection(db, 'patients')
     let q = query(collRef)
-    if (sessionIdOnly && activeSessionId) {
-        q = query(collRef, where('session_id', '==', activeSessionId))
+    if (targetSessionId) {
+        q = query(collRef, where('session_id', '==', targetSessionId))
     }
 
     return onSnapshot(q, (snap) => {
@@ -173,6 +180,20 @@ export async function saveCustomPatient(patient: Patient): Promise<void> {
     }
     const docRef = doc(db, 'custom_patients', String(patient.id))
     await setDoc(docRef, patient)
+}
+
+// ------------------------------------------------------------------
+// カスタム患者を一括削除する
+// ------------------------------------------------------------------
+export async function deleteAllCustomPatients(): Promise<void> {
+    if (USE_MOCK || !db) return
+    const collRef = collection(db, 'custom_patients')
+    const snap = await getDocs(collRef)
+    const batch = writeBatch(db)
+    snap.docs.forEach(d => {
+        batch.delete(d.ref)
+    })
+    await batch.commit()
 }
 
 // ------------------------------------------------------------------
@@ -249,6 +270,9 @@ export async function startTreatmentTimer(
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {
+            if (patient.timer_started_at != null) {
+                throw new Error('ALREADY_LOCKED')
+            }
             patient.timer_started_at = now
             patient.timer_duration_ms = durationMs
             patient.applied_treatment_id = treatmentId
@@ -259,11 +283,21 @@ export async function startTreatmentTimer(
     }
 
     const docRef = doc(db, 'patients', String(patientId))
-    await updateDoc(docRef, {
-        timer_started_at: now,
-        timer_duration_ms: durationMs,
-        applied_treatment_id: treatmentId,
-        status: '処置中',
+    await runTransaction(db, async (transaction) => {
+        const docSnap = await transaction.get(docRef)
+        if (!docSnap.exists()) {
+            throw new Error('Patient does not exist')
+        }
+        const data = docSnap.data() as Patient
+        if (data.timer_started_at != null) {
+            throw new Error('ALREADY_LOCKED')
+        }
+        transaction.update(docRef, {
+            timer_started_at: now,
+            timer_duration_ms: durationMs,
+            applied_treatment_id: treatmentId,
+            status: '処置中',
+        })
     })
 }
 
@@ -277,20 +311,23 @@ export async function completeTreatment(
             const addedId = patient.applied_treatment_id || 'unknown'
             patient.completed_treatments = patient.completed_treatments || []
             patient.completed_treatments.push(addedId)
-            patient.status = 'アセスメント完了' // 継続して処置可能にする
             patient.timer_started_at = null
             patient.timer_duration_ms = null
             patient.applied_treatment_id = null
 
             // 必須処置がすべて完了したか判定
+            let isStabilized = patient.stabilization_completed || false
             if (patient.required_treatments && patient.required_treatments.length > 0) {
                 const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
                 const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
                 if (allRequiredMet) {
+                    isStabilized = true
                     patient.stabilization_completed = true
-                    patient.post_vs_time_ms = Date.now()
+                    if (!patient.post_vs_time_ms) patient.post_vs_time_ms = Date.now()
                 }
             }
+            
+            patient.status = isStabilized ? '処置完了' : 'アセスメント完了' // 継続して処置可能にする
 
             notifyMockListeners(patientId)
         }
@@ -318,7 +355,7 @@ export async function completeTreatment(
         }
 
         await updateDoc(docRef, {
-            status: 'アセスメント完了',
+            status: isStabilized ? '処置完了' : 'アセスメント完了',
             timer_started_at: null,
             timer_duration_ms: null,
             applied_treatment_id: null,
@@ -361,6 +398,8 @@ export interface SessionConfig {
     examLockTimeMinutes: number  // 検査（画像・採血など）のデフォルト拘束時間
     treatmentLockTimeMinutes: number // 手技（点滴・外科処置など）のデフォルト拘束時間
     isTestMode?: boolean         // 動作確認モード：全拘束時間を5秒に短縮
+    selectedScenarios?: string[] // 使用するシナリオタグのリスト（空なら全対象）
+    useExactScenarioMatch?: boolean // 指定したシナリオの患者を「そのまま全員」使用する（割合抽出を無視）
 }
 
 export async function createTrainingSession(config: SessionConfig): Promise<string> {
@@ -389,36 +428,49 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
     
     // マスターデータ（Firestore）からも取得する（既にセッションに属しているものは除外）
     const masterData = await fetchAllPatients(false)
-    const firestorePool = masterData.filter(p => !p.session_id)
+    const mockIds = new Set(mockPatients.map(p => p.id))
+    const firestorePool = masterData.filter(p => !p.session_id && (config.useBasePatients || !mockIds.has(p.id)))
     
     // プール = allPool に firestorePool を追加（両方にある場合は重複排除）
     const idSet = new Set(allPool.map(p => p.id))
     const merged = [...allPool, ...firestorePool.filter(p => !idSet.has(p.id))]
-    const pool = merged
+    let pool = merged
 
-    // 重症度ごとに分類
-    const reds = pool.filter(p => p.triage_color === '赤')
-    const yellows = pool.filter(p => p.triage_color === '黄')
-    const greens = pool.filter(p => p.triage_color === '緑')
-    const blacks = pool.filter(p => p.triage_color === '黒')
+    // シナリオタグでフィルタリング
+    if (config.selectedScenarios && config.selectedScenarios.length > 0) {
+        pool = pool.filter(p => config.selectedScenarios!.includes(p.scenario_tag || '基本'))
+    }
 
-    const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
-    const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
-    const targetGreen = Math.floor(config.totalPatients * (config.greenRatio / 100))
-    let targetBlack = config.totalPatients - (targetRed + targetYellow + targetGreen)
-    if (targetBlack < 0) targetBlack = 0
+    let selected: Patient[] = []
 
-    const selected: Patient[] = [
-        ...shuffle(reds).slice(0, targetRed),
-        ...shuffle(yellows).slice(0, targetYellow),
-        ...shuffle(greens).slice(0, targetGreen),
-        ...shuffle(blacks).slice(0, targetBlack)
-    ]
+    if (config.useExactScenarioMatch) {
+        // 割合指定を無視し、プールにある患者をそのまま全員使用する
+        selected = [...pool]
+    } else {
+        // 重症度ごとに分類してランダム抽出
+        const reds = pool.filter(p => p.triage_color === '赤')
+        const yellows = pool.filter(p => p.triage_color === '黄')
+        const greens = pool.filter(p => p.triage_color === '緑')
+        const blacks = pool.filter(p => p.triage_color === '黒')
 
-    // 人数が足りない場合は全カテゴリーからランダムに追加
-    if (selected.length < config.totalPatients) {
-        const remainingPool = shuffle(pool.filter(p => !selected.includes(p)))
-        selected.push(...remainingPool.slice(0, config.totalPatients - selected.length))
+        const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
+        const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
+        const targetGreen = Math.floor(config.totalPatients * (config.greenRatio / 100))
+        let targetBlack = config.totalPatients - (targetRed + targetYellow + targetGreen)
+        if (targetBlack < 0) targetBlack = 0
+
+        selected = [
+            ...shuffle(reds).slice(0, targetRed),
+            ...shuffle(yellows).slice(0, targetYellow),
+            ...shuffle(greens).slice(0, targetGreen),
+            ...shuffle(blacks).slice(0, targetBlack)
+        ]
+
+        // 人数が足りない場合は全カテゴリーからランダムに追加
+        if (selected.length < config.totalPatients) {
+            const remainingPool = shuffle(pool.filter(p => !selected.includes(p)))
+            selected.push(...remainingPool.slice(0, config.totalPatients - selected.length))
+        }
     }
 
     // 順序の決定

@@ -108,6 +108,89 @@ const PatientDetailPage: React.FC = () => {
 
             <main className="page__content">
 
+                {/* ===== 次のステップ ガイドバナー ===== */}
+                {(() => {
+                    if (!vitalsAny) {
+                        return (
+                            <div style={{
+                                backgroundColor: '#eff6ff',
+                                border: '1px solid #93c5fd',
+                                borderRadius: '10px',
+                                padding: '0.8rem 1rem',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.8rem',
+                            }}>
+                                <span style={{ fontSize: '1.5rem' }}>1️⃣</span>
+                                <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#1d4ed8' }}>まずバイタルサインを測定してください</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#3b82f6', marginTop: '0.2rem' }}>「処置を実施する」→「診療エリアV/S測定」を選択</div>
+                                </div>
+                            </div>
+                        )
+                    } else if (examCount < examTotal) {
+                        return (
+                            <div style={{
+                                backgroundColor: '#f0fdf4',
+                                border: '1px solid #86efac',
+                                borderRadius: '10px',
+                                padding: '0.8rem 1rem',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.8rem',
+                            }}>
+                                <span style={{ fontSize: '1.5rem' }}>2️⃣</span>
+                                <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#166534' }}>続いて診察手技を実施してください（{examCount}/{examTotal}部位完了）</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#16a34a', marginTop: '0.2rem' }}>「処置を実施する」→「頭頸部診察」「胸部診察」などを選択</div>
+                                </div>
+                            </div>
+                        )
+                    } else if (treatmentTotal > 0 && !allRequiredCompleted) {
+                        return (
+                            <div style={{
+                                backgroundColor: '#fff7ed',
+                                border: '1px solid #fdba74',
+                                borderRadius: '10px',
+                                padding: '0.8rem 1rem',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.8rem',
+                            }}>
+                                <span style={{ fontSize: '1.5rem' }}>3️⃣</span>
+                                <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#9a3412' }}>必要な治療処置を実施してください（{treatmentCount}/{treatmentTotal}完了）</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#ea580c', marginTop: '0.2rem' }}>「処置を実施する」→適切な処置を選択</div>
+                                </div>
+                            </div>
+                        )
+                    } else if (allRequiredCompleted) {
+                        return (
+                            <div style={{
+                                backgroundColor: '#faf5ff',
+                                border: '1px solid #c084fc',
+                                borderRadius: '10px',
+                                padding: '0.8rem 1rem',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.8rem',
+                            }}>
+                                <span style={{ fontSize: '1.5rem' }}>✅</span>
+                                <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#6d28d9' }}>必要な処置がすべて完了しました！</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginTop: '0.2rem' }}>患者を次の担当者へ引き継いでください</div>
+                                </div>
+                            </div>
+                        )
+                    }
+                    return null
+                })()}
+
+
                 {/* ===== 自動ステータスパネル ===== */}
                 <div className={`status-panel status-panel--${overallStatus}`}>
                     <div className="status-panel__header">
@@ -234,9 +317,35 @@ const PatientDetailPage: React.FC = () => {
                 {/* ===== 所見詳細 ===== */}
                 <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} />
 
+                {/* ===== FASTエコー結果（FAST実施済み時にアンロック） ===== */}
+                {uniqueCompleted.includes('fast') && patient.findings.fast && (
+                    <div className="card" style={{ marginTop: '1.5rem', borderLeft: '4px solid #0ea5e9' }}>
+                        <div className="card__label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0ea5e9', fontWeight: 'bold' }}>
+                            <span>🔓</span>
+                            <span>エコー（FAST）結果</span>
+                        </div>
+                        <h4 style={{ fontSize: '0.95rem', margin: '0.5rem 0 0.75rem 0', color: '#0369a1' }}>
+                            FAST所見
+                        </h4>
+                        <pre style={{
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '0.9rem',
+                            color: 'var(--gray-800)',
+                            backgroundColor: '#f0f9ff',
+                            padding: '0.875rem',
+                            borderRadius: 'var(--radius-md)',
+                            fontFamily: 'var(--font-mono)',
+                            lineHeight: 1.7,
+                            margin: 0,
+                        }}>
+                            {patient.findings.fast}
+                        </pre>
+                    </div>
+                )}
+
                 {/* ===== 特別検査結果 ===== */}
                 {((patient.tests_completed && patient.image_urls && patient.image_urls.length > 0) || 
-                  (patient.stabilization_completed && patient.blood_test_data)) && (
+                  (patient.tests_completed && patient.blood_test_data)) && (
                     <div className="test-results-section" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '0.8rem', color: 'var(--gray-900)', borderBottom: '1px solid var(--gray-200)', paddingBottom: '0.5rem' }}>
                             専門検査結果
@@ -255,7 +364,7 @@ const PatientDetailPage: React.FC = () => {
                             </div>
                         )}
 
-                        {patient.stabilization_completed && patient.blood_test_data && (
+                        {patient.tests_completed && patient.blood_test_data && (
                             <div className="card" style={{ marginBottom: '0.8rem', borderLeft: '4px solid #8b5cf6' }}>
                                 <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem 0', color: '#6d28d9' }}>血液検査結果</h4>
                                 <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', margin: 0, color: 'var(--gray-800)', backgroundColor: '#f8fafc', padding: '0.8rem', borderRadius: '4px', fontFamily: 'monospace' }}>

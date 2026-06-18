@@ -42,7 +42,7 @@ const LauncherPage: React.FC = () => {
     const handleSelectSession = (sessionId: string) => {
         setActiveSession(sessionId)
         setShowSessionModal(false)
-        navigate('/training')
+        navigate('/role-select')
     }
 
     const handlePasswordSubmit = async (e: React.FormEvent) => {

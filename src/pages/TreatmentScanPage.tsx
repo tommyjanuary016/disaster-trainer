@@ -6,9 +6,29 @@ import { Patient } from '../types/patient'
 import { parseQRCode, ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
 import QRConfirmModal from '../components/QRConfirmModal'
+import { useRole } from '../hooks/useRole'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
+
+// 医師専用処置のリスト（看護師などが選択した際に警告を出す用）
+const DOCTOR_ONLY_PROCEDURES = [
+    'intubation',
+    'surgical_airway',
+    'needle_decompression',
+    'chest_tube',
+    'vasopressor',
+    'antihypertensive',
+    'fasciotomy',
+    'open_cardiac_massage',
+    'aortic_cross_clamping',
+    'exploratory_laparotomy',
+    'emergency_c_section',
+    'iabo',
+    'iabp',
+    'pcps',
+    'pericardiocentesis',
+]
 
 // 手技IDと表示名のマッピング（全臨床リスト）
 export const PROCEDURE_NAMES: Record<string, string> = {
@@ -30,6 +50,8 @@ export const PROCEDURE_NAMES: Record<string, string> = {
     ventilator: '人工呼吸器開始',
     needle_decompression: '胸腔穿刺 (緊急脱気)',
     chest_tube: '胸腔ドレーン挿入',
+    gauze_towel_fixation: 'ガーゼ固定、タオル固定',
+    three_sided_taping: '三辺テーピング',
     // 循環・輸液・輸血
     iv_access: '静脈路確保(末梢)',
     iv_access_2: '静脈路確保(2本目)',
@@ -78,6 +100,7 @@ interface ResolvedProcedure {
 const TreatmentScanPage: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>()
     const navigate = useNavigate()
+    const { role } = useRole()
     const [manualTreatmentId, setManualTreatmentId] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [patient, setPatient] = useState<Patient | null>(null)
@@ -94,10 +117,12 @@ const TreatmentScanPage: React.FC = () => {
         }
     }, [])
 
+
     // 確認モーダル用の状態
     const [pendingProcedure, setPendingProcedure] = useState<ResolvedProcedure | null>(null)
     const [pendingParsed, setPendingParsed] = useState<ParsedQRCode | null>(null)
     const [timerMinutes, setTimerMinutes] = useState<number>(0)
+    const [roleWarning, setRoleWarning] = useState<string | undefined>(undefined)
     const [showModal, setShowModal] = useState(false)
 
     useEffect(() => {
@@ -222,6 +247,13 @@ const TreatmentScanPage: React.FC = () => {
             return
         }
 
+        // ロール（役割）による警告
+        if (role !== '医師' && DOCTOR_ONLY_PROCEDURES.includes(resolved.treatment_id)) {
+            setRoleWarning(`⚠️ 現在の役割は「${role}」です。この処置は通常、医師が行います。医師の指示があるか確認してください。`)
+        } else {
+            setRoleWarning(undefined)
+        }
+
         setError(null)
         setPendingProcedure(resolved)
         setPendingParsed(parsed)
@@ -247,24 +279,37 @@ const TreatmentScanPage: React.FC = () => {
         const treatId = pendingProcedure.treatment_id
         const now = Date.now()
 
-        // トリアージ手技完了時 → triage_time_ms を記録
-        if (treatId === 'triage' && patient && !patient.triage_time_ms) {
-            await updatePatientFlags(pid, { triage_time_ms: now })
-        }
+        try {
+            await startTreatmentTimer(pid, treatId, timerMinutes)
 
-        // バイタルサイン測定手技完了時 → initial_vs_time_ms を記録
-        if (treatId === 'vitals' && patient && !patient.initial_vs_time_ms) {
-            await updatePatientFlags(pid, { initial_vs_time_ms: now })
-        }
+            // トリアージ手技完了時 → triage_time_ms を記録
+            if (treatId === 'triage' && patient && !patient.triage_time_ms) {
+                await updatePatientFlags(pid, { triage_time_ms: now })
+            }
 
-        await startTreatmentTimer(pid, treatId, timerMinutes)
-        navigate(`/training/patient/${patientId}`)
+            // バイタルサイン測定手技完了時 → initial_vs_time_ms を記録
+            if (treatId === 'vitals' && patient && !patient.initial_vs_time_ms) {
+                await updatePatientFlags(pid, { initial_vs_time_ms: now })
+            }
+
+            navigate(`/training/patient/${patientId}`)
+        } catch (err: any) {
+            if (err.message === 'ALREADY_LOCKED') {
+                setError('⚠️ 他のプレイヤーが既に処置を開始しています。画面をリロードしてください。')
+            } else {
+                setError('エラーが発生しました: ' + err.message)
+            }
+            setShowModal(false)
+            setPendingProcedure(null)
+            setPendingParsed(null)
+        }
     }
 
-    const handleCancel = () => {
+            const handleCancel = () => {
         setShowModal(false)
         setPendingProcedure(null)
         setPendingParsed(null)
+        setRoleWarning(undefined)
         setManualTreatmentId('')
         setError(null)
     }
@@ -277,6 +322,7 @@ const TreatmentScanPage: React.FC = () => {
                     parsed={pendingParsed}
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
+                    warningText={roleWarning}
                 />
             )}
 
@@ -375,6 +421,8 @@ const TreatmentScanPage: React.FC = () => {
                                         <option value="ventilator">{PROCEDURE_NAMES.ventilator}</option>
                                         <option value="needle_decompression">{PROCEDURE_NAMES.needle_decompression}</option>
                                         <option value="chest_tube">{PROCEDURE_NAMES.chest_tube}</option>
+                                        <option value="gauze_towel_fixation">{PROCEDURE_NAMES.gauze_towel_fixation}</option>
+                                        <option value="three_sided_taping">{PROCEDURE_NAMES.three_sided_taping}</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 循環・輸液・輸血" disabled={!hasVitalsOrExams}>

@@ -14,8 +14,10 @@ function interpolateLimit(start: number, end: number, progress: number): number 
 }
 
 function formatVitals(vitals: VitalSignStruct): string {
-    const jcsStr = vitals.jcs !== undefined ? `\n・JCS: ${vitals.jcs}` : ''
-    return `・BP: ${vitals.sbp}/${vitals.dbp}\n・HR：${vitals.hr}\n・R:${vitals.rr}\n・SPO2:${vitals.spo2}%\n・KT:${vitals.temp.toFixed(1)}${jcsStr}`
+    const hasGCS = vitals.gcs_e !== undefined || vitals.gcs_v !== undefined || vitals.gcs_m !== undefined
+    const gcsTotal = (vitals.gcs_e || 0) + (vitals.gcs_v || 0) + (vitals.gcs_m || 0)
+    const gcsStr = hasGCS ? `\n・GCS: E${vitals.gcs_e}V${vitals.gcs_v}M${vitals.gcs_m} (${gcsTotal})` : ''
+    return `・BP: ${vitals.sbp}/${vitals.dbp}\n・HR：${vitals.hr}\n・R:${vitals.rr}\n・SPO2:${vitals.spo2}%\n・KT:${vitals.temp.toFixed(1)}${gcsStr}`
 }
 
 export function useDeterioration(patient: Patient | null): DeteriorationResult {
@@ -103,9 +105,15 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
                 rr:   interpolateLimit(init.rr, post.rr, progress),
                 spo2: interpolateLimit(init.spo2, post.spo2, progress),
                 temp: Number((init.temp + (post.temp - init.temp) * progress).toFixed(1)),
-                jcs:  init.jcs !== undefined && post.jcs !== undefined
-                    ? interpolateJCS(init.jcs, post.jcs, progress)
-                    : init.jcs,
+                gcs_e: init.gcs_e !== undefined && post.gcs_e !== undefined
+                    ? Math.max(1, Math.min(4, Math.round(init.gcs_e + (post.gcs_e - init.gcs_e) * progress)))
+                    : init.gcs_e,
+                gcs_v: init.gcs_v !== undefined && post.gcs_v !== undefined
+                    ? Math.max(1, Math.min(5, Math.round(init.gcs_v + (post.gcs_v - init.gcs_v) * progress)))
+                    : init.gcs_v,
+                gcs_m: init.gcs_m !== undefined && post.gcs_m !== undefined
+                    ? Math.max(1, Math.min(6, Math.round(init.gcs_m + (post.gcs_m - init.gcs_m) * progress)))
+                    : init.gcs_m,
             }
             
             setCurrentVitalsStruct(currentStruct)
@@ -129,21 +137,17 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.status,
         patient?.completed_treatments?.length, // CPR完了などのトリガーを検知するため
         patient?.rosc_possible,
+        // vitals_post_struct はオブジェクト参照比較では変化を検知できないため個別値を監視
+        patient?.vitals_post_struct?.sbp,
+        patient?.vitals_post_struct?.dbp,
+        patient?.vitals_post_struct?.hr,
+        patient?.vitals_post_struct?.rr,
+        patient?.vitals_post_struct?.spo2,
+        patient?.vitals_post_struct?.temp,
+        patient?.vitals_post_struct?.gcs_e,
+        patient?.vitals_post_struct?.gcs_v,
+        patient?.vitals_post_struct?.gcs_m,
     ])
 
     return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
-}
-
-/**
- * JCSスケールの離散値リスト（補間時に最も近い値にスナップ）
- * JCS: [0, 1, 2, 3, 10, 20, 30, 100, 200, 300]
- */
-const JCS_SCALE = [0, 1, 2, 3, 10, 20, 30, 100, 200, 300]
-
-function interpolateJCS(start: number, end: number, progress: number): number {
-    const raw = start + (end - start) * progress
-    // 最も近いJCS値にスナップ
-    return JCS_SCALE.reduce((prev, curr) =>
-        Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev
-    )
 }

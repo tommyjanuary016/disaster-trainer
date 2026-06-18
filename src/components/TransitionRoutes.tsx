@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import LauncherPage from '../pages/LauncherPage'
+import RoleSelectionPage from '../pages/RoleSelectionPage'
 import QRScannerPage from '../pages/QRScannerPage'
 import PatientDetailPage from '../pages/PatientDetailPage'
 import TreatmentScanPage from '../pages/TreatmentScanPage'
@@ -64,6 +65,7 @@ export const TransitionRoutes: React.FC = () => {
             <Routes location={displayLocation}>
                 {/* 起動画面 */}
                 <Route path="/" element={<LauncherPage />} />
+                <Route path="/role-select" element={<RoleSelectionPage />} />
 
                 {/* 訓練系ルート（/training/ プレフィックス） */}
                 <Route path="/training" element={<QRScannerPage />} />

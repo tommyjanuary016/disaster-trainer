@@ -55,7 +55,7 @@ function structToText(s: VitalSignStruct | undefined): string {
         s.rr   ? `RR ${s.rr}`          : null,
         s.spo2 ? `SpO2 ${s.spo2}%`     : null,
         s.temp ? `Temp ${s.temp}℃`     : null,
-        (s.jcs !== undefined && s.jcs !== null) ? `JCS ${s.jcs}` : null,
+        (s.gcs_e || s.gcs_v || s.gcs_m) ? `GCS E${s.gcs_e || 4}V${s.gcs_v || 5}M${s.gcs_m || 6}` : null,
     ].filter(Boolean)
     return parts.join(', ')
 }
@@ -68,12 +68,185 @@ function escapeCSV(str: string | number | undefined | null): string {
 }
 
 // ------------------------------------------------------------------
+// 解決策A: 診断名・トリアージ色から血液検査データを自動生成
+// CSVの「血液検査データ」列が空欄の場合に呼び出される
+// ------------------------------------------------------------------
+export function generateDefaultBloodTestData(diagnosis: string, triage_color: string): string {
+    const diag = diagnosis.toLowerCase()
+
+    // 共通の重症度ベースライン
+    const isRed    = triage_color === '赤'
+    const isYellow = triage_color === '黄'
+
+    // 診断名キーワードによる傷病パターン分類
+    const isTraumaticBleed = /出血|骨折|骨盤|大腿|断裂|裂傷|挫創|外出血/.test(diag)
+    const isChestInjury    = /気胸|血胸|肋骨|胸部外傷|肺挫傷/.test(diag)
+    const isCrush          = /クラッシュ|挫滅|コンパートメント/.test(diag)
+    const isHead           = /頭部|頭蓋|脳|硬膜/.test(diag)
+    const isBurn           = /熱傷|火傷|吸入/.test(diag)
+    const isSepsis         = /敗血症|感染/.test(diag)
+    const isCardiac        = /心停止|心肺停止|心筋梗塞|心室細動/.test(diag)
+    const isToxic          = /中毒|薬物|CO中毒/.test(diag)
+
+    // ベースラインとなる正常値
+    let wbc  = '9,800'
+    let rbc  = '4.80'
+    let hgb  = '14.2'
+    let hct  = '42'
+    let plt  = '18.5'
+    let tp   = '7.2'
+    let alb  = '4.1'
+    let alt  = '28'
+    let ast  = '24'
+    let ldh  = '182'
+    let tbil = '0.8'
+    let bun  = '14'
+    let cre  = '0.82'
+    let na   = '139'
+    let k    = '4.0'
+    let cl   = '103'
+    let cRP  = '0.3'
+    let pt   = '100%'
+    let aptt = '28.4'
+    let fibr = '320'
+    let ph   = '7.42'
+    let pco2 = '39'
+    let pO2  = '97'
+    let hco3 = '25.2'
+    let lac  = '1.2'
+    let trop = '<0.01'
+    let bn   = '<18'
+
+    // 出血性外傷（赤タグ）
+    if (isTraumaticBleed && isRed) {
+        hgb = '6.8'; hct = '21'; rbc = '2.26'
+        plt = '9.8'; pt = '48%'; aptt = '55.2'; fibr = '120'
+        bun = '22'; cre = '1.20'
+        ph = '7.15'; pco2 = '34'; hco3 = '11.8'; lac = '6.8'
+        wbc = '14,200'
+    } else if (isTraumaticBleed && isYellow) {
+        hgb = '9.2'; hct = '28'; rbc = '3.01'
+        plt = '14.2'; pt = '72%'; aptt = '38.1'; fibr = '210'
+        lac = '3.1'; ph = '7.32'; hco3 = '18.4'
+    }
+
+    // 胸部外傷
+    if (isChestInjury && isRed) {
+        pO2 = '58'; pco2 = '52'; ph = '7.28'; hco3 = '16.2'; lac = '4.2'
+        wbc = '12,800'; ast = '82'; alt = '44'
+    } else if (isChestInjury && isYellow) {
+        pO2 = '78'; pco2 = '44'; lac = '2.4'
+    }
+
+    // クラッシュ症候群
+    if (isCrush) {
+        cre = '3.40'; bun = '48'; k = '6.2'
+        ldh = '2,840'; ast = '620'; alt = '380'; alb = '2.9'
+        ph = '7.18'; hco3 = '12.4'; lac = '5.6'
+        rbc = '3.12'; hgb = '8.6'
+    }
+
+    // 頭部外傷
+    if (isHead) {
+        na = '148'; k = '3.4'; bun = '20'
+        if (isRed) { lac = '3.8'; ph = '7.30' }
+    }
+
+    // 熱傷・吸入外傷
+    if (isBurn) {
+        wbc = '18,200'; cRP = '12.4'; alb = '2.6'; tp = '5.1'
+        bun = '28'; cre = '1.08'
+        if (isRed) { hgb = '8.4'; hct = '25'; ph = '7.24'; pO2 = '62' }
+    }
+
+    // 敗血症
+    if (isSepsis) {
+        wbc = isRed ? '22,400' : '16,800'
+        cRP = isRed ? '28.6' : '14.2'
+        plt = isRed ? '6.2' : '12.0'; pt = isRed ? '38%' : '68%'
+        lac = isRed ? '8.2' : '4.0'; ph = isRed ? '7.12' : '7.28'
+        bun = '32'; cre = '1.80'; alb = '2.4'
+    }
+
+    // 心停止
+    if (isCardiac) {
+        ph = '6.98'; pco2 = '68'; hco3 = '8.6'; lac = '12.0'
+        trop = '2.84'; k = '6.8'; cre = '1.60'
+        wbc = '16,000'
+    }
+
+    // CO中毒など
+    if (isToxic) {
+        pO2 = '350 (高流量O2後)'; pco2 = '42'; ph = '7.38'
+        lac = '3.6'; ast = '44'; alt = '38'
+    }
+
+    return [
+        '【血算】',
+        `WBC: ${wbc} /μL　RBC: ${rbc} × 10⁶/μL　Hgb: ${hgb} g/dL　Hct: ${hct}%　Plt: ${plt} × 10⁴/μL`,
+        '',
+        '【生化学】',
+        `TP: ${tp} g/dL　Alb: ${alb} g/dL　T-Bil: ${tbil} mg/dL`,
+        `AST: ${ast} IU/L　ALT: ${alt} IU/L　LDH: ${ldh} IU/L`,
+        `BUN: ${bun} mg/dL　Cre: ${cre} mg/dL`,
+        `Na: ${na} mEq/L　K: ${k} mEq/L　Cl: ${cl} mEq/L`,
+        `CRP: ${cRP} mg/dL`,
+        isCardiac ? `Troponin I: ${trop} ng/mL　BNP: ${bn} pg/mL` : '',
+        '',
+        '【凝固】',
+        `PT: ${pt}　APTT: ${aptt} sec　Fibrinogen: ${fibr} mg/dL`,
+        '',
+        '【血液ガス（動脈血）】',
+        `pH: ${ph}　PaCO₂: ${pco2} mmHg　PaO₂: ${pO2} mmHg　HCO₃⁻: ${hco3} mmol/L　Lac: ${lac} mmol/L`,
+    ].filter(l => l !== '').join('\n')
+}
+
+// ------------------------------------------------------------------
+// 解決策A: 診断名・triage_colorからFAST所見テキストを自動生成
+// CSV「FAST所見」列が空欄の場合に呼び出される
+// ------------------------------------------------------------------
+export function generateDefaultFastFindings(diagnosis: string, triage_color: string): string {
+    const diag = diagnosis.toLowerCase()
+
+    const hasPelvicFracture  = /骨盤骨折|骨盤外傷/.test(diag)
+    const hasAbdominalTrauma = /腹部外傷|肝裂傷|脾裂傷|腸間膜損傷|腹腔内出血/.test(diag)
+    const hasChestTrauma     = /血胸|血気胸|心タンポナーデ|心嚢液/.test(diag)
+    const hasCrush           = /クラッシュ|挫滅/.test(diag)
+
+    const isRed = triage_color === '赤'
+
+    // 異常なし（緑・黒・無症状）
+    if (triage_color === '緑' || triage_color === '黒') {
+        return 'Morison窩：液体貯留なし（−）\n脾腎間：液体貯留なし（−）\n骨盤腔：液体貯留なし（−）\n心嚢：液体貯留なし（−）\n→ FAST陰性'
+    }
+
+    if (hasChestTrauma) {
+        return `Morison窩：液体貯留なし（−）\n脾腎間：液体貯留なし（−）\n骨盤腔：液体貯留なし（−）\n心嚢：${isRed ? '心嚢液貯留あり（＋）、心タンポナーデ疑い' : '少量の液体貯留（+/−）'}\n→ FAST ${isRed ? '陽性（心嚢）' : '境界域'}`
+    }
+
+    if (hasPelvicFracture) {
+        return `Morison窩：液体貯留なし（−）\n脾腎間：液体貯留なし（−）\n骨盤腔：${isRed ? '大量の液体貯留あり（＋＋）、後腹膜血腫の可能性' : '少量の液体貯留（+/−）'}\n心嚢：液体貯留なし（−）\n→ FAST ${isRed ? '陽性（骨盤腔）' : '境界域'}`
+    }
+
+    if (hasAbdominalTrauma || hasCrush) {
+        return `Morison窩：${isRed ? '液体貯留あり（＋）、腹腔内出血疑い' : '少量の液体貯留（+/−）'}\n脾腎間：${isRed ? '液体貯留あり（＋）' : '液体貯留なし（−）'}\n骨盤腔：${isRed ? '液体貯留あり（＋）' : '液体貯留なし（−）'}\n心嚢：液体貯留なし（−）\n→ FAST ${isRed ? '陽性（腹腔内出血）' : '境界域'}`
+    }
+
+    // デフォルト（外傷全般・黄タグ）
+    if (isRed) {
+        return 'Morison窩：液体貯留あり（＋）\n脾腎間：液体貯留なし（−）\n骨盤腔：液体貯留なし（−）\n心嚢：液体貯留なし（−）\n→ FAST陽性（腹腔内出血疑い）'
+    }
+    return 'Morison窩：液体貯留なし（−）\n脾腎間：液体貯留なし（−）\n骨盤腔：液体貯留なし（−）\n心嚢：液体貯留なし（−）\n→ FAST陰性'
+}
+
+// ------------------------------------------------------------------
 // マスターCSV雛形生成（現在のPatient型に合わせた完全対応版）
 // セッション中でない場合にダウンロードされる「患者雛形CSV」として使用
 // ------------------------------------------------------------------
 export function exportMasterCSV(patients: Patient[]): string {
     // ヘッダー列定義（Patient型の全フィールドに対応）
     const headers = [
+        'シナリオタグ',
         '管理番号',
         '患者氏名',
         '年齢',
@@ -82,10 +255,10 @@ export function exportMasterCSV(patients: Patient[]): string {
         '現場トリアージ区分',
         // 構造化V/S（トリアージ時）
         'トリアージ時_SBP', 'トリアージ時_DBP', 'トリアージ時_HR',
-        'トリアージ時_RR', 'トリアージ時_SpO2', 'トリアージ時_Temp', 'トリアージ時_JCS',
+        'トリアージ時_RR', 'トリアージ時_SpO2', 'トリアージ時_Temp', 'トリアージ時_GCS_E', 'トリアージ時_GCS_V', 'トリアージ時_GCS_M',
         // 構造化V/S（初期評価時）
         '初期評価時_SBP', '初期評価時_DBP', '初期評価時_HR',
-        '初期評価時_RR', '初期評価時_SpO2', '初期評価時_Temp', '初期評価時_JCS',
+        '初期評価時_RR', '初期評価時_SpO2', '初期評価時_Temp', '初期評価時_GCS_E', '初期評価時_GCS_V', '初期評価時_GCS_M',
         // 身体所見
         '頭頸部所見',
         '胸部所見',
@@ -113,7 +286,7 @@ export function exportMasterCSV(patients: Patient[]): string {
         '悪化シナリオ有効',
         '悪化到達時間（分）',
         '悪化目標_SBP', '悪化目標_DBP', '悪化目標_HR',
-        '悪化目標_RR', '悪化目標_SpO2', '悪化目標_Temp', '悪化目標_JCS',
+        '悪化目標_RR', '悪化目標_SpO2', '悪化目標_Temp', '悪化目標_GCS_E', '悪化目標_GCS_V', '悪化目標_GCS_M',
         'ROSC可能',
         'ROSC目標_SBP', 'ROSC目標_DBP', 'ROSC目標_HR',
         'ROSC目標_RR', 'ROSC目標_SpO2', 'ROSC目標_Temp',
@@ -135,6 +308,7 @@ export function exportMasterCSV(patients: Patient[]): string {
         }
 
         const row = [
+            p.scenario_tag || '基本',
             p.id,
             p.name,
             p.age,
@@ -143,10 +317,10 @@ export function exportMasterCSV(patients: Patient[]): string {
             p.scene_triage_color || '',
             // トリアージ時V/S
             vs_t?.sbp  ?? '', vs_t?.dbp  ?? '', vs_t?.hr   ?? '',
-            vs_t?.rr   ?? '', vs_t?.spo2 ?? '', vs_t?.temp ?? '', vs_t?.jcs ?? '',
+            vs_t?.rr   ?? '', vs_t?.spo2 ?? '', vs_t?.temp ?? '', vs_t?.gcs_e ?? '', vs_t?.gcs_v ?? '', vs_t?.gcs_m ?? '',
             // 初期評価時V/S
             vs_i?.sbp  ?? '', vs_i?.dbp  ?? '', vs_i?.hr   ?? '',
-            vs_i?.rr   ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.jcs ?? '',
+            vs_i?.rr   ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.gcs_e ?? '', vs_i?.gcs_v ?? '', vs_i?.gcs_m ?? '',
             // 所見
             p.findings?.head_and_neck     || '',
             p.findings?.chest             || '',
@@ -170,7 +344,7 @@ export function exportMasterCSV(patients: Patient[]): string {
             p.deterioration_enabled ? '有効' : '無効',
             p.deterioration_time_minutes ?? 30,
             vs_p?.sbp  ?? '', vs_p?.dbp  ?? '', vs_p?.hr   ?? '',
-            vs_p?.rr   ?? '', vs_p?.spo2 ?? '', vs_p?.temp ?? '', vs_p?.jcs ?? '',
+            vs_p?.rr   ?? '', vs_p?.spo2 ?? '', vs_p?.temp ?? '', vs_p?.gcs_e ?? '', vs_p?.gcs_v ?? '', vs_p?.gcs_m ?? '',
             p.rosc_possible ? '可能' : '不可',
             vs_r?.sbp  ?? '', vs_r?.dbp  ?? '', vs_r?.hr   ?? '',
             vs_r?.rr   ?? '', vs_r?.spo2 ?? '', vs_r?.temp ?? '',
@@ -186,11 +360,12 @@ export function exportMasterCSV(patients: Patient[]): string {
 // ------------------------------------------------------------------
 export function exportCSV(patients: Patient[]): string {
     const headers = [
-        '管理番号', '患者氏名', '年齢', '性別', '想定トリアージ区分', '現場トリアージ区分', '診断名',
-        '現在ステータス', 'トリアージ完了日時', '初期V/S完了日時', 
+        '管理番号', '患者氏名', 'シナリオタグ', '年齢', '性別', '想定トリアージ区分', '現場トリアージ区分', '診断名',
+        '現在ステータス', 'トリアージ完了日時', '初期V/S完了日時', '最終処置完了日時',
         '処置済み項目', '画像検査実施', '血液検査実施', 
-        '初期V/S_SBP', '初期V/S_DBP', '初期V/S_HR', '初期V/S_RR', '初期V/S_SpO2', '初期V/S_Temp', '初期V/S_JCS',
-        '最新V/S(テキスト)'
+        '初期V/S_SBP', '初期V/S_DBP', '初期V/S_HR', '初期V/S_RR', '初期V/S_SpO2', '初期V/S_Temp', '初期V/S_GCS_E', '初期V/S_GCS_V', '初期V/S_GCS_M',
+        '最新V/S(テキスト)',
+        'KPI_病着からトリアージまでの時間(分)', 'KPI_トリアージから初期評価までの時間(分)', 'KPI_病着から根本治療までの時間(分)', 'KPI_急変の有無', 'KPI_トリアージ乖離'
     ]
 
     const formatTime = (ms?: number | null) => {
@@ -201,9 +376,31 @@ export function exportCSV(patients: Patient[]): string {
 
     const rows = patients.map(p => {
         const vs_i = p.vitals_initial_struct
+
+        // KPI計算用
+        const calcMinutes = (start?: number, end?: number) => {
+            if (!start || !end) return ''
+            const diffMs = end - start
+            if (diffMs < 0) return '0'
+            return (diffMs / (1000 * 60)).toFixed(1)
+        }
+
+        const triageDiff = () => {
+            if (!p.scene_triage_color) return ''
+            if (p.scene_triage_color === p.triage_color) return '一致'
+            // 簡易的な乖離判定（重さ: 赤>黄>緑>黒 とみなす）
+            const severity = { '赤': 4, '黄': 3, '緑': 2, '黒': 1 }
+            const sceneSev = severity[p.scene_triage_color] || 0
+            const realSev = severity[p.triage_color] || 0
+            if (sceneSev > realSev) return 'オーバートリアージ'
+            if (sceneSev < realSev) return 'アンダートリアージ'
+            return ''
+        }
+
         const row = [
             p.id,
             p.name,
+            p.scenario_tag || '基本',
             p.age,
             p.gender === 'M' ? '男性' : '女性',
             p.triage_color,
@@ -212,13 +409,20 @@ export function exportCSV(patients: Patient[]): string {
             p.status,
             formatTime(p.triage_time_ms),
             formatTime(p.initial_vs_time_ms),
+            formatTime(p.post_vs_time_ms), // 最終処置完了日時とみなす
             p.completed_treatments?.join(',') || 'なし',
             p.tests_completed ? '済' : '未',
             p.stabilization_completed ? '済' : '未',
             vs_i?.sbp ?? '', vs_i?.dbp ?? '', vs_i?.hr ?? '',
-            vs_i?.rr ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.jcs ?? '',
+            vs_i?.rr ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.gcs_e ?? '', vs_i?.gcs_v ?? '', vs_i?.gcs_m ?? '',
             // ログ用に改行を空白に変換
-            (structToText(p.vitals_initial_struct) || p.vitals_initial || '').replace(/\n/g, ' ')
+            (structToText(p.vitals_initial_struct) || p.vitals_initial || '').replace(/\n/g, ' '),
+            // KPIs
+            calcMinutes(p.reception_time_ms, p.triage_time_ms),
+            calcMinutes(p.triage_time_ms, p.initial_vs_time_ms),
+            calcMinutes(p.reception_time_ms, p.post_vs_time_ms),
+            (p.status === '急変' || p.status === '悪化') ? '発生' : 'なし',
+            triageDiff()
         ]
         return row.map(cell => escapeCSV(cell as string)).join(',')
     })
@@ -261,6 +465,15 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
         // 構造化V/Sのパース（新フォーマット優先、なければフリーテキストから推定）
         const parseNum = (s: string) => (s && s !== '') ? (parseFloat(s) || 0) : 0
 
+        // 自動補完ロジック：空欄の場合、トリアージ色から生成
+        const generateDefaultVitals = (color: string) => {
+            if (color === '赤') return { sbp: 80, dbp: 50, hr: 130, rr: 30, spo2: 90, temp: 36.5, gcs_e: 2, gcs_v: 3, gcs_m: 4 }
+            if (color === '黄') return { sbp: 100, dbp: 60, hr: 110, rr: 24, spo2: 95, temp: 36.5, gcs_e: 3, gcs_v: 4, gcs_m: 6 }
+            if (color === '緑') return { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
+            if (color === '黒') return { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 1, gcs_v: 1, gcs_m: 1 }
+            return { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
+        }
+
         const vitals_triage_struct = data['トリアージ時_SBP'] ? {
             sbp:  parseNum(data['トリアージ時_SBP']),
             dbp:  parseNum(data['トリアージ時_DBP']),
@@ -268,8 +481,10 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             rr:   parseNum(data['トリアージ時_RR']),
             spo2: parseNum(data['トリアージ時_SpO2']),
             temp: parseNum(data['トリアージ時_Temp']) || 36.5,
-            jcs:  parseNum(data['トリアージ時_JCS']),
-        } : undefined
+            gcs_e: parseNum(data['トリアージ時_GCS_E']) || undefined,
+            gcs_v: parseNum(data['トリアージ時_GCS_V']) || undefined,
+            gcs_m: parseNum(data['トリアージ時_GCS_M']) || undefined,
+        } : generateDefaultVitals(triage_color);
 
         const vitals_initial_struct = data['初期評価時_SBP'] ? {
             sbp:  parseNum(data['初期評価時_SBP']),
@@ -278,8 +493,10 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             rr:   parseNum(data['初期評価時_RR']),
             spo2: parseNum(data['初期評価時_SpO2']),
             temp: parseNum(data['初期評価時_Temp']) || 36.5,
-            jcs:  parseNum(data['初期評価時_JCS']),
-        } : undefined
+            gcs_e: parseNum(data['初期評価時_GCS_E']) || undefined,
+            gcs_v: parseNum(data['初期評価時_GCS_V']) || undefined,
+            gcs_m: parseNum(data['初期評価時_GCS_M']) || undefined,
+        } : generateDefaultVitals(triage_color);
 
         const vitals_post_struct = data['悪化目標_SBP'] ? {
             sbp:  parseNum(data['悪化目標_SBP']),
@@ -288,8 +505,10 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             rr:   parseNum(data['悪化目標_RR']),
             spo2: parseNum(data['悪化目標_SpO2']),
             temp: parseNum(data['悪化目標_Temp']) || 36.5,
-            jcs:  parseNum(data['悪化目標_JCS']),
-        } : undefined
+            gcs_e: parseNum(data['悪化目標_GCS_E']) || undefined,
+            gcs_v: parseNum(data['悪化目標_GCS_V']) || undefined,
+            gcs_m: parseNum(data['悪化目標_GCS_M']) || undefined,
+        } : undefined;
 
         const vitals_rosc_struct = (data['ROSC可能'] === '可能' && data['ROSC目標_SBP']) ? {
             sbp:  parseNum(data['ROSC目標_SBP']),
@@ -315,9 +534,10 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
         }
 
         const patient: Patient = {
+            scenario_tag: data['シナリオタグ'] || 'カスタム',
             id: Math.max(0, parseInt(data['管理番号'], 10) || Date.now() + i),
             name: data['患者氏名'] || '名称未設定',
-            age: Math.max(0, parseInt(data['年齢'], 10) || 0),
+            age: Math.max(0, parseInt(data['年齢'], 10) || 30),
             gender: (data['性別'] || '').includes('F') || (data['性別'] || '').includes('女') ? 'F' : 'M',
             triage_color,
             scene_triage_color,
@@ -333,7 +553,11 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
                 chest:               data['胸部所見']          || '',
                 abdomen_and_pelvis:  data['腹部・骨盤所見']    || '',
                 limbs:               data['四肢所見']          || '',
-                fast:                data['FAST所見']          || '',
+                // FAST所見が空欄の場合は診断名・トリアージ色から自動生成（解決策A）
+                fast: data['FAST所見'] || generateDefaultFastFindings(
+                    data['診断名'] || '',
+                    triage_color
+                ),
                 ample:               data['AMPLE']             || '',
                 background:          data['背景（負傷機転）']  || '',
             },
@@ -344,7 +568,11 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             image_urls: data['画像URL（カンマ区切り）']
                 ? data['画像URL（カンマ区切り）'].split(',').map(s => s.trim()).filter(Boolean)
                 : [],
-            blood_test_data: data['血液検査データ'] || '',
+            // 血液検査データが空欄の場合は診断名・トリアージ色から自動生成（解決策A）
+            blood_test_data: data['血液検査データ'] || generateDefaultBloodTestData(
+                data['診断名'] || '',
+                triage_color
+            ),
             required_treatments,
             deterioration_enabled:       data['悪化シナリオ有効'] === '有効',
             deterioration_time_minutes:  parseInt(data['悪化到達時間（分）']) || 30,

@@ -14,19 +14,49 @@ const defaultTreatment: RequiredTreatment = {
 }
 
 const COMMON_TREATMENTS = [
-    { id: 'iv_fluid', name: '点滴 (外液・ルート等)', time: 1 },
-    { id: 'blood_transfusion', name: '緊急輸血', time: 5 },
-    { id: 'chest_tube', name: '胸腔ドレーン挿入', time: 5 },
+    // 気道・呼吸
+    { id: 'oxygen', name: '酸素投与', time: 5 },
+    { id: 'hfnc', name: 'ハイフロー開始 (HFNC)', time: 5 },
     { id: 'intubation', name: '気管挿管', time: 5 },
+    { id: 'surgical_airway', name: '外科的気道確保', time: 5 },
+    { id: 'ventilator', name: '人工呼吸器開始', time: 5 },
+    { id: 'needle_decompression', name: '胸腔穿刺 (緊急脱気)', time: 5 },
+    { id: 'chest_tube', name: '胸腔ドレーン挿入', time: 5 },
+    { id: 'gauze_towel_fixation', name: 'ガーゼ固定、タオル固定', time: 5 },
+    { id: 'three_sided_taping', name: '三辺テーピング', time: 5 },
+    // 循環・輸液・輸血
+    { id: 'iv_access', name: '静脈路確保(末梢)', time: 5 },
+    { id: 'iv_access_2', name: '静脈路確保(2本目)', time: 5 },
+    { id: 'cv_access', name: '中心静脈路確保', time: 5 },
+    { id: 'quinton_catheter', name: '血管アクセスカテーテル挿入 (クイントン)', time: 5 },
+    { id: 'iv_fluid', name: '外液急速投与', time: 1 },
+    { id: 'blood_transfusion', name: '緊急輸血 (RBC/FFP/PC)', time: 5 },
+    // 薬剤投与
+    { id: 'vasopressor', name: '昇圧剤投与', time: 5 },
+    { id: 'antihypertensive', name: '降圧剤投与', time: 5 },
+    { id: 'antibiotics', name: '抗菌薬投与', time: 5 },
+    { id: 'sedation', name: '鎮静・鎮痛薬投与', time: 5 },
+    // 蘇生・外科的介入・高度医療
+    { id: 'pelvic_binder', name: 'サムスリング装着 (骨盤固定)', time: 5 },
+    { id: 'cpr', name: '胸骨圧迫 / ACLS', time: 5 },
+    { id: 'fasciotomy', name: '減張切開', time: 5 },
+    { id: 'open_cardiac_massage', name: '開胸心マ', time: 5 },
+    { id: 'aortic_cross_clamping', name: '開胸大動脈クランプ', time: 5 },
+    { id: 'exploratory_laparotomy', name: '試験開腹', time: 5 },
+    { id: 'emergency_c_section', name: '緊急帝王切開', time: 5 },
+    { id: 'iabo', name: 'IABO (大動脈内バルーン閉塞)', time: 5 },
+    { id: 'iabp', name: 'IABP (大動脈内バルーンポンピング)', time: 5 },
+    { id: 'pcps', name: 'PCPS (VA-ECMO)', time: 5 },
+    // 整形・その他
+    { id: 'pericardiocentesis', name: '心嚢穿刺ドレナージ', time: 5 },
     { id: 'splint', name: 'シーネ固定', time: 5 },
-    { id: 'traction', name: '牽引', time: 5 },
+    { id: 'traction', name: '直達牽引', time: 5 },
+    { id: 'suture', name: '挫創処置 (洗浄縫合)', time: 5 },
+    // 検査関係
     { id: 'xray', name: 'レントゲン(X-P)', time: 3 },
     { id: 'ct', name: 'CT画像検査', time: 5 },
     { id: 'blood_test', name: '血液検査', time: 5 },
     { id: 'blood_gas', name: '血液ガス', time: 3 },
-    { id: 'suture', name: '縫合処置', time: 5 },
-    { id: 'sedation', name: '鎮静・鎮痛薬投与', time: 5 },
-    { id: 'antihypertensive', name: '降圧薬投与', time: 5 },
 ]
 
 const defaultPatient: Patient = {
@@ -40,10 +70,10 @@ const defaultPatient: Patient = {
     vitals_initial: '',
     vitals_post: '',
     // 構造化V/S（新UI）
-    vitals_triage_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 },
-    vitals_initial_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 },
-    vitals_post_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 },
-    vitals_deterioration_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 },
+    vitals_triage_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_deterioration_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
         head_and_neck: '',
         chest: '',
@@ -78,10 +108,10 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
             // 既存患者を編集する場合、structが無ければデフォルト値で初期化
             const enriched = { ...initialPatient }
             if (!enriched.vitals_triage_struct) {
-                enriched.vitals_triage_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 }
+                enriched.vitals_triage_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
             }
             if (!enriched.vitals_initial_struct) {
-                enriched.vitals_initial_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, jcs: 0 }
+                enriched.vitals_initial_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
             }
             setFormData(enriched)
         } else {
@@ -160,12 +190,16 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
             s.rr ? `RR ${s.rr}` : null,
             s.spo2 ? `SpO2 ${s.spo2}%` : null,
             s.temp ? `Temp ${s.temp}℃` : null,
-            s.jcs !== undefined && s.jcs !== null ? `JCS ${s.jcs}` : null,
+            s.gcs_e !== undefined || s.gcs_v !== undefined || s.gcs_m !== undefined
+                ? `GCS E${s.gcs_e ?? 4}V${s.gcs_v ?? 5}M${s.gcs_m ?? 6}`
+                : null,
         ].filter(Boolean)
         return parts.join(', ')
     }
 
-    const JCS_OPTIONS = [0, 1, 2, 3, 10, 20, 30, 100, 200, 300]
+    const GCS_E_OPTIONS = [4, 3, 2, 1]
+    const GCS_V_OPTIONS = [5, 4, 3, 2, 1]
+    const GCS_M_OPTIONS = [6, 5, 4, 3, 2, 1]
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -211,16 +245,16 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             setFormData(prev => {
                                 const next = { ...prev, triage_color: val }
                                 if (val === '黒') {
-                                    next.vitals_triage_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 }
-                                    next.vitals_initial_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 }
+                                    next.vitals_triage_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 }
+                                    next.vitals_initial_struct = { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 }
                                 }
                                 return next
                             })
                         }} className="input">
                             <option value="赤">I 赤 (最優先治療)</option>
-                            <option value="黄">II 黄 (待機的治療)</option>
-                            <option value="緑">III 緑 (軽症)</option>
-                            <option value="黒">0 黒 (死亡/非救命対象)</option>
+                            <option value="黄">II Yellow (待機的治療)</option>
+                            <option value="緑">III Green (軽症)</option>
+                            <option value="黒">0 Black (死亡/非救命対象)</option>
                         </select>
                     </div>
                     <div className="form-group">
@@ -232,8 +266,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                 scene_triage_color: val,
                                 // 現場トリアージが選ばれた時、初期値としてV/Sのテンプレを入れる（空の場合）
                                 vitals_triage: prev.vitals_triage || (val === '赤' ? 'HR 120, BP 80/50, RR 30, SpO2 90%' : val === '黄' ? 'HR 100, BP 120/80, RR 20, SpO2 96%' : val === '緑' ? '歩行可能, 著変なし' : '呼吸なし, 脈脈拍触知不可'),
-                                vitals_triage_struct: val === '黒' ? { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 } : prev.vitals_triage_struct,
-                                vitals_initial_struct: val === '黒' ? { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 } : prev.vitals_initial_struct
+                                vitals_triage_struct: val === '黒' ? { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } : prev.vitals_triage_struct,
+                                vitals_initial_struct: val === '黒' ? { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } : prev.vitals_initial_struct
                             }))
                         }} className="input">
                             <option value="">（未設定 / 推測）</option>
@@ -249,13 +283,13 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
             <div className="patient-form__section">
                 <h4 className="section-title">バイタルサイン</h4>
                 {/* 共通ラベル行 */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.25rem', padding: '0 0.25rem' }}>
-                    {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'JCS'].map(l => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem', marginBottom: '0.25rem', padding: '0 0.25rem' }}>
+                    {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'GCS-E', 'GCS-V', 'GCS-M'].map(l => (
                         <div key={l} style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--gray-500)', textAlign: 'center', letterSpacing: '0.03em' }}>{l}</div>
                     ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.25rem', padding: '0 0.25rem' }}>
-                    {['mmHg', 'mmHg', 'bpm', '/min', '%', '℃', '0-300'].map(l => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem', marginBottom: '0.25rem', padding: '0 0.25rem' }}>
+                    {['mmHg', 'mmHg', 'bpm', '/min', '%', '℃', '1-4', '1-5', '1-6'].map(l => (
                         <div key={l} style={{ fontSize: '0.6rem', color: 'var(--gray-400)', textAlign: 'center' }}>{l}</div>
                     ))}
                 </div>
@@ -270,18 +304,18 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             </span>
                             <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                 <button type="button" className="button triage-btn-black" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 } }))}>死亡</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } }))}>死亡</button>
                                 <button type="button" className="button triage-btn-stripe" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 70, dbp: 40, hr: 135, rr: 35, spo2: 85, temp: 36.0, jcs: 100 } }))}>最重症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 70, dbp: 40, hr: 135, rr: 35, spo2: 85, temp: 36.0, gcs_e: 1, gcs_v: 1, gcs_m: 4 } }))}>最重症</button>
                                 <button type="button" className="button triage-btn-red" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 80, dbp: 50, hr: 120, rr: 30, spo2: 90, temp: 36.5, jcs: 30 } }))}>重症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 80, dbp: 50, hr: 120, rr: 30, spo2: 90, temp: 36.5, gcs_e: 3, gcs_v: 3, gcs_m: 5 } }))}>重症</button>
                                 <button type="button" className="button triage-btn-yellow" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 110, dbp: 70, hr: 100, rr: 22, spo2: 94, temp: 36.5, jcs: 10 } }))}>中等症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 110, dbp: 70, hr: 100, rr: 22, spo2: 94, temp: 36.5, gcs_e: 4, gcs_v: 4, gcs_m: 6 } }))}>中等症</button>
                                 <button type="button" className="button triage-btn-green" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, jcs: 0 } }))}>軽症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_triage_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 } }))}>軽症</button>
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem' }}>
                             <input type="number" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="120" value={formData.vitals_triage_struct?.sbp !== undefined ? formData.vitals_triage_struct!.sbp : ''}
                                 onChange={e => updateVitalStruct('vitals_triage_struct', 'sbp', e.target.value)} />
@@ -300,10 +334,20 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             <input type="number" step="0.1" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="36.5" value={formData.vitals_triage_struct?.temp !== undefined ? formData.vitals_triage_struct!.temp : ''}
                                 onChange={e => updateVitalStruct('vitals_triage_struct', 'temp', e.target.value)} />
-                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
-                                value={formData.vitals_triage_struct?.jcs ?? 0}
-                                onChange={e => updateVitalStruct('vitals_triage_struct', 'jcs', e.target.value)}>
-                                {JCS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_triage_struct?.gcs_e ?? 4}
+                                onChange={e => updateVitalStruct('vitals_triage_struct', 'gcs_e', e.target.value)}>
+                                {GCS_E_OPTIONS.map(opt => <option key={opt} value={opt}>E{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_triage_struct?.gcs_v ?? 5}
+                                onChange={e => updateVitalStruct('vitals_triage_struct', 'gcs_v', e.target.value)}>
+                                {GCS_V_OPTIONS.map(opt => <option key={opt} value={opt}>V{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_triage_struct?.gcs_m ?? 6}
+                                onChange={e => updateVitalStruct('vitals_triage_struct', 'gcs_m', e.target.value)}>
+                                {GCS_M_OPTIONS.map(opt => <option key={opt} value={opt}>M{opt}</option>)}
                             </select>
                         </div>
                     </div>
@@ -316,18 +360,18 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             </span>
                             <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                 <button type="button" className="button triage-btn-black" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 } }))}>死亡</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } }))}>死亡</button>
                                 <button type="button" className="button triage-btn-stripe" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 70, dbp: 40, hr: 135, rr: 35, spo2: 85, temp: 36.0, jcs: 100 } }))}>最重症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 70, dbp: 40, hr: 135, rr: 35, spo2: 85, temp: 36.0, gcs_e: 1, gcs_v: 1, gcs_m: 4 } }))}>最重症</button>
                                 <button type="button" className="button triage-btn-red" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 80, dbp: 50, hr: 120, rr: 30, spo2: 90, temp: 36.5, jcs: 30 } }))}>重症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 80, dbp: 50, hr: 120, rr: 30, spo2: 90, temp: 36.5, gcs_e: 3, gcs_v: 3, gcs_m: 5 } }))}>重症</button>
                                 <button type="button" className="button triage-btn-yellow" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 110, dbp: 70, hr: 100, rr: 22, spo2: 94, temp: 36.5, jcs: 10 } }))}>中等症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 110, dbp: 70, hr: 100, rr: 22, spo2: 94, temp: 36.5, gcs_e: 4, gcs_v: 4, gcs_m: 6 } }))}>中等症</button>
                                 <button type="button" className="button triage-btn-green" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
-                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, jcs: 0 } }))}>軽症</button>
+                                    onClick={() => setFormData(p => ({ ...p, vitals_initial_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 } }))}>軽症</button>
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem' }}>
                             <input type="number" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="120" value={formData.vitals_initial_struct?.sbp ?? ''}
                                 onChange={e => updateVitalStruct('vitals_initial_struct', 'sbp', e.target.value)} />
@@ -346,10 +390,20 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             <input type="number" step="0.1" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="36.5" value={formData.vitals_initial_struct?.temp ?? ''}
                                 onChange={e => updateVitalStruct('vitals_initial_struct', 'temp', e.target.value)} />
-                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
-                                value={formData.vitals_initial_struct?.jcs ?? 0}
-                                onChange={e => updateVitalStruct('vitals_initial_struct', 'jcs', e.target.value)}>
-                                {JCS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2,rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_initial_struct?.gcs_e ?? 4}
+                                onChange={e => updateVitalStruct('vitals_initial_struct', 'gcs_e', e.target.value)}>
+                                {GCS_E_OPTIONS.map(opt => <option key={opt} value={opt}>E{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2,rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_initial_struct?.gcs_v ?? 5}
+                                onChange={e => updateVitalStruct('vitals_initial_struct', 'gcs_v', e.target.value)}>
+                                {GCS_V_OPTIONS.map(opt => <option key={opt} value={opt}>V{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2,rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_initial_struct?.gcs_m ?? 6}
+                                onChange={e => updateVitalStruct('vitals_initial_struct', 'gcs_m', e.target.value)}>
+                                {GCS_M_OPTIONS.map(opt => <option key={opt} value={opt}>M{opt}</option>)}
                             </select>
                         </div>
                     </div>
@@ -361,14 +415,24 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                 🩺 処置完了後V/S
                             </span>
                             <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                <button type="button" className="button triage-btn-black" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
+                                    onClick={() => setFormData(p => ({ ...p, vitals_post_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } }))}>死亡</button>
+                                <button type="button" className="button triage-btn-stripe" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
+                                    onClick={() => setFormData(p => ({ ...p, vitals_post_struct: { sbp: 70, dbp: 40, hr: 135, rr: 35, spo2: 85, temp: 36.0, gcs_e: 1, gcs_v: 1, gcs_m: 4 } }))}>最重症</button>
+                                <button type="button" className="button triage-btn-red" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
+                                    onClick={() => setFormData(p => ({ ...p, vitals_post_struct: { sbp: 80, dbp: 50, hr: 120, rr: 30, spo2: 90, temp: 36.5, gcs_e: 3, gcs_v: 3, gcs_m: 5 } }))}>重症</button>
+                                <button type="button" className="button triage-btn-yellow" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
+                                    onClick={() => setFormData(p => ({ ...p, vitals_post_struct: { sbp: 110, dbp: 70, hr: 100, rr: 22, spo2: 94, temp: 36.5, gcs_e: 4, gcs_v: 4, gcs_m: 6 } }))}>中等症</button>
+                                <button type="button" className="button triage-btn-green" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto' }}
+                                    onClick={() => setFormData(p => ({ ...p, vitals_post_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 } }))}>軽症</button>
                                 <button type="button" className="button button--secondary" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', width: 'auto', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                                     onClick={() => setFormData(p => ({ ...p, vitals_post_struct: p.vitals_initial_struct ? { ...p.vitals_initial_struct } : p.vitals_post_struct }))}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 7v8a2 2 0 0 0 2 2h6M16 13l4 4-4 4"/></svg>
-                                    診療エリア初期V/Sから変化なし
+                                    初期V/Sから複写
                                 </button>
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem' }}>
                             <input type="number" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="120" value={formData.vitals_post_struct?.sbp ?? ''}
                                 onChange={e => updateVitalStruct('vitals_post_struct', 'sbp', e.target.value)} />
@@ -387,10 +451,20 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             <input type="number" step="0.1" className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
                                 placeholder="36.5" value={formData.vitals_post_struct?.temp ?? ''}
                                 onChange={e => updateVitalStruct('vitals_post_struct', 'temp', e.target.value)} />
-                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.25rem', fontSize: '0.9rem' }}
-                                value={formData.vitals_post_struct?.jcs ?? 0}
-                                onChange={e => updateVitalStruct('vitals_post_struct', 'jcs', e.target.value)}>
-                                {JCS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_post_struct?.gcs_e ?? 4}
+                                onChange={e => updateVitalStruct('vitals_post_struct', 'gcs_e', e.target.value)}>
+                                {GCS_E_OPTIONS.map(opt => <option key={opt} value={opt}>E{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_post_struct?.gcs_v ?? 5}
+                                onChange={e => updateVitalStruct('vitals_post_struct', 'gcs_v', e.target.value)}>
+                                {GCS_V_OPTIONS.map(opt => <option key={opt} value={opt}>V{opt}</option>)}
+                            </select>
+                            <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                value={formData.vitals_post_struct?.gcs_m ?? 6}
+                                onChange={e => updateVitalStruct('vitals_post_struct', 'gcs_m', e.target.value)}>
+                                {GCS_M_OPTIONS.map(opt => <option key={opt} value={opt}>M{opt}</option>)}
                             </select>
                         </div>
                     </div>
@@ -499,6 +573,34 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
             </div>
 
             <div className="patient-form__section">
+                <h4 className="section-title">検査・画像設定</h4>
+                <div className="form-group">
+                    <label className="form-label">血液検査データ (フリーテキスト)</label>
+                    <textarea 
+                        name="blood_test_data" 
+                        value={formData.blood_test_data || ''} 
+                        onChange={handleChange} 
+                        className="input" 
+                        rows={3} 
+                        placeholder="例: WBC 12000, Hb 10.5, Plt 15万, Lactate 4.5" 
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">放射線画像URL (1行に1URL)</label>
+                    <textarea 
+                        value={(formData.image_urls || []).join('\n')} 
+                        onChange={(e) => setFormData(prev => ({ ...prev, image_urls: e.target.value.split('\n') }))} 
+                        className="input" 
+                        rows={3} 
+                        placeholder="例: https://drive.google.com/file/d/..." 
+                    />
+                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>
+                        ※Googleドライブ等にアップロードした画像のURLを貼り付けてください。複数ある場合は改行してください。
+                    </p>
+                </div>
+            </div>
+
+            <div className="patient-form__section">
                 <h4 className="section-title">急変・悪化・ROSC設定</h4>
                 <div className="form-group">
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -532,24 +634,24 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                 <label className="form-label" style={{ margin: 0 }}>⚠️ 最終到達バイタル目標 (V/S)</label>
                                 <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                     <button type="button" className="button triage-btn-black" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, jcs: 300 } }))}>死亡</button>
+                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 } }))}>死亡</button>
                                     <button type="button" className="button triage-btn-stripe" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 70, dbp: 40, hr: 140, rr: 40, spo2: 82, temp: 36.0, jcs: 100 } }))}>最重症</button>
+                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 70, dbp: 40, hr: 140, rr: 40, spo2: 82, temp: 36.0, gcs_e: 1, gcs_v: 1, gcs_m: 4 } }))}>最重症</button>
                                     <button type="button" className="button triage-btn-red" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 80, dbp: 50, hr: 130, rr: 32, spo2: 88, temp: 36.0, jcs: 30 } }))}>重症</button>
+                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 80, dbp: 50, hr: 130, rr: 32, spo2: 88, temp: 36.0, gcs_e: 3, gcs_v: 3, gcs_m: 5 } }))}>重症</button>
                                     <button type="button" className="button triage-btn-yellow" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 95, dbp: 60, hr: 110, rr: 25, spo2: 92, temp: 36.5, jcs: 10 } }))}>中等症</button>
+                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 95, dbp: 60, hr: 110, rr: 25, spo2: 92, temp: 36.5, gcs_e: 4, gcs_v: 4, gcs_m: 6 } }))}>中等症</button>
                                     <button type="button" className="button triage-btn-green" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, jcs: 0 } }))}>軽症</button>
+                                        onClick={() => setFormData(p => ({ ...p, vitals_deterioration_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 } }))}>軽症</button>
                                 </div>
                             </div>
                             {/* 共通ラベル行（悪化目標V/S） */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.2rem' }}>
-                                {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'JCS'].map(l => (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                                {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'GCS-E', 'GCS-V', 'GCS-M'].map(l => (
                                     <div key={l} style={{ fontSize: '0.6rem', fontWeight: '700', color: 'var(--gray-500)', textAlign: 'center' }}>{l}</div>
                                 ))}
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem' }}>
                                 <input type="number" placeholder="0" value={formData.vitals_deterioration_struct?.sbp ?? ''} onChange={e => updateVitalStruct('vitals_deterioration_struct', 'sbp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} />
                                 <input type="number" placeholder="0" value={formData.vitals_deterioration_struct?.dbp ?? ''} onChange={e => updateVitalStruct('vitals_deterioration_struct', 'dbp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} />
                                 <input type="number" placeholder="0" value={formData.vitals_deterioration_struct?.hr ?? ''} onChange={e => updateVitalStruct('vitals_deterioration_struct', 'hr', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} />
@@ -557,9 +659,19 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                 <input type="number" placeholder="0" value={formData.vitals_deterioration_struct?.spo2 ?? ''} onChange={e => updateVitalStruct('vitals_deterioration_struct', 'spo2', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} />
                                 <input type="number" step="0.1" placeholder="35" value={formData.vitals_deterioration_struct?.temp ?? ''} onChange={e => updateVitalStruct('vitals_deterioration_struct', 'temp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} />
                                 <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
-                                    value={formData.vitals_deterioration_struct?.jcs ?? 0}
-                                    onChange={e => updateVitalStruct('vitals_deterioration_struct', 'jcs', e.target.value)}>
-                                    {JCS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    value={formData.vitals_deterioration_struct?.gcs_e ?? 4}
+                                    onChange={e => updateVitalStruct('vitals_deterioration_struct', 'gcs_e', e.target.value)}>
+                                    {GCS_E_OPTIONS.map(opt => <option key={opt} value={opt}>E{opt}</option>)}
+                                </select>
+                                <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                    value={formData.vitals_deterioration_struct?.gcs_v ?? 5}
+                                    onChange={e => updateVitalStruct('vitals_deterioration_struct', 'gcs_v', e.target.value)}>
+                                    {GCS_V_OPTIONS.map(opt => <option key={opt} value={opt}>V{opt}</option>)}
+                                </select>
+                                <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                    value={formData.vitals_deterioration_struct?.gcs_m ?? 6}
+                                    onChange={e => updateVitalStruct('vitals_deterioration_struct', 'gcs_m', e.target.value)}>
+                                    {GCS_M_OPTIONS.map(opt => <option key={opt} value={opt}>M{opt}</option>)}
                                 </select>
                             </div>
                          </div>
@@ -575,7 +687,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                         setFormData(prev => {
                                             const next = { ...prev, rosc_possible: checked }
                                             if (checked && !next.vitals_rosc_struct) {
-                                                next.vitals_rosc_struct = { sbp: 100, dbp: 60, hr: 100, rr: 20, spo2: 98, temp: 36.0 }
+                                                next.vitals_rosc_struct = { sbp: 100, dbp: 60, hr: 100, rr: 20, spo2: 98, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
                                             }
                                             return next
                                         })
@@ -589,21 +701,21 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                         <label className="form-label" style={{ margin: 0 }}>ROSC後バイタル目標 (※必須)</label>
                                         <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                             <button type="button" className="button triage-btn-stripe" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 70, dbp: 40, hr: 140, rr: 40, spo2: 82, temp: 36.0, jcs: 100 } }))}>最重症</button>
+                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 70, dbp: 40, hr: 140, rr: 40, spo2: 82, temp: 36.0, gcs_e: 1, gcs_v: 1, gcs_m: 4 } }))}>最重症</button>
                                             <button type="button" className="button triage-btn-red" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 80, dbp: 50, hr: 130, rr: 32, spo2: 88, temp: 36.0, jcs: 30 } }))}>重症</button>
+                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 80, dbp: 50, hr: 130, rr: 32, spo2: 88, temp: 36.0, gcs_e: 3, gcs_v: 3, gcs_m: 5 } }))}>重症</button>
                                             <button type="button" className="button triage-btn-yellow" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 95, dbp: 60, hr: 110, rr: 25, spo2: 92, temp: 36.5, jcs: 10 } }))}>中等症</button>
+                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 95, dbp: 60, hr: 110, rr: 25, spo2: 92, temp: 36.5, gcs_e: 4, gcs_v: 4, gcs_m: 6 } }))}>中等症</button>
                                             <button type="button" className="button triage-btn-green" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', width: 'auto' }}
-                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, jcs: 0 } }))}>軽症</button>
+                                                onClick={() => setFormData(p => ({ ...p, vitals_rosc_struct: { sbp: 120, dbp: 80, hr: 80, rr: 16, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 } }))}>軽症</button>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.2rem' }}>
-                                        {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'JCS'].map(l => (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                                        {['SBP', 'DBP', 'HR', 'RR', 'SpO2', 'Temp', 'GCS-E', 'GCS-V', 'GCS-M'].map(l => (
                                             <div key={l} style={{ fontSize: '0.6rem', fontWeight: '700', color: 'var(--gray-500)', textAlign: 'center' }}>{l}</div>
                                         ))}
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '0.4rem' }}>
                                         <input type="number" placeholder="100" value={formData.vitals_rosc_struct?.sbp ?? ''} onChange={e => updateVitalStruct('vitals_rosc_struct', 'sbp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} required />
                                         <input type="number" placeholder="60" value={formData.vitals_rosc_struct?.dbp ?? ''} onChange={e => updateVitalStruct('vitals_rosc_struct', 'dbp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} required />
                                         <input type="number" placeholder="100" value={formData.vitals_rosc_struct?.hr ?? ''} onChange={e => updateVitalStruct('vitals_rosc_struct', 'hr', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} required />
@@ -611,9 +723,19 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                         <input type="number" placeholder="98" value={formData.vitals_rosc_struct?.spo2 ?? ''} onChange={e => updateVitalStruct('vitals_rosc_struct', 'spo2', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} required />
                                         <input type="number" step="0.1" placeholder="36" value={formData.vitals_rosc_struct?.temp ?? ''} onChange={e => updateVitalStruct('vitals_rosc_struct', 'temp', e.target.value)} className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }} required />
                                         <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
-                                            value={formData.vitals_rosc_struct?.jcs ?? 0}
-                                            onChange={e => updateVitalStruct('vitals_rosc_struct', 'jcs', e.target.value)}>
-                                            {JCS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            value={formData.vitals_rosc_struct?.gcs_e ?? 4}
+                                            onChange={e => updateVitalStruct('vitals_rosc_struct', 'gcs_e', e.target.value)}>
+                                            {GCS_E_OPTIONS.map(opt => <option key={opt} value={opt}>E{opt}</option>)}
+                                        </select>
+                                        <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                            value={formData.vitals_rosc_struct?.gcs_v ?? 5}
+                                            onChange={e => updateVitalStruct('vitals_rosc_struct', 'gcs_v', e.target.value)}>
+                                            {GCS_V_OPTIONS.map(opt => <option key={opt} value={opt}>V{opt}</option>)}
+                                        </select>
+                                        <select className="input" style={{ textAlign: 'center', padding: '0.4rem 0.2rem', fontSize: '0.85rem' }}
+                                            value={formData.vitals_rosc_struct?.gcs_m ?? 6}
+                                            onChange={e => updateVitalStruct('vitals_rosc_struct', 'gcs_m', e.target.value)}>
+                                            {GCS_M_OPTIONS.map(opt => <option key={opt} value={opt}>M{opt}</option>)}
                                         </select>
                                     </div>
                                     <p style={{ fontSize: '0.8rem', color: 'var(--amber-600)', marginTop: '0.25rem' }}>※胸骨圧迫/ACLS完了時に、このバイタルサインへ即時ジャンプ回復します。</p>

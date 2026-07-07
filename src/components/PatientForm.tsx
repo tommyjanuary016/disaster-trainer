@@ -138,25 +138,6 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
         }))
     }
 
-    const handleTreatmentChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target
-        setFormData((prev) => {
-            const newTreatments = [...(prev.required_treatments || [])]
-            newTreatments[index] = {
-                ...newTreatments[index],
-                [name]: name === 'lock_timer_minutes' ? (parseInt(value) || 0) : value,
-            }
-            return { ...prev, required_treatments: newTreatments }
-        })
-    }
-
-    const addTreatment = () => {
-        setFormData((prev) => ({
-            ...prev,
-            required_treatments: [...(prev.required_treatments || []), { ...defaultTreatment }]
-        }))
-    }
-
     const removeTreatment = (index: number) => {
         setFormData((prev) => {
             const newTreatments = [...(prev.required_treatments || [])]
@@ -496,13 +477,55 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                     <label className="form-label">FAST (超音波検査)</label>
                     <textarea name="fast" value={formData.findings.fast} onChange={handleFindingsChange} className="input"></textarea>
                 </div>
+
+                {/* AMPLE: A/M/P/L/E 5項目分割入力 */}
                 <div className="form-group">
-                    <label className="form-label">AMPLE (既往歴・アレルギー等)</label>
-                    <textarea name="ample" value={formData.findings.ample} onChange={handleFindingsChange} className="input"></textarea>
+                    <label className="form-label" style={{ fontWeight: '700', marginBottom: '0.6rem', display: 'block' }}>
+                        AMPLE（問診情報）
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                        {([ 
+                            { key: 'ample_a', label: 'A：アレルギー', placeholder: '例: ペニシリンアレルギーあり' },
+                            { key: 'ample_m', label: 'M：内服薬', placeholder: '例: バイアスピリン 100mg/日' },
+                            { key: 'ample_p', label: 'P：既往歴・妊娠', placeholder: '例: 高血圧、糖尿病' },
+                            { key: 'ample_l', label: 'L：最終飲食', placeholder: '例: 3時間前に昼食' },
+                        ] as const).map(({ key, label, placeholder }) => (
+                            <div key={key} className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--blue-600)', fontWeight: '600' }}>{label}</label>
+                                <textarea
+                                    name={key}
+                                    value={(formData.findings as unknown as Record<string, string>)[key] || ''}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        findings: { ...prev.findings, [key]: e.target.value }
+                                    }))}
+                                    className="input"
+                                    rows={2}
+                                    placeholder={placeholder}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    {/* E: 受傷機転は1列フル幅 */}
+                    <div className="form-group" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--blue-600)', fontWeight: '600' }}>E：受傷機転（Events leading to injury）</label>
+                        <textarea
+                            name="ample_e"
+                            value={formData.findings.ample_e || ''}
+                            onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                findings: { ...prev.findings, ample_e: e.target.value }
+                            }))}
+                            className="input"
+                            rows={3}
+                            placeholder="例: 交通事故（バイクvs乗用車）。現場でヘルメット脱落。速度60km/h推定。意識消失なし。"
+                        />
+                    </div>
                 </div>
+
                 <div className="form-group">
-                    <label className="form-label">背景 (負傷機転・事故状況)</label>
-                    <textarea name="background" value={formData.findings.background} onChange={handleFindingsChange} className="input"></textarea>
+                    <label className="form-label">患者背景（生活歴・家族構成など）</label>
+                    <textarea name="background" value={formData.findings.background} onChange={handleFindingsChange} className="input" rows={2} placeholder="例: 独居、職業は会社員。家族に高血圧の既往あり。"></textarea>
                 </div>
             </div>
 
@@ -520,57 +543,145 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                     <label className="form-label">確定診断名 (Diagnosis)</label>
                     <input type="text" name="diagnosis" value={formData.diagnosis} onChange={handleChange} className="input" placeholder="例: 非穿通性胸部外傷, 肺挫傷" />
                 </div>
-                {formData.required_treatments?.map((rt, index) => (
-                    <div key={index} style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
-                            <select 
-                                className="input" 
-                                style={{ width: 'auto', flex: '1 1 auto' }}
-                                value={COMMON_TREATMENTS.find(t => t.id === rt.treatment_id) ? rt.treatment_id : ''}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    const t = COMMON_TREATMENTS.find(t => t.id === val);
-                                    if(t) {
-                                        const eventName = { target: { name: 'treatment_name', value: t.name } } as unknown as React.ChangeEvent<HTMLInputElement>;
-                                        const eventId = { target: { name: 'treatment_id', value: t.id } } as unknown as React.ChangeEvent<HTMLInputElement>;
-                                        const eventTime = { target: { name: 'lock_timer_minutes', value: t.time.toString() } } as unknown as React.ChangeEvent<HTMLInputElement>;
-                                        handleTreatmentChange(index, eventName);
-                                        handleTreatmentChange(index, eventId);
-                                        handleTreatmentChange(index, eventTime);
-                                    }
-                                }}
-                            >
-                                <option value="" disabled>定型処置を選択...</option>
-                                {COMMON_TREATMENTS.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name} ({t.time}分)</option>
+
+                {/* 処置: チェックボックス一覧からチェック → required_treatmentsに同期 */}
+                <div className="form-group">
+                    <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                        必要な処置を選択
+                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', fontWeight: 'normal', marginLeft: '0.5rem' }}>
+                            ※チェックした処置が訓練中に実施要件として設定されます
+                        </span>
+                    </label>
+
+                    {/* カテゴリ別チェックボックスグループ */}
+                    {[
+                        {
+                            category: '気道・呼吸',
+                            items: COMMON_TREATMENTS.filter(t =>
+                                ['oxygen','hfnc','intubation','surgical_airway','ventilator','needle_decompression','chest_tube','gauze_towel_fixation','three_sided_taping'].includes(t.id)
+                            )
+                        },
+                        {
+                            category: '循環・輸液・輸血',
+                            items: COMMON_TREATMENTS.filter(t =>
+                                ['iv_access','iv_access_2','cv_access','quinton_catheter','iv_fluid','blood_transfusion'].includes(t.id)
+                            )
+                        },
+                        {
+                            category: '薬剤投与',
+                            items: COMMON_TREATMENTS.filter(t =>
+                                ['vasopressor','antihypertensive','antibiotics','sedation'].includes(t.id)
+                            )
+                        },
+                        {
+                            category: '蘇生・外科的介入・高度医療',
+                            items: COMMON_TREATMENTS.filter(t =>
+                                ['pelvic_binder','cpr','fasciotomy','open_cardiac_massage','aortic_cross_clamping','exploratory_laparotomy','emergency_c_section','iabo','iabp','pcps','pericardiocentesis','splint','traction','suture'].includes(t.id)
+                            )
+                        },
+                        {
+                            category: '検査',
+                            items: COMMON_TREATMENTS.filter(t =>
+                                ['xray','ct','blood_test','blood_gas'].includes(t.id)
+                            )
+                        },
+                    ].map(({ category, items }) => (
+                        <div key={category} style={{ marginBottom: '1rem', padding: '0.8rem', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--gray-500)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{category}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                {items.map(t => {
+                                    const isChecked = (formData.required_treatments || []).some(rt => rt.treatment_id === t.id)
+                                    return (
+                                        <label
+                                            key={t.id}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                                                cursor: 'pointer', padding: '0.3rem 0.6rem',
+                                                borderRadius: '6px', fontSize: '0.8rem',
+                                                border: `1.5px solid ${isChecked ? 'var(--blue-500)' : 'var(--gray-300)'}`,
+                                                backgroundColor: isChecked ? 'var(--blue-50)' : '#fff',
+                                                color: isChecked ? 'var(--blue-700)' : 'var(--gray-700)',
+                                                fontWeight: isChecked ? '600' : 'normal',
+                                                transition: 'all 0.15s ease',
+                                                userSelect: 'none',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                style={{ accentColor: 'var(--blue-500)', width: '14px', height: '14px' }}
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked
+                                                    setFormData(prev => {
+                                                        const current = prev.required_treatments || []
+                                                        if (checked) {
+                                                            return {
+                                                                ...prev,
+                                                                required_treatments: [
+                                                                    ...current,
+                                                                    { treatment_id: t.id, treatment_name: t.name, lock_timer_minutes: t.time }
+                                                                ]
+                                                            }
+                                                        } else {
+                                                            return {
+                                                                ...prev,
+                                                                required_treatments: current.filter(rt => rt.treatment_id !== t.id)
+                                                            }
+                                                        }
+                                                    })
+                                                }}
+                                            />
+                                            {t.name}
+                                            <span style={{ fontSize: '0.7rem', color: isChecked ? 'var(--blue-500)' : 'var(--gray-400)' }}>
+                                                ({t.time}分)
+                                            </span>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* 選択中の処置一覧と時間調整 */}
+                    {(formData.required_treatments || []).length > 0 && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.8rem', backgroundColor: 'var(--blue-50)', borderRadius: '8px', border: '1px solid var(--blue-200)' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--blue-700)', marginBottom: '0.6rem' }}>
+                                ✓ 選択中の処置（拘束時間を調整可能）
+                            </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                {(formData.required_treatments || []).map((rt, index) => (
+                                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--blue-800)' }}>{rt.treatment_name}</span>
+                                        <label style={{ fontSize: '0.72rem', color: 'var(--gray-600)' }}>拘束時間(分):</label>
+                                        <input
+                                            type="number"
+                                            value={rt.lock_timer_minutes}
+                                            min={1}
+                                            onChange={(e) => {
+                                                const val = Math.max(1, parseInt(e.target.value) || 1)
+                                                setFormData(prev => {
+                                                    const arr = [...(prev.required_treatments || [])]
+                                                    arr[index] = { ...arr[index], lock_timer_minutes: val }
+                                                    return { ...prev, required_treatments: arr }
+                                                })
+                                            }}
+                                            className="input"
+                                            style={{ width: '70px', textAlign: 'center', padding: '0.25rem' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTreatment(index)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-400)', fontSize: '1rem', padding: '0 0.2rem' }}
+                                            title="削除"
+                                        >✕</button>
+                                    </div>
                                 ))}
-                            </select>
-                            {formData.required_treatments && formData.required_treatments.length > 1 && (
-                                <button type="button" onClick={() => removeTreatment(index)} className="button button--danger" style={{ padding: '0 0.5rem', width: 'auto', flex: '0 0 auto' }}>
-                                    削除
-                                </button>
-                            )}
-                        </div>
-                        <div className="form-grid form-grid--2col">
-                            <div className="form-group">
-                                <label className="form-label">処置名</label>
-                                <input type="text" name="treatment_name" value={rt.treatment_name} onChange={(e) => handleTreatmentChange(index, e)} required className="input" placeholder="例: 胸腔ドレナージ" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>拘束時間 (分)</span>
-                                    <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>内部ID: {rt.treatment_id}</span>
-                                </label>
-                                <input type="number" name="lock_timer_minutes" value={rt.lock_timer_minutes} onChange={(e) => handleTreatmentChange(index, e)} required className="input" min="1" />
-                                <input type="hidden" name="treatment_id" value={rt.treatment_id} />
                             </div>
                         </div>
-                    </div>
-                ))}
-                <button type="button" onClick={addTreatment} className="button button--secondary" style={{ width: 'auto', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
-                    + 推奨処置を追加
-                </button>
+                    )}
+                </div>
             </div>
+
 
             <div className="patient-form__section">
                 <h4 className="section-title">検査・画像設定</h4>
@@ -763,3 +874,4 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
 
 export default PatientForm
 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

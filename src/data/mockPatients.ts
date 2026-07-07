@@ -10,6 +10,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E3V4M5\n・BP82/55\n・HR：120\n・R:28\n・SPO2:98％\n（10L)\n・KT:35.8',
     vitals_initial: 'GCS:E2V4M5\n・BP:70/48\n・HR：120\n・R:30\n・SPO2:98%（10L)\n・KT:35.5',
     vitals_post: 'GCS:E4V5M5\n・BP:104/60\n・HR：90\n・R:28\n・SPO2:99%（10L)\n・KT:35.8',
+    vitals_triage_struct: { sbp: 82, dbp: 55, hr: 120, rr: 28, spo2: 98, temp: 35.8, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
+    vitals_initial_struct: { sbp: 70, dbp: 48, hr: 120, rr: 30, spo2: 98, temp: 35.5, gcs_e: 2, gcs_v: 4, gcs_m: 5 },
+    vitals_post_struct: { sbp: 104, dbp: 60, hr: 90, rr: 28, spo2: 99, temp: 35.8, gcs_e: 4, gcs_v: 5, gcs_m: 5 },
     findings: {
       head_and_neck: '顔面に打撲痕あり',
       chest: '明らかな外傷性変化なし',
@@ -41,6 +44,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E3V3M5\n・BP95/66\n・HR：122\n・R:36\n・SPO2:90%\n（10L)\n・KT:36.0',
     vitals_initial: 'GCS:E3V3M4\n・BP88/40\n・HR：130\n・R:36\n・SPO2:88%（10L)\n・KT:36.0',
     vitals_post: 'GCS:E3V4M5\n・BP130/70\n・HR：102\n・R:20\n・SPO2:98%（10L)\n・KT:36.0',
+    vitals_triage_struct: { sbp: 95, dbp: 66, hr: 122, rr: 36, spo2: 90, temp: 36.0, gcs_e: 3, gcs_v: 3, gcs_m: 5 },
+    vitals_initial_struct: { sbp: 88, dbp: 40, hr: 130, rr: 36, spo2: 88, temp: 36.0, gcs_e: 3, gcs_v: 3, gcs_m: 4 },
+    vitals_post_struct: { sbp: 130, dbp: 70, hr: 102, rr: 20, spo2: 98, temp: 36.0, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
     findings: {
       head_and_neck: '頸静脈怒張あり\n・左側に気管支偏位あり',
       chest: '右前胸部に痛みと打撲痕あり、右呼吸音減弱、右胸郭運動の低下、右胸部に皮下気腫、打診で鼓音',
@@ -70,6 +76,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E2V3M6\n・BP140/95\n・HR：119\n・R:35\n・SPO2:100%\n・KT:36.6',
     vitals_initial: 'GCS:E2V2M6\n・BP140/101\n・HR：128\n・R:40\n・SPO2:100%\n・KT:36.7',
     vitals_post: 'GCS:E4V5M6\n・BP106/48\n・HR：90\n・R:20\n・SPO2:99%\n・KT:36.0',
+    vitals_triage_struct: { sbp: 140, dbp: 95, hr: 119, rr: 35, spo2: 100, temp: 36.6, gcs_e: 2, gcs_v: 3, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 140, dbp: 101, hr: 128, rr: 40, spo2: 100, temp: 36.7, gcs_e: 2, gcs_v: 2, gcs_m: 6 },
+    vitals_post_struct: { sbp: 106, dbp: 48, hr: 90, rr: 20, spo2: 99, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '口唇の震えあり',
       chest: '明らかな外傷性変化なし',
@@ -99,6 +108,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E3V4M5\n・BP86/60\n・HR：120\n・R:26\n・SPO2:97%\n(10L)\n・KT:36.4',
     vitals_initial: 'GCS:E2V4M5\n・BP86/50\n・HR：124\n・R:30\n・SPO2:97%\n(10L)\n・KT:36.5',
     vitals_post: 'GCS:E2V5M5\n・BP88/58\n・HR：100\n・R:24\n・SPO2:97%\n(6L)\n・KT:35.5',
+    vitals_triage_struct: { sbp: 86, dbp: 60, hr: 120, rr: 26, spo2: 97, temp: 36.4, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
+    vitals_initial_struct: { sbp: 86, dbp: 50, hr: 124, rr: 30, spo2: 97, temp: 36.5, gcs_e: 2, gcs_v: 4, gcs_m: 5 },
+    vitals_post_struct: { sbp: 88, dbp: 58, hr: 100, rr: 24, spo2: 97, temp: 35.5, gcs_e: 2, gcs_v: 5, gcs_m: 5 },
     findings: {
       head_and_neck: '前額部に皮下血腫',
       chest: '明らかな外傷性変化なし',
@@ -129,6 +141,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E3V1M4\n・BP104/82\n・HR：106\n・R:36\n・SPO2:90%\n(10L)\n・KT:36.5',
     vitals_initial: 'GCS:E3V1M4\n・BP90/70\n・HR：110\n・R:40\n・SPO2:88%\n(10L)\n・KT:36.6\nCRT延長',
     vitals_post: 'RASS :-4\n・BP110/80\n・HR：88\n・R:15\n(人工呼吸器管理下）\n・SPO2:100%\n・KT:36.4',
+    vitals_triage_struct: { sbp: 104, dbp: 82, hr: 106, rr: 36, spo2: 90, temp: 36.5, gcs_e: 3, gcs_v: 1, gcs_m: 4 },
+    vitals_initial_struct: { sbp: 90, dbp: 70, hr: 110, rr: 40, spo2: 88, temp: 36.6, gcs_e: 3, gcs_v: 1, gcs_m: 4 },
+    vitals_post_struct: { sbp: 110, dbp: 80, hr: 88, rr: 15, spo2: 100, temp: 36.4 },
     findings: {
       head_and_neck: '下顎の変形と動揺、泡沫様の血液が口腔内から溢流',
       chest: '明らかな外傷性変化なし',
@@ -159,6 +174,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E2V2M4\n・BP187/106\n・HR：64\n・R:10\n・SPO2:97%\n(10L)\n・KT:37.1',
     vitals_initial: 'GCS:E1V2M4\n・BP220/110\n・HR：55\n・R:6\n・SPO2:95%\n(10L)\n・KT:37.0',
     vitals_post: 'GCS:E1T1M4\n・BP166/98\n・HR：66\n・R:10\n・SPO2:100%\n(10L)\n・KT:37.0\n',
+    vitals_triage_struct: { sbp: 187, dbp: 106, hr: 64, rr: 10, spo2: 97, temp: 37.1, gcs_e: 2, gcs_v: 2, gcs_m: 4 },
+    vitals_initial_struct: { sbp: 220, dbp: 110, hr: 55, rr: 6, spo2: 95, temp: 37.0, gcs_e: 1, gcs_v: 2, gcs_m: 4 },
+    vitals_post_struct: { sbp: 166, dbp: 98, hr: 66, rr: 10, spo2: 100, temp: 37.0, gcs_e: 1, gcs_m: 4 },
     findings: {
       head_and_neck: '右頭部に打撲痕あり、瞳孔5.0/2.5、右対光反射消失、右共同偏視あり',
       chest: '明らかな外傷性変化なし',
@@ -190,6 +208,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP120/68\n・HR：100\n・R:26\n・SPO2:92％\n（RA）\n・KT:36.0',
     vitals_initial: 'GCS:E4V5M6\n・BP122/60\n・HR：102\n・R:28\n・SPO2:92％\n（RA）\n・KT:36.0',
     vitals_post: 'SPO2:98%まで改善。呼吸困難軽減。',
+    vitals_triage_struct: { sbp: 120, dbp: 68, hr: 100, rr: 26, spo2: 92, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 122, dbp: 60, hr: 102, rr: 28, spo2: 92, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 122, dbp: 60, hr: 102, rr: 20, spo2: 98, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '左前胸部痛、左前胸部に打撲痕、左肺野で呼吸音減弱、左前胸部〜側胸部に握雪感あり',
@@ -219,6 +240,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP170/87\n・HR：85\n・R:20\n・SPO2:97％\n（RA）\n・KT:36.0',
     vitals_initial: 'GCS:E4V5M6\n・BP164/88\n・HR：79\n・R:20\n・SPO2:97％\n（RA）\n・KT:35.9',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 170, dbp: 87, hr: 85, rr: 20, spo2: 97, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 164, dbp: 88, hr: 79, rr: 20, spo2: 97, temp: 35.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 164, dbp: 88, hr: 79, rr: 20, spo2: 97, temp: 35.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '頭部に打撲痕あり',
       chest: '明らかな外傷性変化なし',
@@ -248,13 +272,16 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E3V4M5\n・BP168/102\n・HR：99\n・R:20\n・SPO2:99％\n（RA）\n・KT:36.2',
     vitals_initial: 'GCS:E3V4M5\n・BP167/100\n・HR：99\n・R:22\n・SPO2:99％\n（RA）\n・KT:36.3',
     vitals_post: 'GCS:E3V4M5\n・BP130/85\n・HR：91\n・R:22\n・SPO2:99％\n（RA）\n・KT:36.3',
+    vitals_triage_struct: { sbp: 168, dbp: 102, hr: 99, rr: 20, spo2: 99, temp: 36.2, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
+    vitals_initial_struct: { sbp: 167, dbp: 100, hr: 99, rr: 22, spo2: 99, temp: 36.3, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
+    vitals_post_struct: { sbp: 130, dbp: 85, hr: 91, rr: 22, spo2: 99, temp: 36.3, gcs_e: 3, gcs_v: 4, gcs_m: 5 },
     findings: {
       head_and_neck: '頭頂部の皮下血腫、顔面に打撲痕、歯牙の欠損あり',
       chest: '明らかな身体所見なし',
       abdomen_and_pelvis: '明らかな身体所見なし',
       limbs: '右前腕、及び膝関節に擦過傷あり',
       fast: '明らかな異常所見なし',
-      ample: 'A:アレルギー：なし\n・M:内服薬：降圧剤内服（名称不明）\n・P:既往歴：高血圧症\n・L:最終飲食：事故の1時間前に間食\n・E受傷機転：門司駅付近でバスが衝突。立位でバランスを崩し転倒。頭頂部と顔面を床・手すりに強打',
+      ample: 'A:アレルギー：なし\n・M:内服薬：降圧剤内服（名称不明）\n・P:既往歴：高血圧症\n・L:最終飲食：事故の1時間前に間食\n・E受傷機転：門司駅付近でバスが衝突. 立位でバランスを崩し転倒。頭頂部と顔面を床・手すりに強打',
       background: '妻（65歳）と2人暮らし。子供は成人し県外在住。門司区在住、定年退職後、地域活動に参加。日常生活は自立。'
     },
     diagnosis: '外傷性SAH',
@@ -278,6 +305,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V4M6\n・BP162/98\n・HR：105\n・R:24\n・SPO2:99％\n（RA）\n・KT:36.4',
     vitals_initial: 'GCS:E4V4M6\n・BP161/98\n・HR：106\n・R:22\n・SPO2:99％\n（RA）\n・KT:36.4',
     vitals_post: 'GCS:E4V4M6\n・BP128/77\n・HR：100\n・R:20\n・SPO2:99％\n（RA）\n・KT:36.4',
+    vitals_triage_struct: { sbp: 162, dbp: 98, hr: 105, rr: 24, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 4, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 161, dbp: 98, hr: 106, rr: 22, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 4, gcs_m: 6 },
+    vitals_post_struct: { sbp: 128, dbp: 77, hr: 100, rr: 20, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 4, gcs_m: 6 },
     findings: {
       head_and_neck: '後頭部血腫と擦過傷あり、右顔面打撲痕あり',
       chest: '明らかな外傷性変化なし',
@@ -308,6 +338,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M5\n・BP172/90\n・HR：90\n・R:20\n・SPO2:97％\n（RA）\n・KT:36.7',
     vitals_initial: 'GCS:E4V5M5\n・BP168/88\n・HR：88\n・R:20\n・SPO2:98％\n（RA）\n・KT:36.7',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 172, dbp: 90, hr: 90, rr: 20, spo2: 97, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 5 },
+    vitals_initial_struct: { sbp: 168, dbp: 88, hr: 88, rr: 20, spo2: 98, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 5 },
+    vitals_post_struct: { sbp: 168, dbp: 88, hr: 88, rr: 20, spo2: 98, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 5 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '前胸部・側胸部に打撲痕あり',
@@ -337,6 +370,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP168/95\n・HR：82\n・R:24\n・SPO2:99％\n（RA）\n・KT:36.7',
     vitals_initial: 'GCS:E4V5M6\n・BP164/90\n・HR：78\n・R:24\n・SPO2:99％\n（RA）\n・KT:36.7',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 168, dbp: 95, hr: 82, rr: 24, spo2: 99, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 164, dbp: 90, hr: 78, rr: 24, spo2: 99, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 164, dbp: 90, hr: 78, rr: 24, spo2: 99, temp: 36.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '後頭部に皮下血腫',
       chest: '明らかな外傷性変化なし',
@@ -344,7 +380,7 @@ export const mockPatients: Patient[] = [
       limbs: '下肢痺れなし',
       fast: '明らかな異常所見なし',
       ample: 'A:アレルギー：なし\n・M:内服薬：降圧剤内服（名称不明）\n・P:既往歴：高血圧症・腰椎症\n・L:最終飲食：事故の2時間前に昼食\n・E受傷機転：門司駅付近でバスが衝突。座位のまま強い衝撃を受け、体幹を前後に大きく揺さぶられ腰背部を強打。',
-      background: '妻（68歳）と2人暮らし。子供は成人し県外在住。門司区在住。退職後、日常生活は自立。外出は主に徒歩とバス。'
+      background: '妻（68歳）と2人暮らし。子供は成人し県外在住. 門司区在住。退職後、日常生活は自立。外出は主に徒歩とバス。'
     },
     diagnosis: '胸腰椎圧迫骨折',
     required_treatments: [
@@ -366,6 +402,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP160/75\n・HR：88\n・R:25\n・SPO2:100％\n（RA）\n・KT:36.6',
     vitals_initial: 'GCS:E4V5M6\n・BP162/78\n・HR：87\n・R:25\n・SPO2:100％\n（RA）\n・KT:36.5',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 160, dbp: 75, hr: 88, rr: 25, spo2: 100, temp: 36.6, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 162, dbp: 78, hr: 87, rr: 25, spo2: 100, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 162, dbp: 78, hr: 87, rr: 25, spo2: 100, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',
@@ -395,6 +434,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP144/72\n・HR：90\n・R:26\n・SPO2:98％\n（RA）\n・KT:36.3',
     vitals_initial: 'GCS:E4V5M6\n・BP140/68\n・HR：85\n・R:28\n・SPO2:98％\n（RA）\n・KT:36.2',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 144, dbp: 72, hr: 90, rr: 26, spo2: 98, temp: 36.3, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 140, dbp: 68, hr: 85, rr: 28, spo2: 98, temp: 36.2, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 140, dbp: 68, hr: 85, rr: 28, spo2: 98, temp: 36.2, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '顔面に打撲痕',
       chest: '左前胸部に打撲痕',
@@ -424,11 +466,14 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP140/78\n・HR：79\n・R:20\n・SPO2:97％\n（RA）\n・KT:36.6',
     vitals_initial: 'GCS:E4V5M6\n・BP138/78\n・HR：79\n・R:20\n・SPO2:97％\n（RA）\n・KT:36.6',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 140, dbp: 78, hr: 79, rr: 20, spo2: 97, temp: 36.6, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 138, dbp: 78, hr: 79, rr: 20, spo2: 97, temp: 36.6, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 138, dbp: 78, hr: 79, rr: 20, spo2: 97, temp: 36.6, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '左頬部に打撲痕',
       chest: '明らかな外傷性変化なし',
       abdomen_and_pelvis: '明らかな外傷性変化なし',
-      limbs: '右膝痛と挫創、右膝関節の屈曲伸展不可',
+      limbs: '右膝痛と挫創、右膝関節の挫傷屈曲伸展不可',
       fast: '明らかな異常所見なし',
       ample: 'A:アレルギー：なし\n・M:内服薬：なし\n・P:既往歴：変形性膝関節症（右）妊娠なし\n・L:最終飲食：事故の2時間前に軽食\n・E受傷機転：バス乗車中、門司駅付近でバスが衝突。立位から前方に転倒し右膝と顔面を強打。',
       background: '夫（68歳）と2人暮らし。子供は成人し県外在住。門司区在住。日常生活は自立。外出は主に徒歩とバス。'
@@ -453,6 +498,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'JCS:Ⅰ-1\n・BP:92/64\n・HR:112\n・SPO2:100%\n(RA)\n・R:24',
     vitals_initial: 'JCS:Ⅰ-1\n・BP:90/60\n・HR:110\n・SPO2:100%\n(RA)\n・R:24',
     vitals_post: 'V/S変動なし',
+    vitals_triage_struct: { sbp: 92, dbp: 64, hr: 112, rr: 24, spo2: 100, temp: 36.5 },
+    vitals_initial_struct: { sbp: 90, dbp: 60, hr: 110, rr: 24, spo2: 100, temp: 36.5 },
+    vitals_post_struct: { sbp: 90, dbp: 60, hr: 110, rr: 24, spo2: 100, temp: 36.5 },
     findings: {
       head_and_neck: '前額部に約3cmの皮下血腫と擦過傷',
       chest: '明らかな外傷性変化なし',
@@ -480,6 +528,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP102/55\n・HR：94\n・R:24\n・SPO2:96％\n（RA）\n・KT:36.8',
     vitals_initial: 'GCS:E4V5M6\n・BP102/50\n・HR：99\n・R:24\n・SPO2:96％\n（RA）\n・KT:36.8',
     vitals_post: 'V/S変動なし',
+    vitals_triage_struct: { sbp: 102, dbp: 55, hr: 94, rr: 24, spo2: 96, temp: 36.8, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 102, dbp: 50, hr: 99, rr: 24, spo2: 96, temp: 36.8, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 102, dbp: 50, hr: 99, rr: 24, spo2: 96, temp: 36.8, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',
@@ -509,6 +560,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP132/70\n・HR：82\n・R:20\n・SPO2:98％\n（RA）\n・KT:36.5',
     vitals_initial: 'GCS:E4V5M6\n・BP134/68\n・HR：82\n・R:20\n・SPO2:98％\n（RA）\n・KT:36.5',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 132, dbp: 70, hr: 82, rr: 20, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 134, dbp: 68, hr: 82, rr: 20, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 134, dbp: 68, hr: 82, rr: 20, spo2: 98, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '頭痛あり、前額部〜頭頂部にかけて挫創形成、活動性出血なし',
       chest: '明らかな外傷性変化なし',
@@ -538,6 +592,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP112/61\n・HR：84\n・R:22\n・SPO2:99％\n（RA）\n・KT:37.2',
     vitals_initial: 'GCS:E4V5M6\n・BP110/64\n・HR：83\n・R:22\n・SPO2:99％\n（RA）\n・KT:37.2',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 112, dbp: 61, hr: 84, rr: 22, spo2: 99, temp: 37.2, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 110, dbp: 64, hr: 83, rr: 22, spo2: 99, temp: 37.2, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 110, dbp: 64, hr: 83, rr: 22, spo2: 99, temp: 37.2, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',
@@ -567,6 +624,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP133/63\n・HR：90\n・R:15\n・SPO2:97％\n（RA）\n・KT:36.0',
     vitals_initial: 'GCS:E4V5M6\n・BP134/60\n・HR：94\n・R:15\n・SPO2:96％\n（RA）\n・KT:36.0',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 133, dbp: 63, hr: 90, rr: 15, spo2: 97, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 134, dbp: 60, hr: 94, rr: 15, spo2: 96, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 134, dbp: 60, hr: 94, rr: 15, spo2: 96, temp: 36.0, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '右前胸部痛あり、吸気時に痛みが増悪、呼吸音は正常',
@@ -596,6 +656,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP102/55\n・HR：93\n・R:23\n・SPO2:98％\n（RA）\n・KT:36.9',
     vitals_initial: 'GCS:E4V5M6\n・BP108/58\n・HR：93\n・R:22\n・SPO2:100％\n（RA）\n・KT:36.9',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 102, dbp: 55, hr: 93, rr: 23, spo2: 98, temp: 36.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 108, dbp: 58, hr: 93, rr: 22, spo2: 100, temp: 36.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 108, dbp: 58, hr: 93, rr: 22, spo2: 100, temp: 36.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '鼻部を中心に顔面腫脹、鼻出血あり',
       chest: '明らかな外傷性変化なし',
@@ -625,6 +688,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP130/77\n・HR：70\n・R:15\n・SPO2:98％\n（RA）\n・KT:36.3',
     vitals_initial: 'GCS:E4V5M6\n・BP132/78\n・HR：71\n・R:16\n・SPO2:97％\n（RA）\n・KT:36.3',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 130, dbp: 77, hr: 70, rr: 15, spo2: 98, temp: 36.3, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 132, dbp: 78, hr: 71, rr: 16, spo2: 97, temp: 36.3, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 132, dbp: 78, hr: 71, rr: 16, spo2: 97, temp: 36.3, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',
@@ -654,6 +720,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP144/82\n・HR：68\n・R:18\n・SPO2:97％\n（RA）\n・KT:35.7',
     vitals_initial: 'GCS:E4V5M6\n・BP148/88\n・HR：64\n・R:18\n・SPO2:97％\n（RA）\n・KT:35.7',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 144, dbp: 82, hr: 68, rr: 18, spo2: 97, temp: 35.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 148, dbp: 88, hr: 64, rr: 18, spo2: 97, temp: 35.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 148, dbp: 88, hr: 64, rr: 18, spo2: 97, temp: 35.7, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',
@@ -683,6 +752,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP118/66\n・HR：82\n・R:20\n・SPO2:99％\n（RA）\n・KT:36.4',
     vitals_initial: 'GCS:E4V5M6\n・BP118/62\n・HR：85\n・R:15\n・SPO2:99％\n（RA）\n・KT:36.4',
     vitals_post: 'V/S変動なく安定',
+    vitals_triage_struct: { sbp: 118, dbp: 66, hr: 82, rr: 20, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 118, dbp: 62, hr: 85, rr: 15, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 118, dbp: 62, hr: 85, rr: 15, spo2: 99, temp: 36.4, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '左側頭部お皮下血腫、左耳朶の腫脹、外出血なし',
       chest: '明らかな外傷性変化なし',
@@ -712,6 +784,9 @@ export const mockPatients: Patient[] = [
     vitals_triage: 'GCS:E4V5M6\n・BP106/95\n・HR：70\n・R:20\n・SPO2:98％\n（RA）\n・KT:36.9',
     vitals_initial: 'GCS:E4V5M6\n・BP154/91\n・HR：68\n・R:18\n・SPO2:97％\n（RA）\n・KT:36.8',
     vitals_post: 'V/S変動なし',
+    vitals_triage_struct: { sbp: 106, dbp: 95, hr: 70, rr: 20, spo2: 98, temp: 36.9, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_initial_struct: { sbp: 154, dbp: 91, hr: 68, rr: 18, spo2: 97, temp: 36.8, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
+    vitals_post_struct: { sbp: 154, dbp: 91, hr: 68, rr: 18, spo2: 97, temp: 36.8, gcs_e: 4, gcs_v: 5, gcs_m: 6 },
     findings: {
       head_and_neck: '明らかな外傷性変化なし',
       chest: '明らかな外傷性変化なし',

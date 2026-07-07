@@ -239,8 +239,65 @@ export function generateDefaultFastFindings(diagnosis: string, triage_color: str
     return 'Morison窩：液体貯留なし（−）\n脾腎間：液体貯留なし（−）\n骨盤腔：液体貯留なし（−）\n心嚢：液体貯留なし（−）\n→ FAST陰性'
 }
 
+
+// 定型処置マスター（csv.ts内にコピー、処置名照合用）
+const TREATMENT_MASTER = [
+    { id: 'oxygen', name: '酸素投与' },
+    { id: 'hfnc', name: 'ハイフロー開始 (HFNC)' },
+    { id: 'intubation', name: '気管挿管' },
+    { id: 'surgical_airway', name: '外科的気道確保' },
+    { id: 'ventilator', name: '人工呼吸器開始' },
+    { id: 'needle_decompression', name: '胸腔穿刺 (絊急脱気)' },
+    { id: 'chest_tube', name: '胸腔ドレーン挿入' },
+    { id: 'gauze_towel_fixation', name: 'ガーゼ固定、タオル固定' },
+    { id: 'three_sided_taping', name: '三辺テーピング' },
+    { id: 'iv_access', name: '静脈路確保(末梢)' },
+    { id: 'iv_access_2', name: '静脈路確保(2本目)' },
+    { id: 'cv_access', name: '中心静脈路確保' },
+    { id: 'quinton_catheter', name: '血管アクセスカテーテル挿入 (クイントン)' },
+    { id: 'iv_fluid', name: '外液急速投与' },
+    { id: 'blood_transfusion', name: '絊急輸血 (RBC/FFP/PC)' },
+    { id: 'vasopressor', name: '昇圧剤投与' },
+    { id: 'antihypertensive', name: '降圧剤投与' },
+    { id: 'antibiotics', name: '抗菌薬投与' },
+    { id: 'sedation', name: '鹮静・鹮痛薬投与' },
+    { id: 'pelvic_binder', name: 'サムスリング装著 (骨盤固定)' },
+    { id: 'cpr', name: '胸骨圧迫 / ACLS' },
+    { id: 'fasciotomy', name: '減張切開' },
+    { id: 'open_cardiac_massage', name: '開胸心マ' },
+    { id: 'aortic_cross_clamping', name: '開胸大動脈クランプ' },
+    { id: 'exploratory_laparotomy', name: '試験開腹' },
+    { id: 'emergency_c_section', name: '絊急帝王切開' },
+    { id: 'iabo', name: 'IABO (大動脈内バルーン閉塞)' },
+    { id: 'iabp', name: 'IABP (大動脈内バルーンポンピング)' },
+    { id: 'pcps', name: 'PCPS (VA-ECMO)' },
+    { id: 'pericardiocentesis', name: '心囊穿刺ドレナージ' },
+    { id: 'splint', name: 'シーネ固定' },
+    { id: 'traction', name: '直達犍引' },
+    { id: 'suture', name: '挨創処置 (洗浄縫合)' },
+    { id: 'xray', name: 'レントゲン(X-P)' },
+    { id: 'ct', name: 'CT画像検査' },
+    { id: 'blood_test', name: '血液検査' },
+    { id: 'blood_gas', name: '血液ガス' },
+]
+
+// 処置名またはIDからTREATMENT_MASTERを照合
+function findTreatment(nameOrId: string): { id: string; name: string; time: number } | null {
+    const s = nameOrId.trim()
+    // IDで照合
+    const byId = TREATMENT_MASTER.find(t => t.id === s)
+    if (byId) return { ...byId, time: 5 }
+    // 名前で完全一致
+    const byName = TREATMENT_MASTER.find(t => t.name === s)
+    if (byName) return { ...byName, time: 5 }
+    // 部分一致（名前にキーワードを含む）
+    const byPartial = TREATMENT_MASTER.find(t => t.name.includes(s) || s.includes(t.name))
+    if (byPartial) return { ...byPartial, time: 5 }
+    return null
+}
+
 // ------------------------------------------------------------------
-// マスターCSV雛形生成（現在のPatient型に合わせた完全対応版）
+// マスタCSV雛形生成（現在のPatient型に合わせた完全対応版）
 // セッション中でない場合にダウンロードされる「患者雛形CSV」として使用
 // ------------------------------------------------------------------
 export function exportMasterCSV(patients: Patient[]): string {
@@ -260,23 +317,29 @@ export function exportMasterCSV(patients: Patient[]): string {
         '初期評価時_SBP', '初期評価時_DBP', '初期評価時_HR',
         '初期評価時_RR', '初期評価時_SpO2', '初期評価時_Temp', '初期評価時_GCS_E', '初期評価時_GCS_V', '初期評価時_GCS_M',
         // 身体所見
-        '頭頸部所見',
+        '頭謝部所見',
         '胸部所見',
         '腹部・骨盤所見',
         '四肢所見',
         'FAST所見',
-        'AMPLE',
-        '背景（負傷機転）',
-        // 診断・方針
+        // AMPLE分割（5列）
+        'A:アレルギー',
+        'M:内服薬',
+        'P:既往歴・妊娠',
+        'L:最終飲食',
+        'E:受傷機転',
+        // 患者背景
+        '患者背景',
+        // 診断・方针
         '診断名',
         '必要検査・安定処置',
-        '方針',
+        '方针',
         // アクター情報
         '演技・痛がり方アドバイス',
         // 画像・採血
-        '画像URL（カンマ区切り）',
+        '画像ＵＲＬ（カンマ区切り）',
         '血液検査データ',
-        // 必要処置（最大5件）
+        // 必要処置（処置名 — COMMON_TREATMENTSから選択、最大1履歴あるのみここに出力）
         '処置名_1', '拘束時間分_1',
         '処置名_2', '拘束時間分_2',
         '処置名_3', '拘束時間分_3',
@@ -299,13 +362,20 @@ export function exportMasterCSV(patients: Patient[]): string {
         const vs_r = p.vitals_rosc_struct
         const treatments = p.required_treatments || []
 
-        // 処置を最大5件まで展開
+        // 処置を最大10件まで展開
         const treatmentCells: string[] = []
         for (let i = 0; i < 5; i++) {
             const rt = treatments[i]
             treatmentCells.push(rt ? rt.treatment_name : '')
             treatmentCells.push(rt ? String(rt.lock_timer_minutes) : '')
         }
+
+        // AMPLE各項目の出力（分割データ側または一括AMPLEの分解）
+        const ample_a = p.findings?.ample_a ?? ''
+        const ample_m = p.findings?.ample_m ?? ''
+        const ample_p = p.findings?.ample_p ?? ''
+        const ample_l = p.findings?.ample_l ?? ''
+        const ample_e = p.findings?.ample_e ?? ''
 
         const row = [
             p.scenario_tag || '基本',
@@ -322,22 +392,24 @@ export function exportMasterCSV(patients: Patient[]): string {
             vs_i?.sbp  ?? '', vs_i?.dbp  ?? '', vs_i?.hr   ?? '',
             vs_i?.rr   ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.gcs_e ?? '', vs_i?.gcs_v ?? '', vs_i?.gcs_m ?? '',
             // 所見
-            p.findings?.head_and_neck     || '',
-            p.findings?.chest             || '',
-            p.findings?.abdomen_and_pelvis || '',
-            p.findings?.limbs             || '',
-            p.findings?.fast              || '',
-            p.findings?.ample             || '',
-            p.findings?.background        || '',
-            // 診断・方針
-            p.diagnosis             || '',
+            p.findings?.head_and_neck      || '',
+            p.findings?.chest              || '',
+            p.findings?.abdomen_and_pelvis  || '',
+            p.findings?.limbs              || '',
+            p.findings?.fast               || '',
+            // AMPLE5分割
+            ample_a, ample_m, ample_p, ample_l, ample_e,
+            // 患者背景
+            p.findings?.background         || '',
+            // 診断・方针
+            p.diagnosis                    || '',
             p.necessary_tests_and_treatments || '',
-            p.policy                || '',
+            p.policy                       || '',
             // アクター
-            p.acting_instructions   || '',
+            p.acting_instructions          || '',
             // 画像・採血
             (p.image_urls || []).join(','),
-            p.blood_test_data       || '',
+            p.blood_test_data              || '',
             // 処置（最大5件）
             ...treatmentCells,
             // 悪化シナリオ
@@ -354,6 +426,7 @@ export function exportMasterCSV(patients: Patient[]): string {
 
     return '\uFEFF' + [headers.join(','), ...rows].join('\n') // BOM付きUTF-8でExcelで文字化けしない
 }
+
 
 // ------------------------------------------------------------------
 // 訓練結果の振り返り用CSV（セッション中に使う従来のexportCSV）
@@ -519,19 +592,69 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             temp: parseNum(data['ROSC目標_Temp']) || 36.5,
         } : undefined
 
-        // 処置は処置名_1〜5列から読み取る
-        const required_treatments = []
+        // ------------------------------------------------------------------
+        // 処置のビルド: 処置名_1〜5 → 文字列とTREATMENT_MASTERで照合して結び付け
+        // 処置名がなくて必要検査・安定処置列に記載があれば自動分解して登録
+        // ------------------------------------------------------------------
+        let required_treatments: { treatment_id: string; treatment_name: string; lock_timer_minutes: number }[] = []
+
+        // まず処置名_1〜5列を参照
         for (let j = 1; j <= 5; j++) {
-            const name = data[`処置名_${j}`]
+            const nameOrId = data[`処置名_${j}`]
             const time = data[`拘束時間分_${j}`]
-            if (name && name.trim()) {
-                required_treatments.push({
-                    treatment_id: `custom_${j}_${Date.now()}`,
-                    treatment_name: name.trim(),
-                    lock_timer_minutes: parseInt(time) || 5,
-                })
+            if (nameOrId && nameOrId.trim()) {
+                const matched = findTreatment(nameOrId)
+                if (matched) {
+                    required_treatments.push({
+                        treatment_id: matched.id,
+                        treatment_name: matched.name,
+                        lock_timer_minutes: parseInt(time) || matched.time,
+                    })
+                } else {
+                    // TREATMENT_MASTERにないカスタム処置名はそのまま登録
+                    required_treatments.push({
+                        treatment_id: `custom_${j}_${Date.now()}`,
+                        treatment_name: nameOrId.trim(),
+                        lock_timer_minutes: parseInt(time) || 5,
+                    })
+                }
             }
         }
+
+        // 処置名列が全て空で、必要検査・安定処置列に記載があれば自動分解
+        if (required_treatments.length === 0) {
+            const rawTests = data['必要検査・安定処置'] || ''
+            if (rawTests.trim()) {
+                // 読点、カンマ、改行、「、」で分割
+                const items = rawTests.split(/[、,，\n／･・]+/).map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+                let autoIdx = 1
+                for (const item of items) {
+                    const matched = findTreatment(item)
+                    if (matched) {
+                        required_treatments.push({
+                            treatment_id: matched.id,
+                            treatment_name: matched.name,
+                            lock_timer_minutes: matched.time,
+                        })
+                    } else if (item.length > 0) {
+                        required_treatments.push({
+                            treatment_id: `auto_${autoIdx++}_${Date.now()}`,
+                            treatment_name: item,
+                            lock_timer_minutes: 5,
+                        })
+                    }
+                }
+            }
+        }
+
+        // AMPLE各項目を読み込む（新形式優先、旧形式の後方互換も対応）
+        const ample_a = data['A:アレルギー'] || ''
+        const ample_m = data['M:内服薬'] || ''
+        const ample_p = data['P:既往歴・妊娠'] || ''
+        const ample_l = data['L:最終飲食'] || ''
+        const ample_e = data['E:受傷機転'] || ''
+        // 旧形式の一括AMPLEテキスト
+        const ampleRaw = data['AMPLE'] || ''
 
         const patient: Patient = {
             scenario_tag: data['シナリオタグ'] || 'カスタム',
@@ -549,7 +672,7 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
             vitals_post_struct,
             vitals_rosc_struct,
             findings: {
-                head_and_neck:       data['頭頸部所見']        || '',
+                head_and_neck:       data['頭謝部所見']        || '',
                 chest:               data['胸部所見']          || '',
                 abdomen_and_pelvis:  data['腹部・骨盤所見']    || '',
                 limbs:               data['四肢所見']          || '',
@@ -558,15 +681,22 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
                     data['診断名'] || '',
                     triage_color
                 ),
-                ample:               data['AMPLE']             || '',
-                background:          data['背景（負傷機転）']  || '',
+                ample: ampleRaw,
+                // AMPLE分割各項目
+                ample_a,
+                ample_m,
+                ample_p,
+                ample_l,
+                ample_e,
+                // 後方互換: '患者背景'列下位互換
+                background: data['患者背景'] || data['背景（負傷機転）'] || '',
             },
             diagnosis:                      data['診断名']                      || '',
             necessary_tests_and_treatments: data['必要検査・安定処置']          || '',
-            policy:                         data['方針']                        || '',
+            policy:                         data['方针']                        || '',
             acting_instructions:            data['演技・痛がり方アドバイス']    || '',
-            image_urls: data['画像URL（カンマ区切り）']
-                ? data['画像URL（カンマ区切り）'].split(',').map(s => s.trim()).filter(Boolean)
+            image_urls: data['画像ＵＲＬ（カンマ区切り）']
+                ? data['画像ＵＲＬ（カンマ区切り）'].split(',').map((s: string) => s.trim()).filter(Boolean)
                 : [],
             // 血液検査データが空欄の場合は診断名・トリアージ色から自動生成（解決策A）
             blood_test_data: data['血液検査データ'] || generateDefaultBloodTestData(
@@ -589,3 +719,4 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
 
     return patients
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      

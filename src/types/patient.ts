@@ -9,8 +9,14 @@ export interface PatientFindings {
     abdomen_and_pelvis: string
     limbs: string
     fast: string
-    ample: string
-    background: string // 生活歴・家族情報 に相当
+    ample: string // 後方互換用（一括テキスト）
+    // AMPLE各項目（分割入力・CSV対応）
+    ample_a?: string // A: アレルギー
+    ample_m?: string // M: 内服薬
+    ample_p?: string // P: 既往歴・妊娠
+    ample_l?: string // L: 最終飲食
+    ample_e?: string // E: 受傷機転
+    background: string // 患者背景（生活歴・家族情報）
 }
 
 export interface RequiredTreatment {

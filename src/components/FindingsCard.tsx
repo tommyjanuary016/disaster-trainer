@@ -19,6 +19,18 @@ const FindingsCard: React.FC<FindingsCardProps> = ({ findings, completedTreatmen
         )
     }
 
+    // AMPLE5項目を組み立てる（分割データ優先、なければ旧ampleフィールドを表示）
+    const hasAmpleSplit = findings.ample_a || findings.ample_m || findings.ample_p || findings.ample_l || findings.ample_e
+    const ampleDisplayText = hasAmpleSplit
+        ? [
+            findings.ample_a ? `A（アレルギー）：${findings.ample_a}` : null,
+            findings.ample_m ? `M（内服薬）：${findings.ample_m}` : null,
+            findings.ample_p ? `P（既往歴・妊娠）：${findings.ample_p}` : null,
+            findings.ample_l ? `L（最終飲食）：${findings.ample_l}` : null,
+            findings.ample_e ? `E（受傷機転）：${findings.ample_e}` : null,
+          ].filter(Boolean).join('\n')
+        : (findings.ample || '')
+
     return (
         <div className="findings-card">
             <h3 className="findings-card__title">所見詳細</h3>
@@ -28,8 +40,8 @@ const FindingsCard: React.FC<FindingsCardProps> = ({ findings, completedTreatmen
                 {renderFinding('abdomen_and_pelvis', '腹部・骨盤', findings.abdomen_and_pelvis)}
                 {renderFinding('limbs', '四肢', findings.limbs)}
                 {renderFinding('fast', 'FAST', findings.fast)}
-                {renderFinding('ample', 'AMPLE', findings.ample, true)}
-                {renderFinding('background', '背景', findings.background, true)}
+                {renderFinding('ample', 'AMPLE', ampleDisplayText, true)}
+                {renderFinding('background', '患者背景', findings.background, true)}
             </div>
         </div>
     )

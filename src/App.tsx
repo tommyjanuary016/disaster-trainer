@@ -3,6 +3,16 @@ import { BrowserRouter as Router } from 'react-router-dom'
 import { TransitionRoutes } from './components/TransitionRoutes'
 import { GlobalNavigation } from './components/GlobalNavigation'
 import { NotificationProvider } from './components/NotificationProvider'
+import { setActiveSession } from './lib/firestore'
+
+// URLのクエリパラメータからセッションIDを検出し、最優先で設定する
+const params = new URLSearchParams(window.location.search)
+const sessionIdParam = params.get('session_id') || params.get('sid')
+if (sessionIdParam) {
+    setActiveSession(sessionIdParam)
+    // クエリパラメータを取り除いて /role-select へリダイレクト
+    window.location.href = '/role-select'
+}
 
 const Header: React.FC = () => {
     return (

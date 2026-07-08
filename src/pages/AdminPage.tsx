@@ -36,7 +36,22 @@ const AdminPage: React.FC = () => {
     const [displaySessionId, setDisplaySessionId] = useState<string | null>(activeSessionId)
     const [currentSessionTitle, setCurrentSessionTitle] = useState<string | null>(null)
     const [sessionEnded, setSessionEnded] = useState(false) // 訓練終了状態フラグ
+    const [showShareModal, setShowShareModal] = useState(false)
+    const [copySuccess, setCopySuccess] = useState(false)
     const location = useLocation()
+
+    const shareUrl = currentSessionId ? `${window.location.origin}/?session_id=${currentSessionId}` : ''
+    const qrUrl = shareUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}` : ''
+
+    const handleCopyLink = () => {
+        if (!shareUrl) return
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            setCopySuccess(true)
+            setTimeout(() => setCopySuccess(false), 2000)
+        }).catch(err => {
+            console.error('コピー失敗:', err)
+        })
+    }
 
     // 抽出可能なシナリオタグ一覧
     const availableScenarios = Array.from(new Set(patients.map(p => p.scenario_tag || '基本')))
@@ -249,6 +264,25 @@ const AdminPage: React.FC = () => {
                                 <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace'}}>
                                     ID: {currentSessionId.replace('session_', '')}
                                 </span>
+                                <button
+                                    onClick={() => setShowShareModal(true)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        padding: '0.25rem 0.65rem',
+                                        borderRadius: '999px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: '600',
+                                        color: '#1d4ed8',
+                                        background: 'rgba(37, 99, 235, 0.1)',
+                                        border: '1px solid rgba(37, 99, 235, 0.3)',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    📱 プレイヤーを招待
+                                </button>
                             </div>
                         ) : sessionEnded && displaySessionId ? (
                             <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem'}}>
@@ -666,6 +700,79 @@ const AdminPage: React.FC = () => {
                     </>
                 )}
             </main>
+
+            {/* QRコード共有モーダル（管理者用） */}
+            {showShareModal && currentSessionId && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        backdropFilter: 'blur(6px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem'
+                    }}
+                    onClick={() => setShowShareModal(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: '#0f172a',
+                            borderRadius: '20px',
+                            padding: '2rem',
+                            maxWidth: '380px',
+                            width: '100%',
+                            textAlign: 'center',
+                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📱</div>
+                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.25rem', color: '#f8fafc', fontWeight: 700 }}>
+                            プレイヤーを招待
+                        </h3>
+                        <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.5rem' }}>
+                            セッション:&nbsp;<strong style={{ color: '#e2e8f0' }}>{currentSessionTitle || '（タイトルなし）'}</strong>
+                        </p>
+                        <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1.5rem' }}>
+                            このQRコードをスキャンすると、訓練の役割選択画面に直接アクセスできます。
+                        </p>
+                        <div style={{
+                            backgroundColor: '#ffffff',
+                            padding: '1.25rem',
+                            borderRadius: '16px',
+                            display: 'inline-block',
+                            marginBottom: '1.5rem',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                        }}>
+                            <img
+                                src={qrUrl}
+                                alt="参加用QRコード"
+                                style={{ display: 'block', width: '220px', height: '220px' }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button
+                                className="button button--primary"
+                                onClick={handleCopyLink}
+                                style={{ width: '100%' }}
+                            >
+                                {copySuccess ? '✅ コピー完了' : '📋 参加URLをコピー'}
+                            </button>
+                            <button
+                                className="button button--secondary"
+                                onClick={() => setShowShareModal(false)}
+                                style={{ width: '100%' }}
+                            >
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -23,26 +23,40 @@ const QRScannerPage: React.FC = () => {
     // 患者リスト用の状態
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([])
     const [isLoadingPatients, setIsLoadingPatients] = useState(false)
+    const [isTestMode, setIsTestMode] = useState(false)
+    const [recentPatients, setRecentPatients] = useState<Patient[]>([])
     // 連続トリアージモード
     const [continuousMode, setContinuousMode] = useState(false)
     const [continuousDoneCount, setContinuousDoneCount] = useState(0)
+    const STORAGE_KEY = 'recent_scanned_patients'
 
     useEffect(() => {
         if (activeSessionId) {
             fetchTrainingSession(activeSessionId).then(session => {
-                if (session) setSessionTitle(session.title)
+                if (session) {
+                    setSessionTitle(session.title)
+                    setIsTestMode(!!session.isTestMode)
+                }
             }).catch(e => console.error(e))
+            // セッションが変わったら患者リストをロード（検証用＆履歴用）
+            loadPatients()
         } else {
             // セッション未選択ならセッション一覧を取得してモーダルを表示
             openSessionModal()
         }
-    }, [])
+    }, [activeSessionId])
 
     useEffect(() => {
-        if (activeTab === 'list') {
-            loadPatients()
+        // 患者データがロードされたら履歴を復元
+        if (sessionPatients.length > 0) {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY)
+                const ids: number[] = stored ? JSON.parse(stored) : []
+                const mapped = ids.map(id => sessionPatients.find(p => p.id === id)).filter(Boolean) as Patient[]
+                setRecentPatients(mapped)
+            } catch (e) { console.error(e) }
         }
-    }, [activeTab, activeSessionId])
+    }, [sessionPatients])
 
     const loadPatients = async () => {
         setIsLoadingPatients(true)
@@ -135,8 +149,24 @@ const QRScannerPage: React.FC = () => {
         }
     }
 
+    const addRecentPatient = (patient: Patient) => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY)
+            let ids: number[] = stored ? JSON.parse(stored) : []
+            ids = [patient.id, ...ids.filter(id => id !== patient.id)].slice(0, 10)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+            
+            // local state update
+            setRecentPatients(prev => {
+                const newRecent = [patient, ...prev.filter(p => p.id !== patient.id)].slice(0, 10)
+                return newRecent
+            })
+        } catch (e) { console.error('Failed to save recent patient', e) }
+    }
+
     const handleConfirm = () => {
-        if (pendingPatientId) {
+        if (pendingPatientId && pendingPatient) {
+            addRecentPatient(pendingPatient)
             if (continuousMode) {
                 // 連続モード：カルテへ遷移せず、モーダルを閉じてカメラを再起動
                 setContinuousDoneCount(c => c + 1)
@@ -294,31 +324,95 @@ const QRScannerPage: React.FC = () => {
                 <span>OR</span>
             </div>
 
-            <div className="manual-entry">
-                <form onSubmit={handleManualSubmit} className="manual-entry__form">
-                    <div className="form-group">
-                        <label>患者IDを直接入力（口頭確認用）</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={manualId}
-                            onChange={(e) => {
-                                const val = parseInt(e.target.value)
-                                if (val < 1) {
-                                    setManualId('')
-                                } else {
-                                    setManualId(e.target.value)
-                                }
-                            }}
-                            placeholder="例: 101"
-                            className="input"
-                        />
+            {isTestMode ? (
+                <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>検証用: 患者カード（直接アクセス）</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
+                        {sessionPatients.slice(0, 12).map(p => (
+                            <button
+                                key={p.id}
+                                className="button button--secondary"
+                                style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
+                                onClick={() => handleScan(`patient:${p.id}`)}
+                            >
+                                <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
+                                    {p.triage_color}
+                                </span>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.4rem' }}>ID: {String(p.base_patient_id || p.id).padStart(4, '0')}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{p.name}</span>
+                            </button>
+                        ))}
                     </div>
-                    <button type="submit" className="button button--primary" disabled={!manualId}>
-                        ID検索
-                    </button>
+                </div>
+            ) : (
+                <div className="manual-entry">
+                    <form onSubmit={handleManualSubmit} className="manual-entry__form">
+                        <div className="form-group">
+                            <label>患者IDを直接入力（口頭確認用）</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={manualId}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value)
+                                    if (val < 1) {
+                                        setManualId('')
+                                    } else {
+                                        setManualId(e.target.value)
+                                    }
+                                }}
+                                placeholder="例: 101"
+                                className="input"
+                            />
+                        </div>
+                        <button type="submit" className="button button--primary" disabled={!manualId}>
+                            ID検索
+                        </button>
                     </form>
                 </div>
+            )}
+
+            {/* 最近対応した患者履歴 */}
+            {recentPatients.length > 0 && (
+                <div style={{ margin: '1rem 1.25rem 2rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-600)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        最近対応した患者
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                        {recentPatients.map(p => (
+                            <div
+                                key={p.id}
+                                onClick={() => navigate(`/training/patient/${p.id}`)}
+                                style={{
+                                    flexShrink: 0,
+                                    width: '140px',
+                                    background: 'var(--white)',
+                                    border: '1px solid var(--gray-200)',
+                                    borderRadius: '8px',
+                                    padding: '0.75rem',
+                                    cursor: 'pointer',
+                                    boxShadow: 'var(--shadow-sm)',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>患者 {p.id % 1000}</span>
+                                    <div style={{
+                                        width: '12px',
+                                        height: '12px',
+                                        borderRadius: '50%',
+                                        backgroundColor: `var(--triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'})`
+                                    }} />
+                                </div>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.diagnosis || '診断未設定'}</span>
+                                <span style={{ fontSize: '0.7rem', color: getStatusColor(p.status), fontWeight: 'bold', marginTop: 'auto', paddingTop: '0.25rem' }}>{p.status}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             </>
             ) : (
                 <div style={{ padding: '0 1rem 1rem' }}>

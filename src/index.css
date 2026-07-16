@@ -3828,3 +3828,14 @@ select.input {
   border: 2px solid rgba(59, 130, 246, 0.7);
   animation: fabPulse 2s ease-out infinite;
 }
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

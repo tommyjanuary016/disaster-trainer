@@ -6,6 +6,7 @@ import VitalsCard from '../components/VitalsCard'
 import FindingsCard from '../components/FindingsCard'
 import LockTimerOverlay from '../components/LockTimerOverlay'
 import PatientPictogram from '../components/PatientPictogram'
+import LoadingScreen from '../components/LoadingScreen'
 
 // 診察手技一覧
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
@@ -31,8 +32,17 @@ const PatientDetailPage: React.FC = () => {
     const { isLocked, remainingDisplay } = useTimer(patient)
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
 
-    if (loading) return <div className="loading">読み込み中...</div>
-    if (error || !patient) return <div className="error">{error || '患者が見つかりません'}</div>
+    if (loading) return <LoadingScreen message="患者データを取得中" subMessage="しばらくお待ちください..." />
+    if (error || !patient) return (
+        <div className="page-error">
+            <div className="page-error__icon">⚠</div>
+            <p className="page-error__title">データ取得エラー</p>
+            <p className="page-error__message">{error || '患者が見つかりません'}</p>
+            <button className="button button--secondary" style={{ marginTop: '1.5rem', width: 'auto' }} onClick={() => navigate('/training')}>
+                訓練トップへ戻る
+            </button>
+        </div>
+    )
 
     const completed = patient.completed_treatments || []
     const uniqueCompleted = Array.from(new Set(completed))

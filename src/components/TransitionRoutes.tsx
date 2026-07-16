@@ -12,14 +12,13 @@ import QRGeneratorPage from '../pages/QRGeneratorPage'
 import RadiologyScanPage from '../pages/RadiologyScanPage'
 import LabScanPage from '../pages/LabScanPage'
 
-const PREFIX = '/@fs/Users/tominaganaoki/.gemini/antigravity/brain/bf741cb1-4338-4192-8b2a-3b615d890951'
-
-// AI生成画像のパスリスト（画面遷移エフェクト用）
-const TRANSITION_IMAGES = [
-    `${PREFIX}/ambulance_arrival_1774248316337.png`,
-    `${PREFIX}/vitals_monitor_1774248410493.png`,
-    `${PREFIX}/medical_procedure_1774248435337.png`,
-    `${PREFIX}/er_examination_1774248470389.png`
+// 画面遷移時に表示するメッセージをランダムで選択
+const TRANSITION_MESSAGES = [
+    'SYSTEM LOADING',
+    'CONNECTING TO SERVER',
+    'SYNCING DATA',
+    'PREPARING INTERFACE',
+    'AUTHENTICATING',
 ]
 
 // 起動画面（ランチャー）は遷移エフェクトを出さない
@@ -29,7 +28,8 @@ export const TransitionRoutes: React.FC = () => {
     const location = useLocation()
     const [displayLocation, setDisplayLocation] = useState(location)
     const [isTransitioning, setIsTransitioning] = useState(false)
-    const [bgImage, setBgImage] = useState('')
+    const [transitionMessage, setTransitionMessage] = useState(TRANSITION_MESSAGES[0])
+    const [progress, setProgress] = useState(0)
 
     useEffect(() => {
         if (location.pathname === displayLocation.pathname) return
@@ -41,24 +41,58 @@ export const TransitionRoutes: React.FC = () => {
             return
         }
 
+        // ランダムメッセージを選択
+        const msg = TRANSITION_MESSAGES[Math.floor(Math.random() * TRANSITION_MESSAGES.length)]
+        setTransitionMessage(msg)
+        setProgress(0)
         setIsTransitioning(true)
-        const randomImage = TRANSITION_IMAGES[Math.floor(Math.random() * TRANSITION_IMAGES.length)]
-        setBgImage(randomImage)
+
+        // プログレスバーを徐々に進める
+        let p = 0
+        const interval = setInterval(() => {
+            p += Math.random() * 25 + 10
+            if (p > 90) p = 90
+            setProgress(p)
+        }, 150)
 
         const timer = setTimeout(() => {
+            clearInterval(interval)
+            setProgress(100)
             setDisplayLocation(location)
             setTimeout(() => setIsTransitioning(false), 300)
-        }, 1200)
+        }, 900)
 
-        return () => clearTimeout(timer)
+        return () => {
+            clearInterval(interval)
+            clearTimeout(timer)
+        }
     }, [location, displayLocation])
 
     return (
         <>
-            <div className={`transition-overlay ${isTransitioning ? 'active' : ''}`} style={{ backgroundImage: `url(${bgImage})` }}>
+            {/* 画面遷移オーバーレイ */}
+            <div className={`transition-overlay ${isTransitioning ? 'active' : ''}`}>
+                <div className="transition-overlay__grid" />
+                <div className="transition-overlay__scanline" />
                 <div className="transition-overlay__content">
-                    <div className="spinner"></div>
-                    <h2>SYSTEM LOADING...</h2>
+                    {/* スピナー */}
+                    <div className="transition-spinner">
+                        <div className="transition-spinner__ring transition-spinner__ring--1" />
+                        <div className="transition-spinner__ring transition-spinner__ring--2" />
+                        <div className="transition-spinner__core" />
+                    </div>
+                    {/* タイトル */}
+                    <h2 className="transition-overlay__title">DISASTER LOGIC</h2>
+                    {/* メッセージ（点滅） */}
+                    <p className="transition-overlay__message">{transitionMessage}...</p>
+                    {/* プログレスバー */}
+                    <div className="transition-overlay__progressbar">
+                        <div
+                            className="transition-overlay__progressbar-fill"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                    <p className="transition-overlay__percent">{Math.round(progress)}%</p>
                 </div>
             </div>
 

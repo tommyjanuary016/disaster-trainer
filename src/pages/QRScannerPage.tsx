@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatient, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, fetchAllPatients } from '../lib/firestore'
+import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, fetchAllPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 
@@ -92,9 +92,25 @@ const QRScannerPage: React.FC = () => {
     useEffect(() => {
         if (showModal || activeTab !== 'qr') return // モーダル表示中や別のタブの場合はスキャナーを起動しない
 
+        // Android・iOS対応のレスポンシブqrbox設定および最適化
+        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+            const qrboxSize = Math.floor(minEdge * 0.75)
+            return {
+                width: Math.max(qrboxSize, 200),
+                height: Math.max(qrboxSize, 200)
+            }
+        }
+
         const scanner = new Html5QrcodeScanner(
             'reader',
-            { fps: 10, qrbox: { width: 250, height: 250 } },
+            { 
+                fps: 10, 
+                qrbox: qrboxFunction,
+                aspectRatio: 1.0,
+                rememberLastUsedCamera: true,
+                showTorchButtonIfSupported: true
+            },
             /* verbose= */ false
         )
 
@@ -114,30 +130,32 @@ const QRScannerPage: React.FC = () => {
     }, [showModal, activeTab])
 
     const handleScan = async (text: string) => {
-        const parsed = parseQRCode(text)
-
-        if (!parsed || parsed.type !== 'patient') {
-            setError('無効なQRコードです。患者QR（病着に貼付）を読み取ってください。')
-            return
+        let rawId = text
+        if (text.startsWith('patient:')) {
+            rawId = text.slice(8)
+        } else {
+            const parsed = parseQRCode(text)
+            if (parsed && parsed.type === 'patient') {
+                rawId = parsed.id
+            }
         }
 
         setError(null)
-        // 患者情報を取得して確認モーダルを表示
-        const patientId = parsed.id
-        const patient = await fetchPatient(parseInt(patientId))
+        // 柔軟な患者ID検索を実行（ID, base_patient_id, 番号いずれも対応）
+        const patient = await fetchPatientFlexible(rawId)
         
         if (!patient) {
-            setError('該当する患者が見つかりません。')
+            setError(`該当する患者が見つかりません (入力・読み取り値: ${rawId})`)
             return
         }
 
         // アクティブなセッションがある場合、そのセッションに属しているかチェック
-        if (activeSessionId && patient.session_id !== activeSessionId) {
+        if (activeSessionId && patient.session_id && patient.session_id !== activeSessionId) {
             setError('この患者は現在のセッションに参加していません。')
             return
         }
 
-        setPendingPatientId(patientId)
+        setPendingPatientId(String(patient.id))
         setPendingPatient(patient)
         setShowModal(true)
     }
@@ -145,7 +163,7 @@ const QRScannerPage: React.FC = () => {
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (manualId) {
-            handleScan(`patient:${manualId}`)
+            handleScan(manualId.trim())
         }
     }
 
@@ -328,17 +346,17 @@ const QRScannerPage: React.FC = () => {
                 <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
                     <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>検証用: 患者カード（直接アクセス）</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
-                        {sessionPatients.slice(0, 12).map(p => (
+                        {sessionPatients.slice(0, 12).map((p, idx) => (
                             <button
                                 key={p.id}
                                 className="button button--secondary"
                                 style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
-                                onClick={() => handleScan(`patient:${p.id}`)}
+                                onClick={() => handleScan(String(p.id))}
                             >
                                 <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
                                     {p.triage_color}
                                 </span>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.4rem' }}>ID: {String(p.base_patient_id || p.id).padStart(4, '0')}</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginTop: '0.4rem' }}>No.{idx + 1}</span>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{p.name}</span>
                             </button>
                         ))}
@@ -348,25 +366,17 @@ const QRScannerPage: React.FC = () => {
                 <div className="manual-entry">
                     <form onSubmit={handleManualSubmit} className="manual-entry__form">
                         <div className="form-group">
-                            <label>患者IDを直接入力（口頭確認用）</label>
+                            <label>患者番号（1番, 2番…）または患者ID（101, 102…）を直接入力</label>
                             <input
-                                type="number"
-                                min="1"
+                                type="text"
                                 value={manualId}
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value)
-                                    if (val < 1) {
-                                        setManualId('')
-                                    } else {
-                                        setManualId(e.target.value)
-                                    }
-                                }}
-                                placeholder="例: 101"
+                                onChange={(e) => setManualId(e.target.value)}
+                                placeholder="例: 1 または 101"
                                 className="input"
                             />
                         </div>
-                        <button type="submit" className="button button--primary" disabled={!manualId}>
-                            ID検索
+                        <button type="submit" className="button button--primary" disabled={!manualId.trim()}>
+                            患者を検索
                         </button>
                     </form>
                 </div>
@@ -445,7 +455,7 @@ const QRScannerPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                    {sessionPatients.map(p => (
+                                    {sessionPatients.map((p, idx) => (
                                         <div
                                             key={p.id}
                                             className="list-item"
@@ -471,7 +481,7 @@ const QRScannerPage: React.FC = () => {
                                             }} />
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                                    患者 {p.id % 1000} <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {p.base_patient_id || p.id})</span>
+                                                    No.{idx + 1} {p.name} <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {p.base_patient_id || p.id})</span>
                                                 </div>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
                                                     年齢/性別: {p.age}歳 {p.gender} | {p.diagnosis || '（診断未設定）'}

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { mockPatients } from '../data/mockData'
 import { MEDICAL_ITEMS, getItemCategories } from '../data/items'
 import { makePatientQR, makeProcedureQR, makeItemQR } from '../types/qr'
@@ -45,11 +45,20 @@ type Tab = 'patient' | 'procedure' | 'item' | 'import'
 
 const QRGeneratorPage: React.FC = () => {
     const navigate = useNavigate()
-    const [activeTab, setActiveTab] = useState<Tab>('patient')
+    const [searchParams] = useSearchParams()
+    const initialTab = (searchParams.get('tab') as Tab) || 'patient'
+    const [activeTab, setActiveTab] = useState<Tab>(initialTab)
     const [importJson, setImportJson] = useState('')
     const [importStatus, setImportStatus] = useState<string | null>(null)
     const [importError, setImportError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        const tab = searchParams.get('tab') as Tab
+        if (tab && ['patient', 'procedure', 'item', 'import'].includes(tab)) {
+            setActiveTab(tab)
+        }
+    }, [searchParams])
 
     const procedureCategories = [...new Set(PROCEDURES.map(p => p.category))]
     const itemCategories = getItemCategories()
@@ -85,11 +94,16 @@ const QRGeneratorPage: React.FC = () => {
 
     return (
         <div className="page qr-generator-page">
-            <header className="admin-header">
-                <h1>QRコード生成</h1>
-                <button onClick={() => navigate('/admin')} className="button button--secondary" style={{ width: 'auto', padding: '0.5rem 1rem' }}>
-                    ← 管理画面
-                </button>
+            <header className="admin-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h1>QRコード生成・印刷</h1>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button onClick={() => navigate(-1)} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                        ← 戻る
+                    </button>
+                    <button onClick={() => navigate('/admin')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                        管理画面
+                    </button>
+                </div>
             </header>
 
             {/* タブ */}

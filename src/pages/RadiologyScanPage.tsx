@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatient, updatePatientFlags, subscribeToAllPatients } from '../lib/firestore'
+import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients } from '../lib/firestore'
 import { Patient } from '../types/patient'
 
 const RadiologyScanPage: React.FC = () => {
@@ -16,9 +16,24 @@ const RadiologyScanPage: React.FC = () => {
     useEffect(() => {
         if (patient) return // 患者表示中はスキャナーを停止
 
+        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+            const qrboxSize = Math.floor(minEdge * 0.75)
+            return {
+                width: Math.max(qrboxSize, 200),
+                height: Math.max(qrboxSize, 200)
+            }
+        }
+
         const scanner = new Html5QrcodeScanner(
             'rad-reader',
-            { fps: 10, qrbox: { width: 250, height: 250 } },
+            {
+                fps: 10,
+                qrbox: qrboxFunction,
+                aspectRatio: 1.0,
+                rememberLastUsedCamera: true,
+                showTorchButtonIfSupported: true
+            },
             false
         )
 
@@ -44,18 +59,22 @@ const RadiologyScanPage: React.FC = () => {
     }, [])
 
     const handleScan = async (text: string) => {
-        const parsed = parseQRCode(text)
-        if (!parsed || parsed.type !== 'patient') {
-            setError('無効なQRです。患者病着QRを読み取ってください。')
-            return
+        let rawId = text
+        if (text.startsWith('patient:')) {
+            rawId = text.slice(8)
+        } else {
+            const parsed = parseQRCode(text)
+            if (parsed && parsed.type === 'patient') {
+                rawId = parsed.id
+            }
         }
 
         setError(null)
-        const p = await fetchPatient(parseInt(parsed.id))
+        const p = await fetchPatientFlexible(rawId)
         if (p) {
             setPatient(p)
         } else {
-            setError('存在しない患者IDです。')
+            setError(`該当する患者が見つかりません (入力・読み取り値: ${rawId})`)
         }
     }
 

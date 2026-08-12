@@ -91,6 +91,48 @@ export async function fetchPatient(patientId: number): Promise<Patient | null> {
     return snap.data() as Patient
 }
 
+/**
+ * ID (絶対ID, base_patient_id, 通し番号, 末尾番号等) で柔軟に患者を検索する
+ */
+export async function fetchPatientFlexible(queryIdStr: string | number): Promise<Patient | null> {
+    const numId = typeof queryIdStr === 'number' ? queryIdStr : parseInt(queryIdStr, 10)
+    if (isNaN(numId)) return null
+
+    // 1. 完全一致IDで探す
+    const direct = await fetchPatient(numId)
+    if (direct) return direct
+
+    // 2. セッション内の患者一覧を取得して柔軟マッチ
+    const allPatients = await fetchAllPatients(true)
+    if (allPatients.length === 0) {
+        const fallbackAll = await fetchAllPatients(false)
+        allPatients.push(...fallbackAll)
+    }
+
+    // 2a. base_patient_id で検索
+    const byBaseId = allPatients.find(p => p.base_patient_id === numId)
+    if (byBaseId) return byBaseId
+
+    // 2b. id で検索
+    const byId = allPatients.find(p => p.id === numId)
+    if (byId) return byId
+
+    // 2c. 末尾番号 (id % 1000 または id % 100) で検索
+    const byMod1000 = allPatients.find(p => (p.id % 1000) === numId || (p.id % 100) === numId)
+    if (byMod1000) return byMod1000
+
+    // 2d. 1始まりの通し番号 (インデックス + 1) で検索
+    // トリアージ区分等の並び順でソートされたインデックスに対応
+    const order: Record<string, number> = { '赤': 1, '黄': 2, '緑': 3, '黒': 4 }
+    const sorted = [...allPatients].sort((a, b) => (order[a.triage_color] || 9) - (order[b.triage_color] || 9) || a.id - b.id)
+    if (numId >= 1 && numId <= sorted.length) {
+        return sorted[numId - 1]
+    }
+
+    return null
+}
+
+
 // ------------------------------------------------------------------
 // すべての患者データを取得する（Admin用）
 // ------------------------------------------------------------------

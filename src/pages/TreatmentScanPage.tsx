@@ -142,9 +142,24 @@ const TreatmentScanPage: React.FC = () => {
     useEffect(() => {
         if (showModal) return // モーダル表示中はスキャナーを起動しない
 
+        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+            const qrboxSize = Math.floor(minEdge * 0.75)
+            return {
+                width: Math.max(qrboxSize, 200),
+                height: Math.max(qrboxSize, 200)
+            }
+        }
+
         const scanner = new Html5QrcodeScanner(
             'treatment-reader',
-            { fps: 10, qrbox: { width: 250, height: 250 } },
+            {
+                fps: 10,
+                qrbox: qrboxFunction,
+                aspectRatio: 1.0,
+                rememberLastUsedCamera: true,
+                showTorchButtonIfSupported: true
+            },
             /* verbose= */ false
         )
 

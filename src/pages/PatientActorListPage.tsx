@@ -51,7 +51,29 @@ const PatientActorListPage: React.FC = () => {
                 color: '#1d4ed8',
                 lineHeight: '1.6',
             }}>
-                📋 スタッフから指示された<strong>患者名（または番号）</strong>と照合して、あなたの担当患者をタップしてください
+                <div style={{ fontWeight: 'bold', marginBottom: '0.4rem' }}>📋 模擬患者役の方へ案内</div>
+                スタッフから指示された<strong>患者番号（例: 1番, 2番...）</strong>をタップして演技内容を確認してください。<br />
+                また、バイタル測定や手技用のQRコードを提示・印刷する場合は、下のボタンをご利用ください。
+                <div style={{ marginTop: '0.6rem' }}>
+                    <button
+                        onClick={() => navigate('/qr-generator?tab=procedure')}
+                        style={{
+                            background: '#2563eb',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem'
+                        }}
+                    >
+                        🖨️ バイタル測定・手技用QRコードを表示・生成
+                    </button>
+                </div>
             </div>
 
             <div className="page__content" style={{ padding: '0 1rem' }}>

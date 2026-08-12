@@ -147,14 +147,29 @@ const PatientActorPage: React.FC = () => {
 
     return (
         <div className="actor-page">
-            <header className="actor-page__header">
+            <header className="actor-page__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button className="actor-page__back" onClick={() => navigate('/training/actor')}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M15 18l-6-6 6-6" />
                     </svg>
-                    患者一覧へ戻る
+                    一覧へ戻る
                 </button>
                 <h2>模擬患者モード</h2>
+                <button
+                    onClick={() => navigate('/qr-generator?tab=procedure')}
+                    style={{
+                        backgroundColor: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                    }}
+                >
+                    🖨️ 手技/バイタルQR
+                </button>
             </header>
 
             {/* フラッシュ通知バナー */}
@@ -174,8 +189,8 @@ const PatientActorPage: React.FC = () => {
 
             <div className="actor-page__content">
                 <div className="actor-patient-info">
-                    <div className="actor-patient-info__demo">
-                        {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
+                    <div className="actor-patient-info__demo" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                        {patient.name} 様 <span style={{ fontSize: '0.9rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {patient.base_patient_id || patient.id})</span> | {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
                     </div>
                 </div>
 

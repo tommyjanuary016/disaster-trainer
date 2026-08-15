@@ -150,4 +150,18 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.stabilization_completed,
         patient?.status,
         patient?.completed_treatments?.length, // CPR完了などのトリガーを検知するため
-        patient?.r
+        patient?.rosc_possible,
+        // vitals_post_struct はオブジェクト参照比較では変化を検知できないため個別値を監視
+        patient?.vitals_post_struct?.sbp,
+        patient?.vitals_post_struct?.dbp,
+        patient?.vitals_post_struct?.hr,
+        patient?.vitals_post_struct?.rr,
+        patient?.vitals_post_struct?.spo2,
+        patient?.vitals_post_struct?.temp,
+        patient?.vitals_post_struct?.gcs_e,
+        patient?.vitals_post_struct?.gcs_v,
+        patient?.vitals_post_struct?.gcs_m,
+    ])
+
+    return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
+}

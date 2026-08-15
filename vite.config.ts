@@ -7,6 +7,10 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
+            workbox: {
+                skipWaiting: true,
+                clientsClaim: true,
+            },
             manifest: {
                 name: '災害医療訓練システム',
                 short_name: '訓練システム',
@@ -30,12 +34,4 @@ export default defineConfig({
             },
         }),
     ],
-    server: {
-        fs: {
-            allow: [
-                '..', // プロジェクトルート以上も含める
-                '/Users/tominaganaoki/.gemini/antigravity/brain/bf741cb1-4338-4192-8b2a-3b615d890951'
-            ]
-        }
-    }
 })

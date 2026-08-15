@@ -303,4 +303,4 @@ const LauncherPage: React.FC = () => {
     )
 }
 
-ex
+export default LauncherPage

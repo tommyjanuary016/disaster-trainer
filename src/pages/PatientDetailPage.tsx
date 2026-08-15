@@ -401,4 +401,19 @@ const PatientDetailPage: React.FC = () => {
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                             <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </s
+                        </svg>
+                        処置を実施する
+                    </button>
+                    <button
+                        className="button button--secondary"
+                        onClick={() => navigate('/training')}
+                    >
+                        トップに戻る
+                    </button>
+                </div>
+            </main>
+        </div>
+    )
+}
+
+export default PatientDetailPage

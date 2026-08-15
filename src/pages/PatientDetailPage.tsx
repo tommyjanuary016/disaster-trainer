@@ -7,6 +7,7 @@ import FindingsCard from '../components/FindingsCard'
 import LockTimerOverlay from '../components/LockTimerOverlay'
 import PatientPictogram from '../components/PatientPictogram'
 import LoadingScreen from '../components/LoadingScreen'
+import { PROCEDURE_NAMES } from './TreatmentScanPage'
 
 // 診察手技一覧
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
@@ -52,8 +53,11 @@ const PatientDetailPage: React.FC = () => {
     const vitalsCount = completed.filter(id => id === 'vitals').length
     const vitalsAny = vitalsCount > 0 || triageVitalsDone  // トリアージV/Sでもブラー解除
 
-    // バイタル表示に使う struct（診療エリアV/S > トリアージV/S の順で優先）
-    const displayVitalsStruct = patient.vitals_initial_struct || patient.vitals_triage_struct
+    // バイタル表示に使う struct（診療エリアV/S測定が完了していれば initial、そうでなければ triage）
+    const hasVitals = completed.includes('vitals')
+    const displayVitalsStruct = hasVitals 
+        ? (patient.vitals_initial_struct || patient.vitals_triage_struct)
+        : (patient.vitals_triage_struct || patient.vitals_initial_struct)
 
     // --- 診察手技判定 ---
     const completedExams = EXAM_IDS.filter(id => uniqueCompleted.includes(id))
@@ -84,7 +88,12 @@ const PatientDetailPage: React.FC = () => {
     // --- 実施済みフラグ（カテゴリ別チップ） ---
     const vitalsFlags = uniqueCompleted.filter(id => id === 'vitals')
     const examFlags = uniqueCompleted.filter(id => EXAM_IDS.includes(id))
-    const treatmentFlags = uniqueCompleted.filter(id => requiredIds.includes(id))
+    // バイタル、トリアージ、診察手技以外のすべてを治療処置として表示
+    const treatmentFlags = uniqueCompleted.filter(id => 
+        id !== 'vitals' && 
+        id !== 'triage' && 
+        !EXAM_IDS.includes(id)
+    )
     const hasFitFlags = uniqueCompleted.length > 0
 
     const getAgeGroup = (age: number) => `${Math.floor(age / 10) * 10}代`
@@ -302,7 +311,7 @@ const PatientDetailPage: React.FC = () => {
                                                     <svg className="flag-chip__icon" viewBox="0 0 12 12" fill="none">
                                                         <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                                     </svg>
-                                                    {req?.treatment_name ?? id}
+                                                    {PROCEDURE_NAMES[id] || req?.treatment_name || id}
                                                 </span>
                                             )
                                         })}
@@ -392,19 +401,4 @@ const PatientDetailPage: React.FC = () => {
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                             <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        処置を実施する
-                    </button>
-                    <button
-                        className="button button--secondary"
-                        onClick={() => navigate('/training')}
-                    >
-                        トップに戻る
-                    </button>
-                </div>
-            </main>
-        </div>
-    )
-}
-
-export default PatientDetailPage
+                        </s

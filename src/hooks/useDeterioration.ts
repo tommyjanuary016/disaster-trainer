@@ -30,6 +30,20 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         if (!patient) return
 
         const completed = patient.completed_treatments || []
+        const hasVitals = completed.includes('vitals')
+        const hasTriage = completed.includes('triage')
+
+        // ── トリアージV/Sのみ完了時の処理 ──
+        if (!hasVitals && hasTriage) {
+            setCurrentVitalsText(patient.vitals_triage_struct
+                ? formatVitals(patient.vitals_triage_struct)
+                : patient.vitals_triage || 'トリアージバイタルデータなし'
+            )
+            setCurrentVitalsStruct(patient.vitals_triage_struct || null)
+            setProgressPercent(0)
+            setIsDeteriorating(false)
+            return
+        }
 
         // ── ROSC（心拍再開）の判定 ──
         // ROSC可能フラグがON、かつCPR完了、かつ患者の必須処置が全て完了している場合
@@ -136,18 +150,4 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.stabilization_completed,
         patient?.status,
         patient?.completed_treatments?.length, // CPR完了などのトリガーを検知するため
-        patient?.rosc_possible,
-        // vitals_post_struct はオブジェクト参照比較では変化を検知できないため個別値を監視
-        patient?.vitals_post_struct?.sbp,
-        patient?.vitals_post_struct?.dbp,
-        patient?.vitals_post_struct?.hr,
-        patient?.vitals_post_struct?.rr,
-        patient?.vitals_post_struct?.spo2,
-        patient?.vitals_post_struct?.temp,
-        patient?.vitals_post_struct?.gcs_e,
-        patient?.vitals_post_struct?.gcs_v,
-        patient?.vitals_post_struct?.gcs_m,
-    ])
-
-    return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
-}
+        patient?.r

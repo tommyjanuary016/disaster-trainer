@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchPatient, startTreatmentTimer, updatePatientFlags, activeSessionId, fetchTrainingSession } from '../lib/firestore'
 import { Patient } from '../types/patient'
@@ -7,6 +6,7 @@ import { parseQRCode, ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { useRole } from '../hooks/useRole'
+import { startRobustQRScanner } from '../lib/qrScannerHelper'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
@@ -140,41 +140,16 @@ const TreatmentScanPage: React.FC = () => {
     }, [patientId])
 
     useEffect(() => {
-        if (showModal) return // モーダル表示中はスキャナーを起動しない
+        if (showModal) return
 
-        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-            const qrboxSize = Math.floor(minEdge * 0.75)
-            return {
-                width: Math.max(qrboxSize, 200),
-                height: Math.max(qrboxSize, 200)
-            }
-        }
-
-        const scanner = new Html5QrcodeScanner(
-            'treatment-reader',
-            {
-                fps: 10,
-                qrbox: qrboxFunction,
-                aspectRatio: 1.0,
-                rememberLastUsedCamera: true,
-                showTorchButtonIfSupported: true
-            },
-            /* verbose= */ false
-        )
-
-        scanner.render(
-            (decodedText) => {
-                handleScan(decodedText)
-                scanner.clear()
-            },
-            () => {
-                // スキャン中のエラーは無視
-            }
-        )
+        const stopScanner = startRobustQRScanner('treatment-reader', (decodedText) => {
+            handleScan(decodedText)
+        }, (err) => {
+            console.error('Treatment scanner error:', err)
+        })
 
         return () => {
-            scanner.clear().catch(e => console.error('Error clearing scanner', e))
+            stopScanner()
         }
     }, [patientId, showModal, hasVitalsOrExams])
 

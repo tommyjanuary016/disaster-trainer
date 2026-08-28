@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
 import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, fetchAllPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
+import { startRobustQRScanner } from '../lib/qrScannerHelper'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
@@ -90,42 +90,16 @@ const QRScannerPage: React.FC = () => {
     }
 
     useEffect(() => {
-        if (showModal || activeTab !== 'qr') return // モーダル表示中や別のタブの場合はスキャナーを起動しない
+        if (showModal || activeTab !== 'qr') return
 
-        // Android・iOS対応のレスポンシブqrbox設定および最適化
-        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-            const qrboxSize = Math.floor(minEdge * 0.75)
-            return {
-                width: Math.max(qrboxSize, 200),
-                height: Math.max(qrboxSize, 200)
-            }
-        }
-
-        const scanner = new Html5QrcodeScanner(
-            'reader',
-            { 
-                fps: 10, 
-                qrbox: qrboxFunction,
-                aspectRatio: 1.0,
-                rememberLastUsedCamera: true,
-                showTorchButtonIfSupported: true
-            },
-            /* verbose= */ false
-        )
-
-        scanner.render(
-            (decodedText) => {
-                handleScan(decodedText)
-                scanner.clear()
-            },
-            () => {
-                // スキャン中のエラーは無視
-            }
-        )
+        const stopScanner = startRobustQRScanner('reader', (decodedText) => {
+            handleScan(decodedText)
+        }, (err) => {
+            console.error('Camera init error:', err)
+        })
 
         return () => {
-            scanner.clear().catch(e => console.error('Error clearing scanner', e))
+            stopScanner()
         }
     }, [showModal, activeTab])
 

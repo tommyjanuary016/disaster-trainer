@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
 import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients } from '../lib/firestore'
 import { Patient } from '../types/patient'
+import { startRobustQRScanner } from '../lib/qrScannerHelper'
 
 const LabScanPage: React.FC = () => {
     const navigate = useNavigate()
@@ -16,37 +16,14 @@ const LabScanPage: React.FC = () => {
     useEffect(() => {
         if (patient) return
 
-        const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-            const qrboxSize = Math.floor(minEdge * 0.75)
-            return {
-                width: Math.max(qrboxSize, 200),
-                height: Math.max(qrboxSize, 200)
-            }
-        }
-
-        const scanner = new Html5QrcodeScanner(
-            'lab-reader',
-            {
-                fps: 10,
-                qrbox: qrboxFunction,
-                aspectRatio: 1.0,
-                rememberLastUsedCamera: true,
-                showTorchButtonIfSupported: true
-            },
-            false
-        )
-
-        scanner.render(
-            (decodedText) => {
-                handleScan(decodedText)
-                scanner.clear()
-            },
-            () => {}
-        )
+        const stopScanner = startRobustQRScanner('lab-reader', (decodedText) => {
+            handleScan(decodedText)
+        }, (err) => {
+            console.error('Lab scanner error:', err)
+        })
 
         return () => {
-            scanner.clear().catch(e => console.error(e))
+            stopScanner()
         }
     }, [patient])
 

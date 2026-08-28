@@ -16,6 +16,15 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
 }) => {
     const navigate = useNavigate()
 
+    React.useEffect(() => {
+        if (remainingDisplay === '00:00' && patientId) {
+            const pid = typeof patientId === 'string' ? parseInt(patientId, 10) : patientId
+            if (pid) {
+                completeTreatment(pid, true).catch(e => console.error(e))
+            }
+        }
+    }, [remainingDisplay, patientId])
+
     return (
         <div className="lock-overlay">
             <div className="lock-overlay__inner">
@@ -36,20 +45,6 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                         <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.8rem' }}>
                             ✅ 処置・観察が完了しました！
                         </p>
-                        {patientId && (
-                            <button
-                                onClick={() => {
-                                    if (typeof patientId === 'number' || typeof patientId === 'string') {
-                                        completeTreatment(Number(patientId), true).catch(e => console.error(e))
-                                    }
-                                    window.location.reload()
-                                }}
-                                className="button button--primary"
-                                style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', backgroundColor: '#22c55e', borderColor: '#16a34a' }}
-                            >
-                                画面をリロードして結果を確認
-                            </button>
-                        )}
                     </div>
                 ) : (
                     <div className="lock-overlay__timer">{remainingDisplay}</div>
@@ -62,4 +57,28 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                     <div className="lock-overlay__progress-bar" />
                 </div>
 
-                {/*
+                {/* 離脱用CTA（下部固定） */}
+                <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%', maxWidth: '300px', marginLeft: 'auto', marginRight: 'auto' }}>
+                    <button
+                        onClick={() => navigate('/training')}
+                        className="button button--secondary"
+                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                    >
+                        訓練トップへ戻る
+                    </button>
+                    {patientId && (
+                        <button
+                            onClick={() => navigate(`/training/patient/${patientId}`)}
+                            className="button button--secondary"
+                            style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                        >
+                            患者ステータス画面へ戻る
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default LockTimerOverlay

@@ -58,13 +58,11 @@ export function useTimer(patient: Patient | null): UseTimerResult {
         }, 1000)
 
         return () => clearInterval(intervalId)
-    }, [patient?.status, patient?.timer_started_at, patient?.timer_duration_ms])
+    }, [patient?.status, patient?.timer_started_at, patient?.timer_duration_ms, patient?.id])
 
     async function handleTimerEnd(p: Patient) {
-        // applied_treatment_id が required_treatments の中にあれば正解
-        const isCorrect =
-            (p.required_treatments ?? []).some(rt => rt.treatment_id === p.applied_treatment_id)
-
+        if (!p || p.status !== '処置中') return
+        const isCorrect = (p.required_treatments ?? []).some(rt => rt.treatment_id === p.applied_treatment_id)
         try {
             await completeTreatment(p.id, isCorrect)
         } catch (e) {

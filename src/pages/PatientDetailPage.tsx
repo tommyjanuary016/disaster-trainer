@@ -326,7 +326,7 @@ const PatientDetailPage: React.FC = () => {
                 <div className="vitals-section">
                     <VitalsCard
                         title="バイタルサイン"
-                        vitals={currentVitalsText || patient.vitals_initial}
+                        vitals={currentVitalsText || (triageVitalsDone && !hasVitals ? (patient.vitals_triage || patient.vitals_initial) : patient.vitals_initial)}
                         vitalsStruct={currentVitalsStruct || displayVitalsStruct}
                         isBlurred={!vitalsAny}
                     />

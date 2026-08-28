@@ -1,6 +1,7 @@
 // LockTimerOverlay - 処置タイマー中に全画面をロックするオーバーレイ
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { completeTreatment } from '../lib/firestore'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
@@ -30,9 +31,31 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                 </div>
                 <h2 className="lock-overlay__title">処置実行中</h2>
                 <p className="lock-overlay__treatment">{treatmentName}</p>
-                <div className="lock-overlay__timer">{remainingDisplay}</div>
+                {remainingDisplay === '00:00' ? (
+                    <div style={{ margin: '1rem 0' }}>
+                        <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.8rem' }}>
+                            ✅ 処置・観察が完了しました！
+                        </p>
+                        {patientId && (
+                            <button
+                                onClick={() => {
+                                    if (typeof patientId === 'number' || typeof patientId === 'string') {
+                                        completeTreatment(Number(patientId), true).catch(e => console.error(e))
+                                    }
+                                    window.location.reload()
+                                }}
+                                className="button button--primary"
+                                style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', backgroundColor: '#22c55e', borderColor: '#16a34a' }}
+                            >
+                                画面をリロードして結果を確認
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="lock-overlay__timer">{remainingDisplay}</div>
+                )}
                 <p className="lock-overlay__note">
-                    対象の処置が完了するまで<br />
+                    対象の処置・観察が完了するまで<br />
                     デバイスの操作はロックされます
                 </p>
                 <div className="lock-overlay__progress">

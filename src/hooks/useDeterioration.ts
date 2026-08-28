@@ -149,6 +149,7 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.deterioration_time_minutes,
         patient?.stabilization_completed,
         patient?.status,
+        patient?.completed_treatments?.join(','), // triageやvitalsなどの追加を確実に検知
         patient?.completed_treatments?.length, // CPR完了などのトリガーを検知するため
         patient?.rosc_possible,
         // vitals_post_struct はオブジェクト参照比較では変化を検知できないため個別値を監視

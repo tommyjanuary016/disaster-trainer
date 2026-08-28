@@ -8,7 +8,8 @@ import { Patient } from '../types/patient'
 
 // 手技一覧（QR生成用）
 const PROCEDURES = [
-    { id: 'vitals',             name: 'バイタルサイン測定', category: 'バイタル' },
+    { id: 'triage',             name: 'トリアージエリアV/S測定', category: 'バイタル' },
+    { id: 'vitals',             name: '診療エリアV/S測定',     category: 'バイタル' },
     { id: 'head_and_neck',      name: '頭頸部診察',         category: '診察手技' },
     { id: 'chest',              name: '胸部診察',           category: '診察手技' },
     { id: 'abdomen_and_pelvis', name: '腹部・骨盤診察',     category: '診察手技' },

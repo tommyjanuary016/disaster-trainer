@@ -313,7 +313,17 @@ export async function startTreatmentTimer(
         const patient = mockStore.get(patientId)
         if (patient) {
             if (patient.timer_started_at != null) {
-                throw new Error('ALREADY_LOCKED')
+                const duration = patient.timer_duration_ms ?? 0
+                const isExpired = now >= (patient.timer_started_at + duration)
+                if (!isExpired) {
+                    throw new Error('ALREADY_LOCKED')
+                }
+                // 期限切れの場合は前の処置を自動完了として登録
+                const prevTreatment = patient.applied_treatment_id
+                if (prevTreatment) {
+                    patient.completed_treatments = patient.completed_treatments || []
+                    patient.completed_treatments.push(prevTreatment)
+                }
             }
             patient.timer_started_at = now
             patient.timer_duration_ms = durationMs
@@ -331,13 +341,24 @@ export async function startTreatmentTimer(
             throw new Error('Patient does not exist')
         }
         const data = docSnap.data() as Patient
+        let newCompleted = data.completed_treatments || []
+
         if (data.timer_started_at != null) {
-            throw new Error('ALREADY_LOCKED')
+            const duration = data.timer_duration_ms ?? 0
+            const isExpired = now >= (data.timer_started_at + duration)
+            if (!isExpired) {
+                throw new Error('ALREADY_LOCKED')
+            }
+            // 期限切れの場合は前の処置を自動完了として登録
+            if (data.applied_treatment_id) {
+                newCompleted = [...newCompleted, data.applied_treatment_id]
+            }
         }
         transaction.update(docRef, {
             timer_started_at: now,
             timer_duration_ms: durationMs,
             applied_treatment_id: treatmentId,
+            completed_treatments: newCompleted,
             status: '処置中',
         })
     })

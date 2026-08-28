@@ -142,9 +142,6 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         // 1秒ごとに更新
         const intervalId = setInterval(updateTimer, 1000)
 
-        const completedStr = patient?.completed_treatments ? patient.completed_treatments.join(',') : ''
-        const postStructStr = patient?.vitals_post_struct ? JSON.stringify(patient.vitals_post_struct) : ''
-
         return () => clearInterval(intervalId)
     }, [
         patient?.reception_time_ms,
@@ -153,7 +150,7 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.status,
         patient?.completed_treatments,
         patient?.rosc_possible,
-        patient?.vitals_post_struct
+        patient?.vitals_post_struct,
     ])
 
     return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }

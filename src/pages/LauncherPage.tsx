@@ -297,7 +297,7 @@ const LauncherPage: React.FC = () => {
                     </button>
                 </div>
 
-                <p className="launcher-version">DISASTER LOGIC v2.1.0 (改訂日: 2026-08-15)</p>
+                <p className="launcher-version">DISASTER LOGIC v2.1.1 (改訂日: 2026-08-28)</p>
             </div>
         </div>
     )

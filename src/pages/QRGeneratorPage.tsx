@@ -273,12 +273,4 @@ const QRGeneratorPage: React.FC = () => {
                         >
                             インポート実行
                         </button>
-                    </div>
-                )}
-
-            </main>
-        </div>
-    )
-}
-
-export default QRGeneratorPage
+                  

@@ -640,34 +640,4 @@ export async function fetchTrainingSession(sessionId: string): Promise<TrainingS
         return null
     }
     const docRef = doc(db, 'sessions', sessionId)
-    const snap = await getDoc(docRef)
-    if (snap.exists()) {
-        return snap.data() as TrainingSession
-    }
-    return null
-}
-
-// ------------------------------------------------------------------
-// セッションを終了する
-// ------------------------------------------------------------------
-export async function endTrainingSession(sessionId: string): Promise<void> {
-    if (USE_MOCK || !db) {
-        // モックストアでも isActive を false に更新
-        const meta = mockSessionStore.get(sessionId)
-        if (meta) mockSessionStore.set(sessionId, { ...meta, isActive: false })
-        if (activeSessionId === sessionId) {
-            activeSessionId = null
-            localStorage.removeItem(STORAGE_KEY_SESSION)
-        }
-        return
-    }
-    const docRef = doc(db, 'sessions', sessionId)
-    await updateDoc(docRef, { isActive: false })
-    if (activeSessionId === sessionId) {
-        activeSessionId = null
-        localStorage.removeItem(STORAGE_KEY_SESSION)
-    }
-}
-
-// モックかどうかを外部に公開
-export { USE_MOCK }
+    const 

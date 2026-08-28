@@ -62,28 +62,4 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                     <div className="lock-overlay__progress-bar" />
                 </div>
 
-                {/* 離脱用CTA（下部固定） */}
-                <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%', maxWidth: '300px', marginLeft: 'auto', marginRight: 'auto' }}>
-                    <button
-                        onClick={() => navigate('/training')}
-                        className="button button--secondary"
-                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
-                    >
-                        訓練トップへ戻る
-                    </button>
-                    {patientId && (
-                        <button
-                            onClick={() => navigate(`/training/patient/${patientId}`)}
-                            className="button button--secondary"
-                            style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
-                        >
-                            患者ステータス画面へ戻る
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-export default LockTimerOverlay
+                {/*

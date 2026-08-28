@@ -161,8 +161,4 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         patient?.vitals_post_struct?.temp,
         patient?.vitals_post_struct?.gcs_e,
         patient?.vitals_post_struct?.gcs_v,
-        patient?.vitals_post_struct?.gcs_m,
-    ])
-
-    return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
-}
+        patient?.vitals_post_struct?.gcs

@@ -410,10 +410,4 @@ const PatientDetailPage: React.FC = () => {
                     >
                         トップに戻る
                     </button>
-                </div>
-            </main>
-        </div>
-    )
-}
-
-export default PatientDetailPage
+             

@@ -142,23 +142,19 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         // 1秒ごとに更新
         const intervalId = setInterval(updateTimer, 1000)
 
-        return () => clearInterval(intervalId)
+        const completedStr = patient?.completed_treatments ? patient.completed_treatments.join(',') : ''
+        const postStructStr = patient?.vitals_post_struct ? JSON.stringify(patient.vitals_post_struct) : ''
 
+        return () => clearInterval(intervalId)
     }, [
         patient?.reception_time_ms,
         patient?.deterioration_time_minutes,
         patient?.stabilization_completed,
         patient?.status,
-        patient?.completed_treatments?.join(','), // triageやvitalsなどの追加を確実に検知
-        patient?.completed_treatments?.length, // CPR完了などのトリガーを検知するため
+        patient?.completed_treatments,
         patient?.rosc_possible,
-        // vitals_post_struct はオブジェクト参照比較では変化を検知できないため個別値を監視
-        patient?.vitals_post_struct?.sbp,
-        patient?.vitals_post_struct?.dbp,
-        patient?.vitals_post_struct?.hr,
-        patient?.vitals_post_struct?.rr,
-        patient?.vitals_post_struct?.spo2,
-        patient?.vitals_post_struct?.temp,
-        patient?.vitals_post_struct?.gcs_e,
-        patient?.vitals_post_struct?.gcs_v,
-        patient?.vitals_post_struct?.gcs
+        patient?.vitals_post_struct
+    ])
+
+    return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
+}

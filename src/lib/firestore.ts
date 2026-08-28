@@ -41,6 +41,28 @@ function notifyMockListeners(patientId: number) {
     }
 }
 
+/**
+ * 患者の処置タイマーが満了（期限切れ）している場合、自動で completeTreatment を実行する
+ */
+export function checkAutoTimerExpiration(patient: Patient | null): Patient | null {
+    if (!patient) return null
+    if (
+        patient.status === '処置中' &&
+        patient.timer_started_at != null &&
+        patient.timer_duration_ms != null
+    ) {
+        const now = Date.now()
+        if (now >= (patient.timer_started_at + patient.timer_duration_ms)) {
+            // タイマーが満了しているため、非同期で completeTreatment を実行して処置を完了・データ同期する
+            const isCorrect = (patient.required_treatments ?? []).some(
+                rt => rt.treatment_id === patient.applied_treatment_id
+            )
+            completeTreatment(patient.id, isCorrect).catch(e => console.error('Auto check complete error:', e))
+        }
+    }
+    return patient
+}
+
 // ------------------------------------------------------------------
 // 患者データをリアルタイム購読する
 // モックモード: インメモリストアを購読
@@ -53,6 +75,7 @@ export function subscribeToPatient(
     if (USE_MOCK || !db) {
         // モックモード: 現在の値をすぐ返す
         const patient = mockStore.get(patientId)
+        checkAutoTimerExpiration(patient ? { ...patient } : null)
         callback(patient ? { ...patient } : null)
 
         // リスナー登録
@@ -71,7 +94,9 @@ export function subscribeToPatient(
     const docRef = doc(db, 'patients', String(patientId))
     return onSnapshot(docRef, (snap) => {
         if (snap.exists()) {
-            callback(snap.data() as Patient)
+            const p = snap.data() as Patient
+            checkAutoTimerExpiration(p)
+            callback(p)
         } else {
             callback(null)
         }
@@ -83,12 +108,16 @@ export function subscribeToPatient(
 // ------------------------------------------------------------------
 export async function fetchPatient(patientId: number): Promise<Patient | null> {
     if (USE_MOCK || !db) {
-        return mockStore.get(patientId) ?? null
+        const p = mockStore.get(patientId) ?? null
+        checkAutoTimerExpiration(p)
+        return p
     }
     const docRef = doc(db, 'patients', String(patientId))
     const snap = await getDoc(docRef)
     if (!snap.exists()) return null
-    return snap.data() as Patient
+    const p = snap.data() as Patient
+    checkAutoTimerExpiration(p)
+    return p
 }
 
 /**
@@ -139,7 +168,10 @@ export async function fetchPatientFlexible(queryIdStr: string | number): Promise
 
 export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]> {
     if (USE_MOCK || !db) {
-        const all = Array.from(mockStore.values())
+        const all = Array.from(mockStore.values()).map(p => {
+            checkAutoTimerExpiration(p)
+            return p
+        })
         if (sessionIdOnly && activeSessionId) {
             return all.filter(p => p.session_id === activeSessionId)
         }
@@ -147,7 +179,11 @@ export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]>
     }
     const collRef = collection(db, 'patients')
     const snap = await getDocs(collRef)
-    let docs = snap.docs.map(doc => doc.data() as Patient)
+    let docs = snap.docs.map(doc => {
+        const p = doc.data() as Patient
+        checkAutoTimerExpiration(p)
+        return p
+    })
     if (sessionIdOnly && activeSessionId) {
         docs = docs.filter(p => p.session_id === activeSessionId)
     }
@@ -168,7 +204,10 @@ export function subscribeToAllPatients(
     if (USE_MOCK || !db) {
         // モックモード: 初回の通知
         const notify = () => {
-            const all = Array.from(mockStore.values())
+            const all = Array.from(mockStore.values()).map(p => {
+                checkAutoTimerExpiration(p)
+                return p
+            })
             if (targetSessionId) {
                 callback(all.filter(p => p.session_id === targetSessionId))
             } else {
@@ -177,9 +216,6 @@ export function subscribeToAllPatients(
         }
         notify()
 
-        // すべての患者IDのリスナーを監視するのは効率が悪いため、
-        // モックモードでは簡易的なポーリングまたは更新通知用のグローバルリスナーを想定
-        // 今回はシンプルに、どこかで更新があった際に通知が来るようにする
         const intervalId = setInterval(notify, 1000)
         return () => clearInterval(intervalId)
     }
@@ -192,7 +228,11 @@ export function subscribeToAllPatients(
     }
 
     return onSnapshot(q, (snap) => {
-        const docs = snap.docs.map(doc => doc.data() as Patient)
+        const docs = snap.docs.map(doc => {
+            const p = doc.data() as Patient
+            checkAutoTimerExpiration(p)
+            return p
+        })
         callback(docs)
     })
 }

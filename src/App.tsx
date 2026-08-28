@@ -38,7 +38,7 @@ const Header: React.FC = () => {
             </div>
 
             {/* 右側：システムバージョン */}
-            <div className="app-header__version">v2.1.2</div>
+            <div className="app-header__version">v2.1.3</div>
         </header>
     )
 }

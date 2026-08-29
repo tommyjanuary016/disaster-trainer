@@ -1,7 +1,6 @@
 // LockTimerOverlay - 処置タイマー中に全画面をロックするオーバーレイ
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { completeTreatment } from '../lib/firestore'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式

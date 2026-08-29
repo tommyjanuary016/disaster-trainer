@@ -60,14 +60,9 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
             return
         }
 
-        // ── 安定化完了（必須処置が全て終わった）場合は「処置完了後V/S」を固定表示 ──
-        if (patient.stabilization_completed && patient.vitals_post_struct) {
-            setCurrentVitalsText(formatVitals(patient.vitals_post_struct))
-            setCurrentVitalsStruct(patient.vitals_post_struct)
-            setProgressPercent(100)
-            setIsDeteriorating(false)
-            return
-        }
+        // ── 安定化完了（必須処置が全て終わった）場合でも「処置完了後V/S」は自動表示しない ──
+        // ※プレイヤーが自らバイタルサインを再測定（vitals手技を実施）するまで自動反映させない
+        // したがって、安定化完了による強制 vitals_post_struct 切り替え処理を削除
 
         // ── 悪化設定がOFF or 必要なstruct/設定値が不足している場合 ──
         // 悪化到達バイタルは vitals_deterioration_struct を使う（旧: vitals_post_struct）

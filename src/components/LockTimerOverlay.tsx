@@ -17,12 +17,8 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
     const navigate = useNavigate()
 
     React.useEffect(() => {
-        if (remainingDisplay === '00:00' && patientId) {
-            const pid = typeof patientId === 'string' ? parseInt(patientId, 10) : patientId
-            if (pid) {
-                completeTreatment(pid, true).catch(e => console.error(e))
-            }
-        }
+        // useTimer.ts の handleTimerEnd にて completeTreatment は実行されるため、
+        // ここでの重複呼び出しは削除し、UIのロック解除のみを待つ
     }, [remainingDisplay, patientId])
 
     return (

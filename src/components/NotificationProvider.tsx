@@ -89,17 +89,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         addNotification(`【${patient.name} 様】の容体が急変しました！`, 'error')
                     }
 
-                    // 3. タイマーの終了を検知 (timer_started_at が number -> null)
-                    // かつ completed_treatments の数が増えている場合
-                    const prevLen = prevPatient.completed_treatments?.length || 0
-                    const curLen = patient.completed_treatments?.length || 0
-                    if (prevPatient.timer_started_at != null && patient.timer_started_at == null && curLen > prevLen) {
-                        // 何の処置が終わったかは applied_treatment_id に入っていたもの
-                        const finishedTreatment = prevPatient.applied_treatment_id
-                        if (finishedTreatment) {
-                            addNotification(`【${patient.name} 様】の処置/検査タイマーが完了しました`, 'info')
-                        }
-                    }
+                    // 3. タイマーの終了を検知するが、プレイヤーに正解・完了を想起させる通知は出さない
+                    // （以前の '処置/検査タイマーが完了しました' のトーストは削除）
                 }
             })
 

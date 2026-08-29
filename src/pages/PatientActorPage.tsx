@@ -80,9 +80,7 @@ const PatientActorPage: React.FC = () => {
         // ステータス変化の検知
         if (prevStatus.current !== null && prevStatus.current !== patient.status) {
             const messages: Record<string, { msg: string; icon: string }> = {
-                '処置中': { msg: '処置が開始されました。秘計を仿び続けてください。', icon: '💉' },
-                'アセスメント完了': { msg: '初期評価が完了しました。', icon: '✅' },
-                '処置完了': { msg: '必要な処置が全て完了しました。', icon: '🏆' },
+                '処置中': { msg: '処置が開始されました。演技を続けてください。', icon: '💉' },
                 '悪化': { msg: '悪化しています！バイタルが変化しています。', icon: '🚨' },
                 '急変': { msg: '急変です！不動の演技をしてください。', icon: '🚨' },
             }
@@ -97,10 +95,7 @@ const PatientActorPage: React.FC = () => {
         }
         prevTests.current = patient.tests_completed
 
-        // 安定化処置完了
-        if (prevStabilization.current === false && patient.stabilization_completed === true) {
-            addLog('安定化処置が完了しました。', '💊')
-        }
+        // 安定化処置完了（プレイヤーへの正解通知になるため非表示）
         prevStabilization.current = patient.stabilization_completed
 
         // 処置追加検知

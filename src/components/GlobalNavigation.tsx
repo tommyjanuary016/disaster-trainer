@@ -105,6 +105,6 @@ export const GlobalNavigation: React.FC = () => {
                 <span className="fab-qr__pulse" />
             </button>
         )}
-    </>
+        </>
     )
 }

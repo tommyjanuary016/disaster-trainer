@@ -54,6 +54,8 @@ export interface Patient {
     vitals_initial: string // 各診療エリア到着時（初期）V/S（表示フォールバック用）
     vitals_post: string // 処置後V/S（表示フォールバック用）
 
+    consciousness_level?: string // 意識レベル（JCS/GCS）
+
     // 構造化V/S（新UIで入力されたデータ）
     vitals_triage_struct?: VitalSignStruct  // トリアージ時
     vitals_initial_struct?: VitalSignStruct // 初期評価時（Primary Survey）

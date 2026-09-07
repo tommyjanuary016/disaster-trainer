@@ -87,6 +87,8 @@ const QRScannerPage: React.FC = () => {
         setActiveSession(session.id)
         setSessionTitle(session.title)
         setShowSessionModal(false)
+    }
+
     const [isCameraActive, setIsCameraActive] = useState(false)
 
     useEffect(() => {

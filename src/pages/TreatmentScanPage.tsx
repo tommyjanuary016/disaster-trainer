@@ -139,8 +139,25 @@ const TreatmentScanPage: React.FC = () => {
         }
     }, [patientId])
 
+    const [isCameraActive, setIsCameraActive] = useState(false)
+    const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
     useEffect(() => {
-        if (showModal) return
+        if (patientId) {
+            fetchPatient(parseInt(patientId)).then(p => {
+                if (p) {
+                    setPatient(p)
+                    const done = p.completed_treatments?.some(
+                        id => id === 'vitals' || id === 'triage' || EXAM_IDS.includes(id)
+                    ) || false
+                    setHasVitalsOrExams(done)
+                }
+            })
+        }
+    }, [patientId])
+
+    useEffect(() => {
+        if (showModal || !isCameraActive) return
 
         const stopScanner = startRobustQRScanner('treatment-reader', (decodedText) => {
             handleScan(decodedText)
@@ -151,7 +168,35 @@ const TreatmentScanPage: React.FC = () => {
         return () => {
             stopScanner()
         }
-    }, [patientId, showModal, hasVitalsOrExams])
+    }, [patientId, showModal, hasVitalsOrExams, isCameraActive])
+
+    /** 意識障害・気管挿管・鎮静により問診（AMPLE/背景聴取）が不能かチェック */
+    const isAnamnesisBlocked = (p: Patient | null): { blocked: boolean; reason?: string } => {
+        if (!p) return { blocked: false }
+        const completed = p.completed_treatments || []
+        const hasIntubation = completed.includes('intubation') || completed.includes('surgical_airway')
+        const hasSedation = completed.includes('sedation')
+
+        // 意識障害の数値判定 (JCS 20以上/3桁、または GCS 8以下)
+        let isUnconscious = false
+        if (p.consciousness_level) {
+            const level = String(p.consciousness_level).toLowerCase()
+            if (level.includes('3桁') || level.includes('200') || level.includes('300') || level.includes('100') || level.includes('20') || level.includes('30')) {
+                isUnconscious = true
+            }
+        }
+
+        if (hasIntubation) {
+            return { blocked: true, reason: '気管挿管・人工呼吸器管理中のため、問診（AMPLE/背景聴取）は行えません。' }
+        }
+        if (hasSedation) {
+            return { blocked: true, reason: '鎮静薬投与中のため、問診（AMPLE/背景聴取）は行えません。' }
+        }
+        if (isUnconscious) {
+            return { blocked: true, reason: '意識障害（JCS 20以上/3桁等）のため、問診（AMPLE/背景聴取）は行えません。' }
+        }
+        return { blocked: false }
+    }
 
     /** QR文字列をパースして手技として解決する */
     const resolveQR = (text: string): { resolved: ResolvedProcedure; parsed: ParsedQRCode } | null => {
@@ -216,6 +261,15 @@ const TreatmentScanPage: React.FC = () => {
 
         const { resolved, parsed } = result
 
+        // AMPLE/背景聴取の可能判定
+        if (resolved.treatment_id === 'ample' || resolved.treatment_id === 'background') {
+            const anamnesisCheck = isAnamnesisBlocked(patient)
+            if (anamnesisCheck.blocked) {
+                setError(`※ ${anamnesisCheck.reason}`)
+                return
+            }
+        }
+
         // 治療処置の場合、バイタル・診察未実施ならブロック
         if (isTreatmentOption(resolved.treatment_id) && !hasVitalsOrExams) {
             setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。')
@@ -269,6 +323,15 @@ const TreatmentScanPage: React.FC = () => {
         const treatId = pendingProcedure.treatment_id
         const now = Date.now()
 
+        // 確定時にも再度ルート確保と問診制限を検証
+        const requireIvMeds = ['vasopressor', 'antihypertensive', 'antibiotics', 'sedation', 'iv_fluid', 'blood_transfusion']
+        if (requireIvMeds.includes(treatId) && !hasAnyIvAccess) {
+            setError('※ 薬剤や輸液の投与には、事前に静脈路の確保が必要です。')
+            setShowModal(false)
+            setPendingProcedure(null)
+            return
+        }
+
         try {
             await startTreatmentTimer(pid, treatId, timerMinutes)
 
@@ -282,7 +345,11 @@ const TreatmentScanPage: React.FC = () => {
                 await updatePatientFlags(pid, { initial_vs_time_ms: now })
             }
 
-            navigate(`/training/patient/${patientId}`)
+            // 自動で推移せず、プレイヤーが選択できるように成功モーダルを表示
+            setShowModal(false)
+            setSuccessMessage(`「${pendingProcedure.treatment_name}」を開始・登録しました。`)
+            setPendingProcedure(null)
+            setPendingParsed(null)
         } catch (err: any) {
             if (err.message === 'ALREADY_LOCKED') {
                 setError('⚠️ 他のプレイヤーが既に処置を開始しています。画面をリロードしてください。')
@@ -314,6 +381,36 @@ const TreatmentScanPage: React.FC = () => {
                     onCancel={handleCancel}
                     warningText={roleWarning}
                 />
+            )}
+
+            {/* 処置開始成功モーダル（プレイヤーが選択して患者トップへ推移） */}
+            {successMessage && (
+                <div className="launcher-modal-overlay" onClick={() => {}}>
+                    <div className="launcher-modal" style={{ maxWidth: '400px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>✅</div>
+                        <h2 className="launcher-modal__title" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>処置登録完了</h2>
+                        <p style={{ color: 'var(--gray-700)', marginBottom: '1.5rem', fontWeight: 'bold' }}>{successMessage}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            <button
+                                type="button"
+                                className="button button--primary"
+                                onClick={() => navigate(`/training/patient/${patientId}`)}
+                            >
+                                患者詳細画面へ移動する
+                            </button>
+                            <button
+                                type="button"
+                                className="button button--secondary"
+                                onClick={() => {
+                                    setSuccessMessage(null)
+                                    setManualTreatmentId('')
+                                }}
+                            >
+                                続けて他の処置を行う
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <header className="treatment-header" style={{ position: 'relative' }}>
@@ -349,11 +446,36 @@ const TreatmentScanPage: React.FC = () => {
                 )}
 
                 <>
-                    <p className="instruction-text">手技QRまたは物品QRコードをスキャンしてください。</p>
+                    <p className="instruction-text">カメラ起動ボタンを押して手技QRまたは物品QRコードをスキャンしてください。</p>
 
-                    <div className="qr-reader-wrapper">
-                        <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
+                    <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                        {!isCameraActive ? (
+                            <button
+                                type="button"
+                                onClick={() => setIsCameraActive(true)}
+                                className="button button--primary"
+                                style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                📷 カメラを起動する
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setIsCameraActive(false)}
+                                className="button button--secondary"
+                                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                ⏹️ カメラを停止する
+                            </button>
+                        )}
                     </div>
+
+                    {isCameraActive && (
+                        <div className="qr-reader-wrapper">
+                            <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
+                        </div>
+                    )}
 
                     {error && (
                         <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>

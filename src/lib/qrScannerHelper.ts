@@ -40,7 +40,7 @@ export function startRobustQRScanner(
     }
 
     const config = {
-        fps: 12,
+        fps: 15,
         qrbox: qrboxFunction,
         aspectRatio: 1.0,
     }
@@ -54,7 +54,7 @@ export function startRobustQRScanner(
         // フレームエラーは無視
     }
 
-    // iPadOS / iOS Safari 対策: video要素に playsinline と muted を付与
+    // iPadOS / iOS Safari / Android 対策: video要素に playsinline と muted を付与
     const enforcePlaysInline = () => {
         setTimeout(() => {
             const videoElem = container.querySelector('video')
@@ -67,22 +67,41 @@ export function startRobustQRScanner(
         }, 100)
     }
 
+    // 高精度のカメラ標準設定（Android focus/resolution対策）
+    const highResConstraint = {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        advanced: [{ focusMode: "continuous" }]
+    } as MediaTrackConstraints
+
     // 段階的カメラ起動
     const attemptStart = async () => {
         if (!html5Qrcode || isStopped) return
 
-        // 第1優先: { facingMode: "environment" } (背面カメラ)
+        // 第1優先: 高解像度・オートフォーカス指定の背面カメラ
         try {
-            await html5Qrcode.start({ facingMode: "environment" }, config, handleSuccess, handleFailure)
+            await html5Qrcode.start(highResConstraint, config, handleSuccess, handleFailure)
             enforcePlaysInline()
             return
         } catch (e1) {
-            console.warn('[QRScanner] facingMode environment failed, trying fallback...', e1)
+            console.warn('[QRScanner] High-res facingMode environment failed, trying standard environment...', e1)
         }
 
         if (isStopped) return
 
-        // 第2優先: getCameras() によるデバイス特定
+        // 第2優先: { facingMode: "environment" } (標準背面カメラ)
+        try {
+            await html5Qrcode.start({ facingMode: "environment" }, config, handleSuccess, handleFailure)
+            enforcePlaysInline()
+            return
+        } catch (e2) {
+            console.warn('[QRScanner] facingMode environment failed, trying fallback...', e2)
+        }
+
+        if (isStopped) return
+
+        // 第3優先: getCameras() によるデバイス特定
         try {
             const cameras = await Html5Qrcode.getCameras()
             if (isStopped) return
@@ -96,20 +115,20 @@ export function startRobustQRScanner(
                 enforcePlaysInline()
                 return
             }
-        } catch (e2) {
-            console.warn('[QRScanner] getCameras fallback failed:', e2)
+        } catch (e3) {
+            console.warn('[QRScanner] getCameras fallback failed:', e3)
         }
 
         if (isStopped) return
 
-        // 第3優先: 指定なし (標準カメラ)
+        // 第4優先: 指定なし (標準カメラ)
         try {
             await html5Qrcode.start({ facingMode: "user" }, config, handleSuccess, handleFailure)
             enforcePlaysInline()
             return
-        } catch (e3) {
-            console.error('[QRScanner] All camera start attempts failed:', e3)
-            if (onError) onError(e3)
+        } catch (e4) {
+            console.error('[QRScanner] All camera start attempts failed:', e4)
+            if (onError) onError(e4)
         }
     }
 

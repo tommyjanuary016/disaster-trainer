@@ -4,10 +4,39 @@ import { PatientFindings } from '../types/patient'
 interface FindingsCardProps {
     findings: PatientFindings
     completedTreatments: string[]
+    consciousnessLevel?: string
 }
 
-const FindingsCard: React.FC<FindingsCardProps> = ({ findings, completedTreatments }) => {
+const FindingsCard: React.FC<FindingsCardProps> = ({ findings, completedTreatments, consciousnessLevel }) => {
+    const hasIntubation = completedTreatments.includes('intubation') || completedTreatments.includes('surgical_airway')
+    const hasSedation = completedTreatments.includes('sedation')
+    let isUnconscious = false
+    if (consciousnessLevel) {
+        const level = String(consciousnessLevel).toLowerCase()
+        if (level.includes('3桁') || level.includes('200') || level.includes('300') || level.includes('100') || level.includes('20') || level.includes('30')) {
+            isUnconscious = true
+        }
+    }
+    const isAnamnesisBlocked = hasIntubation || hasSedation || isUnconscious
+    const blockedReason = hasIntubation 
+        ? '⚠️ 気管挿管中のため問診不可' 
+        : hasSedation 
+            ? '⚠️ 鎮静薬投与中のため問診不可' 
+            : '⚠️ 意識障害（JCS 20以上/3桁等）のため問診不可'
+
     const renderFinding = (id: string, label: string, value: string, isPre: boolean = false) => {
+        const isAnamnesisItem = id === 'ample' || id === 'background'
+        if (isAnamnesisItem && isAnamnesisBlocked) {
+            return (
+                <div className={`findings-card__item ${isPre ? 'findings-card__item--full' : ''}`} style={{ opacity: 0.75, backgroundColor: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <span className="findings-card__label" style={{ color: 'var(--danger)' }}>{label} (問診不可)</span>
+                    <p className="findings-card__value" style={{ color: 'var(--danger)', fontWeight: 'bold' }}>
+                        {blockedReason}
+                    </p>
+                </div>
+            )
+        }
+
         const isRevealed = completedTreatments.includes(id)
         return (
             <div className={`findings-card__item ${isPre ? 'findings-card__item--full' : ''} ${isRevealed ? 'findings-card__item--revealed' : ''}`}>

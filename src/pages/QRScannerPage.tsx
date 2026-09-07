@@ -87,10 +87,10 @@ const QRScannerPage: React.FC = () => {
         setActiveSession(session.id)
         setSessionTitle(session.title)
         setShowSessionModal(false)
-    }
+    const [isCameraActive, setIsCameraActive] = useState(false)
 
     useEffect(() => {
-        if (showModal || activeTab !== 'qr') return
+        if (showModal || activeTab !== 'qr' || !isCameraActive) return
 
         const stopScanner = startRobustQRScanner('reader', (decodedText) => {
             handleScan(decodedText)
@@ -101,7 +101,7 @@ const QRScannerPage: React.FC = () => {
         return () => {
             stopScanner()
         }
-    }, [showModal, activeTab])
+    }, [showModal, activeTab, isCameraActive])
 
     const handleScan = async (text: string) => {
         let rawId = text
@@ -303,12 +303,37 @@ const QRScannerPage: React.FC = () => {
                     </svg>
                 </div>
                 <h2 className="scanner-hero__title">患者スキャン</h2>
-                <p className="scanner-hero__sub">患者の病着QRを読み取ってください</p>
+                <p className="scanner-hero__sub">カメラ起動ボタンを押して病着QRを読み取ってください</p>
             </div>
 
-            <div className="qr-reader-wrapper">
-                <div id="reader" className="qr-reader custom-qr-scanner"></div>
+            <div style={{ textAlign: 'center', margin: '0.75rem 1.25rem' }}>
+                {!isCameraActive ? (
+                    <button
+                        type="button"
+                        onClick={() => setIsCameraActive(true)}
+                        className="button button--primary"
+                        style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        📷 カメラを起動する
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setIsCameraActive(false)}
+                        className="button button--secondary"
+                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                        ⏹️ カメラを停止する
+                    </button>
+                )}
             </div>
+
+            {isCameraActive && (
+                <div className="qr-reader-wrapper">
+                    <div id="reader" className="qr-reader custom-qr-scanner"></div>
+                </div>
+            )}
 
             {error && <div className="error-message" style={{ margin: '0 1.25rem 1.25rem' }}>{error}</div>}
 
@@ -320,7 +345,7 @@ const QRScannerPage: React.FC = () => {
                 <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
                     <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>検証用: 患者カード（直接アクセス）</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
-                        {sessionPatients.slice(0, 12).map((p, idx) => (
+                        {sessionPatients.map((p, idx) => (
                             <button
                                 key={p.id}
                                 className="button button--secondary"

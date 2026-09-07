@@ -138,15 +138,7 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         const intervalId = setInterval(updateTimer, 1000)
 
         return () => clearInterval(intervalId)
-    }, [
-        patient?.reception_time_ms,
-        patient?.deterioration_time_minutes,
-        patient?.stabilization_completed,
-        patient?.status,
-        patient?.completed_treatments,
-        patient?.rosc_possible,
-        patient?.vitals_post_struct,
-    ])
+    }, [patient])
 
     return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
 }

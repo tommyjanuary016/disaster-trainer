@@ -6,7 +6,7 @@ import { makePatientQR, makeProcedureQR, makeItemQR } from '../types/qr'
 import { createPatient } from '../lib/firestore'
 import { Patient } from '../types/patient'
 
-// 手技一覧（QR生成用）
+// 手技一覧（QR生成用・全臨床対応）
 const PROCEDURES = [
     { id: 'triage',             name: 'トリアージエリアV/S測定', category: 'バイタル' },
     { id: 'vitals',             name: '診療エリアV/S測定',     category: 'バイタル' },
@@ -18,23 +18,45 @@ const PROCEDURES = [
     { id: 'ample',              name: 'AMPLE',              category: '診察手技' },
     { id: 'background',         name: '背景聴取',           category: '診察手技' },
     { id: 'diagnosis',          name: '診断',               category: '診察手技' },
-    { id: 'iv_access',          name: 'ルート確保',         category: '治療処置' },
-    { id: 'iv_fluid',           name: '輸液',               category: '治療処置' },
-    { id: 'blood_transfusion',  name: '輸血',               category: '治療処置' },
-    { id: 'oxygen',             name: '酸素投与',           category: '治療処置' },
-    { id: 'intubation',         name: '気管内挿管',         category: '治療処置' },
-    { id: 'chest_tube',         name: 'トロッカーカテーテル', category: '治療処置' },
-    { id: 'pelvic_binder',      name: '骨盤固定',           category: '治療処置' },
-    { id: 'tourniquet',         name: '止血帯',             category: '治療処置' },
-    { id: 'traction',           name: '鋼線牽引',           category: '治療処置' },
-    { id: 'ct',                 name: 'CT撮影',             category: '治療処置' },
-    { id: 'xray',               name: 'X-P',                category: '治療処置' },
-    { id: 'xray_ct',            name: 'X-P/CT',             category: '治療処置' },
-    { id: 'medication',         name: '薬剤投与',           category: '治療処置' },
-    { id: 'sedation',           name: '鎮静',               category: '治療処置' },
-    { id: 'suture',             name: '縫合',               category: '治療処置' },
-    { id: 'cpr',                name: 'CPR',                category: '治療処置' },
-    { id: 'breathing_support',  name: '呼吸誘導',           category: '治療処置' },
+    // 気道・呼吸
+    { id: 'oxygen',             name: '酸素投与',           category: '気道・呼吸' },
+    { id: 'hfnc',               name: 'ハイフロー開始 (HFNC)', category: '気道・呼吸' },
+    { id: 'intubation',         name: '気管挿管',           category: '気道・呼吸' },
+    { id: 'surgical_airway',    name: '外科的気道確保',     category: '気道・呼吸' },
+    { id: 'ventilator',         name: '人工呼吸器開始',     category: '気道・呼吸' },
+    { id: 'needle_decompression', name: '胸腔穿刺 (緊急脱気)', category: '気道・呼吸' },
+    { id: 'chest_tube',         name: '胸腔ドレーン挿入',   category: '気道・呼吸' },
+    { id: 'gauze_towel_fixation', name: 'ガーゼ・タオル固定', category: '気道・呼吸' },
+    { id: 'three_sided_taping', name: '三辺テーピング',     category: '気道・呼吸' },
+    // 循環・輸液・輸血
+    { id: 'iv_access',          name: '静脈路確保(末梢)',   category: '循環・輸液' },
+    { id: 'iv_access_2',        name: '静脈路確保(2本目)',  category: '循環・輸液' },
+    { id: 'cv_access',          name: '中心静脈路確保',     category: '循環・輸液' },
+    { id: 'quinton_catheter',   name: 'カテーテル(クイントン)', category: '循環・輸液' },
+    { id: 'iv_fluid',           name: '外液急速投与',       category: '循環・輸液' },
+    { id: 'blood_transfusion',  name: '緊急輸血',           category: '循環・輸液' },
+    { id: 'tourniquet',         name: '止血帯',             category: '循環・輸液' },
+    // 薬剤投与
+    { id: 'vasopressor',        name: '昇圧剤投与',         category: '薬剤投与' },
+    { id: 'antihypertensive',   name: '降圧剤投与',         category: '薬剤投与' },
+    { id: 'antibiotics',        name: '抗菌薬投与',         category: '薬剤投与' },
+    { id: 'sedation',           name: '鎮静・鎮痛薬投与',   category: '薬剤投与' },
+    // 蘇生・高度医療
+    { id: 'pelvic_binder',      name: 'サムスリング(骨盤固定)', category: '蘇生・高度医療' },
+    { id: 'cpr',                name: '胸骨圧迫 / ACLS',    category: '蘇生・高度医療' },
+    { id: 'fasciotomy',         name: '減張切開',           category: '蘇生・高度医療' },
+    { id: 'open_cardiac_massage', name: '開胸心マ',         category: '蘇生・高度医療' },
+    { id: 'aortic_cross_clamping', name: '開胸大動脈クランプ', category: '蘇生・高度医療' },
+    { id: 'exploratory_laparotomy', name: '試験開腹',       category: '蘇生・高度医療' },
+    { id: 'emergency_c_section', name: '緊急帝王切開',     category: '蘇生・高度医療' },
+    { id: 'iabo',               name: 'IABO',               category: '蘇生・高度医療' },
+    { id: 'iabp',               name: 'IABP',               category: '蘇生・高度医療' },
+    { id: 'pcps',               name: 'PCPS (VA-ECMO)',     category: '蘇生・高度医療' },
+    // 整形・その他
+    { id: 'pericardiocentesis', name: '心嚢穿刺ドレナージ', category: '整形・その他' },
+    { id: 'splint',             name: 'シーネ固定',         category: '整形・その他' },
+    { id: 'traction',           name: '直達牽引',           category: '整形・その他' },
+    { id: 'suture',             name: '挫創処置 (洗浄縫合)', category: '整形・その他' },
 ]
 
 /** フリーQR画像APIでQR画像URLを生成 */

@@ -13,8 +13,10 @@ const RadiologyScanPage: React.FC = () => {
     const [showManual, setShowManual] = useState(false) // サブ：手入力表示制御
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
+    const [isCameraActive, setIsCameraActive] = useState(false)
+
     useEffect(() => {
-        if (patient) return // 患者表示中はスキャナーを停止
+        if (patient || !isCameraActive) return // 患者表示中またはカメラ停止中はスキャナーを停止
 
         const stopScanner = startRobustQRScanner('rad-reader', (decodedText) => {
             handleScan(decodedText)
@@ -25,7 +27,7 @@ const RadiologyScanPage: React.FC = () => {
         return () => {
             stopScanner()
         }
-    }, [patient])
+    }, [patient, isCameraActive])
 
     // セッション内の患者一覧を購読（患者ID手入力時の表示用）
     useEffect(() => {
@@ -124,13 +126,38 @@ const RadiologyScanPage: React.FC = () => {
             {/* タイトルバナー（放射線科のデフォルト色） */}
             <div className="scanner-hero">
                 <h2 className="scanner-hero__title">患者スキャン（放射線科）</h2>
-                <p className="scanner-hero__sub">患者の病着QRを読み取ってください</p>
+                <p className="scanner-hero__sub">カメラ起動ボタンを押すか、下部の患者選択から選択してください</p>
             </div>
 
-            {/* QRスキャナー（デフォルト表示） */}
-            <div className="qr-reader-wrapper">
-                <div id="rad-reader" className="qr-reader custom-qr-scanner"></div>
+            <div style={{ textAlign: 'center', margin: '0.75rem 1.25rem' }}>
+                {!isCameraActive ? (
+                    <button
+                        type="button"
+                        onClick={() => setIsCameraActive(true)}
+                        className="button button--primary"
+                        style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        📷 カメラを起動する
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setIsCameraActive(false)}
+                        className="button button--secondary"
+                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                        ⏹️ カメラを停止する
+                    </button>
+                )}
             </div>
+
+            {/* QRスキャナー */}
+            {isCameraActive && (
+                <div className="qr-reader-wrapper">
+                    <div id="rad-reader" className="qr-reader custom-qr-scanner"></div>
+                </div>
+            )}
 
             {error && <div className="error-message" style={{ margin: '0 1.25rem 1.25rem' }}>{error}</div>}
 

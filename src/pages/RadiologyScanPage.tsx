@@ -218,4 +218,35 @@ const RadiologyScanPage: React.FC = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end'
+                        <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                            <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>患者ID番号を直接入力</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={manualId}
+                                    onChange={(e) => setManualId(e.target.value)}
+                                    placeholder="例: 101"
+                                    className="input"
+                                    style={{ marginTop: '0.25rem' }}
+                                />
+                            </div>
+                            <button type="submit" className="button button--primary" disabled={!manualId} style={{ width: 'auto', padding: '0.6rem 1rem', flexShrink: 0 }}>
+                                検索
+                            </button>
+                        </form>
+                        <button
+                            type="button"
+                            onClick={() => setShowManual(false)}
+                            style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
+                        >
+                            閉じる
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+export default RadiologyScanPage

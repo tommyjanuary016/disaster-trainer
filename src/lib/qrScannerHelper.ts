@@ -128,4 +128,27 @@ export function startRobustQRScanner(
             return
         } catch (e4) {
             console.error('[QRScanner] All camera start attempts failed:', e4)
-    
+            if (onError) onError(e4)
+        }
+    }
+
+    attemptStart()
+
+    // クリーンアップ関数
+    return () => {
+        isStopped = true
+        if (html5Qrcode && html5Qrcode.isScanning) {
+            html5Qrcode.stop().then(() => {
+                try { html5Qrcode?.clear() } catch (_) {}
+                if (container) container.innerHTML = ''
+            }).catch(e => {
+                console.error('[QRScanner] Error during stop:', e)
+                try { html5Qrcode?.clear() } catch (_) {}
+                if (container) container.innerHTML = ''
+            })
+        } else if (html5Qrcode) {
+            try { html5Qrcode.clear() } catch (_) {}
+            if (container) container.innerHTML = ''
+        }
+    }
+}

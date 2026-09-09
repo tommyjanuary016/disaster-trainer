@@ -9,8 +9,6 @@ const LabScanPage: React.FC = () => {
     const navigate = useNavigate()
     const [patient, setPatient] = useState<Patient | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [manualId, setManualId] = useState('')
-    const [showManual, setShowManual] = useState(false) // サブ：手入力表示制御
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
     const [isCameraActive, setIsCameraActive] = useState(false)
@@ -57,21 +55,12 @@ const LabScanPage: React.FC = () => {
         }
     }
 
-    const handleManualSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (manualId) {
-            handleScan(manualId.trim())
-        }
-    }
-
     const handleComplete = async () => {
         if (patient) {
             // 血液検査結果をプレイヤーに解放するのみ（悪化タイマーは停止しない）
             await updatePatientFlags(patient.id, { tests_completed: true })
             alert('血液検査結果を訓練プレイヤーに送信しました。(※タイマーは継続します)')
             setPatient(null)
-            setManualId('')
-            setShowManual(false)
         }
     }
 

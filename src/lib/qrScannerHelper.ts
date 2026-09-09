@@ -67,14 +67,6 @@ export function startRobustQRScanner(
         }, 100)
     }
 
-    // 高精度のカメラ標準設定（Android focus/resolution対策）
-    const highResConstraint = {
-        facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        advanced: [{ focusMode: "continuous" }]
-    } as unknown as MediaTrackConstraints
-
     // 段階的カメラ起動
     const attemptStart = async () => {
         if (!html5Qrcode || isStopped) return

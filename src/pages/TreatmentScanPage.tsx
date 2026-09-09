@@ -140,7 +140,6 @@ const TreatmentScanPage: React.FC = () => {
     }, [patientId])
 
     const [isCameraActive, setIsCameraActive] = useState(false)
-    const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
     useEffect(() => {
         if (patientId) {

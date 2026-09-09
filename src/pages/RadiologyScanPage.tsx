@@ -9,8 +9,6 @@ const RadiologyScanPage: React.FC = () => {
     const navigate = useNavigate()
     const [patient, setPatient] = useState<Patient | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [manualId, setManualId] = useState('')
-    const [showManual, setShowManual] = useState(false) // サブ：手入力表示制御
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
     const [isCameraActive, setIsCameraActive] = useState(false)
@@ -57,21 +55,12 @@ const RadiologyScanPage: React.FC = () => {
         }
     }
 
-    const handleManualSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (manualId) {
-            handleScan(`patient:${manualId}`)
-        }
-    }
-
     const handleComplete = async () => {
         if (patient) {
             // 画像結果をプレイヤーに解放し、tests_completedフラグを更新
             await updatePatientFlags(patient.id, { tests_completed: true })
             alert('放射線画像結果を訓練プレイヤーに送信しました。')
             setPatient(null)
-            setManualId('')
-            setShowManual(false)
         }
     }
 

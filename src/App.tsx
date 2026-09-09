@@ -4,6 +4,7 @@ import { TransitionRoutes } from './components/TransitionRoutes'
 import { GlobalNavigation } from './components/GlobalNavigation'
 import { NotificationProvider } from './components/NotificationProvider'
 import { setActiveSession } from './lib/firestore'
+import { APP_VERSION } from './version'
 
 // URLのクエリパラメータからセッションIDを検出し、最優先で設定する
 const params = new URLSearchParams(window.location.search)
@@ -38,7 +39,7 @@ const Header: React.FC = () => {
             </div>
 
             {/* 右側：システムバージョン */}
-            <div className="app-header__version">v2.2.0</div>
+            <div className="app-header__version">{APP_VERSION}</div>
         </header>
     )
 }

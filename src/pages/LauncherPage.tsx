@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchActiveSessions, setActiveSession } from '../lib/firestore'
 import { TrainingSession } from '../types/patient'
+import { APP_VERSION, APP_LAST_UPDATED } from '../version'
 
 const LauncherPage: React.FC = () => {
     const navigate = useNavigate()
@@ -297,7 +298,7 @@ const LauncherPage: React.FC = () => {
                     </button>
                 </div>
 
-                <p className="launcher-version">DISASTER LOGIC v2.1.3 (改訂日: 2026-08-29)</p>
+                <p className="launcher-version">DISASTER LOGIC {APP_VERSION} (改訂日: {APP_LAST_UPDATED})</p>
             </div>
         </div>
     )

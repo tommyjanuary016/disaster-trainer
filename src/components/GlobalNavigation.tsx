@@ -82,29 +82,6 @@ export const GlobalNavigation: React.FC = () => {
                 </span>
             </div>
         </div>
-
-        {/* フローティングQRスキャンボタン：訓練画面内でのみ表示 */}
-        {path.startsWith('/training') &&
-         !path.startsWith('/training/scan') &&
-         !path.startsWith('/training/actor') &&
-         path !== '/training' && (
-            <button
-                onClick={() => navigate('/training/scan')}
-                title="QRスキャンで患者を開く"
-                className="fab-qr"
-            >
-                {/* スキャンアイコン */}
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
-                    <rect x="7" y="7" width="4" height="4" rx="1" />
-                    <rect x="13" y="7" width="4" height="4" rx="1" />
-                    <rect x="7" y="13" width="4" height="4" rx="1" />
-                    <path d="M13 13h4v4" />
-                </svg>
-                {/* パルスリング */}
-                <span className="fab-qr__pulse" />
-            </button>
-        )}
         </>
     )
 }

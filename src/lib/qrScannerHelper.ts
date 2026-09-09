@@ -79,36 +79,42 @@ export function startRobustQRScanner(
     const attemptStart = async () => {
         if (!html5Qrcode || isStopped) return
 
-        // 第1優先: 高解像度・オートフォーカス指定の背面カメラ
-        try {
-            await html5Qrcode.start(highResConstraint, config, handleSuccess, handleFailure)
-            enforcePlaysInline()
-            return
-        } catch (e1) {
-            console.warn('[QRScanner] High-res facingMode environment failed, trying standard environment...', e1)
-        }
-
-        if (isStopped) return
-
-        // 第2優先: { facingMode: "environment" } (標準背面カメラ)
+        // 第1優先: { facingMode: "environment" } (iOS Safari / iPad / Android 共通標準背面カメラ)
         try {
             await html5Qrcode.start({ facingMode: "environment" }, config, handleSuccess, handleFailure)
             enforcePlaysInline()
             return
-        } catch (e2) {
-            console.warn('[QRScanner] facingMode environment failed, trying fallback...', e2)
+        } catch (e1) {
+            console.warn('[QRScanner] Standard facingMode environment failed:', e1)
         }
 
         if (isStopped) return
 
-        // 第3優先: getCameras() によるデバイス特定
+        // 第2優先: 高解像度・オートフォーカス指定（Android一部端末用）
+        try {
+            const highResConstraint = {
+                facingMode: { exact: "environment" },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+            } as unknown as MediaTrackConstraints
+
+            await html5Qrcode.start(highResConstraint, config, handleSuccess, handleFailure)
+            enforcePlaysInline()
+            return
+        } catch (e2) {
+            console.warn('[QRScanner] High-res exact environment failed:', e2)
+        }
+
+        if (isStopped) return
+
+        // 第3優先: getCameras() によるデバイス特定（背面カメラマッチング）
         try {
             const cameras = await Html5Qrcode.getCameras()
             if (isStopped) return
             if (cameras && cameras.length > 0) {
                 const rearCam = cameras.find(c => {
                     const label = c.label.toLowerCase()
-                    return label.includes('back') || label.includes('rear') || label.includes('環境') || label.includes('背面') || label.includes('0')
+                    return label.includes('back') || label.includes('rear') || label.includes('環境') || label.includes('背面')
                 }) || cameras[cameras.length - 1]
 
                 await html5Qrcode.start(rearCam.id, config, handleSuccess, handleFailure)
@@ -121,7 +127,7 @@ export function startRobustQRScanner(
 
         if (isStopped) return
 
-        // 第4優先: 指定なし (標準カメラ)
+        // 第4優先: フォールバック（標準フロント/任意カメラ）
         try {
             await html5Qrcode.start({ facingMode: "user" }, config, handleSuccess, handleFailure)
             enforcePlaysInline()

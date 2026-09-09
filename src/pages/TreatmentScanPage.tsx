@@ -345,11 +345,11 @@ const TreatmentScanPage: React.FC = () => {
                 await updatePatientFlags(pid, { initial_vs_time_ms: now })
             }
 
-            // 自動で推移せず、プレイヤーが選択できるように成功モーダルを表示
+            // 処置タイマー開始後、即座に患者詳細画面に遷移
             setShowModal(false)
-            setSuccessMessage(`「${pendingProcedure.treatment_name}」を開始・登録しました。`)
             setPendingProcedure(null)
             setPendingParsed(null)
+            navigate(`/training/patient/${patientId}`)
         } catch (err: any) {
             if (err.message === 'ALREADY_LOCKED') {
                 setError('⚠️ 他のプレイヤーが既に処置を開始しています。画面をリロードしてください。')
@@ -381,36 +381,6 @@ const TreatmentScanPage: React.FC = () => {
                     onCancel={handleCancel}
                     warningText={roleWarning}
                 />
-            )}
-
-            {/* 処置開始成功モーダル（プレイヤーが選択して患者トップへ推移） */}
-            {successMessage && (
-                <div className="launcher-modal-overlay" onClick={() => {}}>
-                    <div className="launcher-modal" style={{ maxWidth: '400px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>✅</div>
-                        <h2 className="launcher-modal__title" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>処置登録完了</h2>
-                        <p style={{ color: 'var(--gray-700)', marginBottom: '1.5rem', fontWeight: 'bold' }}>{successMessage}</p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <button
-                                type="button"
-                                className="button button--primary"
-                                onClick={() => navigate(`/training/patient/${patientId}`)}
-                            >
-                                患者詳細画面へ移動する
-                            </button>
-                            <button
-                                type="button"
-                                className="button button--secondary"
-                                onClick={() => {
-                                    setSuccessMessage(null)
-                                    setManualTreatmentId('')
-                                }}
-                            >
-                                続けて他の処置を行う
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
 
             <header className="treatment-header" style={{ position: 'relative' }}>

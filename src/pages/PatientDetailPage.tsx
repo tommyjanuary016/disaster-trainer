@@ -22,7 +22,6 @@ const PROCEDURE_LABELS: Record<string, string> = {
     fast:               'FAST',
     ample:              'AMPLE',
     background:         '背景聴取',
-    diagnosis:          '診断',
 }
 
 const PatientDetailPage: React.FC = () => {

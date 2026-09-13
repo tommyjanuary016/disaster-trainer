@@ -11,7 +11,7 @@ const RadiologyScanPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null)
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
-    const [isCameraActive, setIsCameraActive] = useState(false)
+    const [isCameraActive, setIsCameraActive] = useState(true)
 
     useEffect(() => {
         if (patient || !isCameraActive) return // 患者表示中またはカメラ停止中はスキャナーを停止

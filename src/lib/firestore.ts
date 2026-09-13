@@ -42,7 +42,9 @@ function notifyMockListeners(patientId: number) {
 }
 
 /**
- * 患者の処置タイマーが満了（期限切れ）している場合、自動で completeTreatment を実行する
+ * 患者の処置タイマーが満了（期限切れ）している場合、
+ * 即座に「完了状態に変換した患者データ」を同期的に返却しつつ、
+ * 非同期で completeTreatment を実行して Firestore / mockStore を同期する（1周遅れ解決）
  */
 export function checkAutoTimerExpiration(patient: Patient | null): Patient | null {
     if (!patient) return null
@@ -53,11 +55,38 @@ export function checkAutoTimerExpiration(patient: Patient | null): Patient | nul
     ) {
         const now = Date.now()
         if (now >= (patient.timer_started_at + patient.timer_duration_ms)) {
-            // タイマーが満了しているため、非同期で completeTreatment を実行して処置を完了・データ同期する
+            // タイマーが満了しているため、非同期で completeTreatment を実行して永続化する
             const isCorrect = (patient.required_treatments ?? []).some(
                 rt => rt.treatment_id === patient.applied_treatment_id
             )
             completeTreatment(patient.id, isCorrect).catch(e => console.error('Auto check complete error:', e))
+
+            // 同期的に即座に反映されたPatientオブジェクトを作成して返す（1周遅れ解消）
+            const addedId = patient.applied_treatment_id || 'unknown'
+            const currentCompleted = patient.completed_treatments || []
+            const newCompleted = currentCompleted.includes(addedId) ? currentCompleted : [...currentCompleted, addedId]
+
+            let isStabilized = patient.stabilization_completed || false
+            let postVsTimeMs = patient.post_vs_time_ms
+            if (patient.required_treatments && patient.required_treatments.length > 0) {
+                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
+                const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
+                if (allRequiredMet) {
+                    isStabilized = true
+                    if (!postVsTimeMs) postVsTimeMs = now
+                }
+            }
+
+            return {
+                ...patient,
+                status: isStabilized ? '処置完了' : 'アセスメント完了',
+                timer_started_at: null,
+                timer_duration_ms: null,
+                applied_treatment_id: null,
+                completed_treatments: newCompleted,
+                stabilization_completed: isStabilized,
+                post_vs_time_ms: postVsTimeMs,
+            }
         }
     }
     return patient
@@ -74,15 +103,15 @@ export function subscribeToPatient(
 ): Unsubscribe {
     if (USE_MOCK || !db) {
         // モックモード: 現在の値をすぐ返す
-        const patient = mockStore.get(patientId)
-        checkAutoTimerExpiration(patient ? { ...patient } : null)
-        callback(patient ? { ...patient } : null)
+        const raw = mockStore.get(patientId)
+        const patient = checkAutoTimerExpiration(raw ? { ...raw } : null)
+        callback(patient)
 
         // リスナー登録
         if (!mockListeners.has(patientId)) {
             mockListeners.set(patientId, new Set())
         }
-        const wrappedCallback = (p: Patient) => callback({ ...p })
+        const wrappedCallback = (p: Patient) => callback(checkAutoTimerExpiration({ ...p }))
         mockListeners.get(patientId)!.add(wrappedCallback)
 
         return () => {
@@ -95,8 +124,8 @@ export function subscribeToPatient(
     return onSnapshot(docRef, (snap) => {
         if (snap.exists()) {
             const p = snap.data() as Patient
-            checkAutoTimerExpiration(p)
-            callback(p)
+            const resolved = checkAutoTimerExpiration(p)
+            callback(resolved)
         } else {
             callback(null)
         }
@@ -109,15 +138,13 @@ export function subscribeToPatient(
 export async function fetchPatient(patientId: number): Promise<Patient | null> {
     if (USE_MOCK || !db) {
         const p = mockStore.get(patientId) ?? null
-        checkAutoTimerExpiration(p)
-        return p
+        return checkAutoTimerExpiration(p ? { ...p } : null)
     }
     const docRef = doc(db, 'patients', String(patientId))
     const snap = await getDoc(docRef)
     if (!snap.exists()) return null
     const p = snap.data() as Patient
-    checkAutoTimerExpiration(p)
-    return p
+    return checkAutoTimerExpiration(p)
 }
 
 /**

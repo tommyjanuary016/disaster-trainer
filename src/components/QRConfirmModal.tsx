@@ -13,7 +13,6 @@ const PROCEDURE_NAMES: Record<string, string> = {
   fast:               'FAST',
   ample:              'AMPLE',
   background:         '背景聴取',
-  diagnosis:          '診断',
 }
 
 interface QRConfirmModalProps {

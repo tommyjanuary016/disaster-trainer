@@ -38,6 +38,7 @@ export const TransitionRoutes: React.FC = () => {
         const skipTransition = NO_TRANSITION_PATHS.includes(location.pathname)
         if (skipTransition) {
             setDisplayLocation(location)
+            window.scrollTo(0, 0)
             return
         }
 
@@ -59,6 +60,7 @@ export const TransitionRoutes: React.FC = () => {
             clearInterval(interval)
             setProgress(100)
             setDisplayLocation(location)
+            window.scrollTo(0, 0)
             setTimeout(() => setIsTransitioning(false), 300)
         }, 900)
 

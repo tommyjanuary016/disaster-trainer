@@ -183,12 +183,13 @@ const AdminPage: React.FC = () => {
             setSessionEnded(false)
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
-            alert('新しいセッションを作成しました。')
+            setShowShareModal(true) // セッション作成直後に自動で招待モーダルを開く
+            alert('新しいセッションを作成しました。プレイヤーを招待できます。')
         }
     }
 
     const handleClearSession = async () => {
-        if (window.confirm('訓練を終了しますか？\n（訓練のダッシュボードと結果はそのまま表示されます）')) {
+        if (window.confirm('訓練を終了しますか？\n（訓練のダッシュボードと結果表示へ遷移します）')) {
             if (activeSessionId) {
                 await endTrainingSession(activeSessionId)
             }
@@ -196,6 +197,7 @@ const AdminPage: React.FC = () => {
             setActiveSession(null)
             setCurrentSessionId(null)
             setSessionEnded(true)
+            setActiveTab('dashboard') // 訓練終了時にダッシュボード結果画面へ遷移
         }
     }
 
@@ -701,58 +703,72 @@ const AdminPage: React.FC = () => {
                 )}
             </main>
 
-            {/* QRコード共有バナー（管理者用） */}
+            {/* QRコード共有モーダル（全画面オーバーレイ） */}
             {showShareModal && currentSessionId && (
                 <div
                     style={{
-                        position: 'sticky',
-                        top: '60px', /* app-header height */
-                        left: 0,
-                        right: 0,
-                        backgroundColor: 'var(--white)',
-                        borderBottom: 'var(--border)',
-                        padding: '1rem',
-                        zIndex: 90,
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        zIndex: 9999,
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
-                        boxShadow: 'var(--shadow-md)',
-                        animation: 'slideInDown 0.3s ease both'
+                        justifyContent: 'center',
+                        padding: '1.5rem'
                     }}
+                    onClick={() => setShowShareModal(false)}
                 >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>📱 プレイヤーを招待</h3>
+                    <div
+                        style={{
+                            backgroundColor: 'var(--white)',
+                            borderRadius: '16px',
+                            padding: '1.5rem',
+                            maxWidth: '380px',
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+                            position: 'relative'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--gray-900)' }}>📱 プレイヤーを招待</h3>
+                            <button
+                                onClick={() => setShowShareModal(false)}
+                                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem', textAlign: 'center', lineHeight: '1.4' }}>
+                            セッション:&nbsp;<strong style={{ color: 'var(--primary)' }}>{currentSessionTitle || '（タイトルなし）'}</strong><br />
+                            以下のQRコードまたはリンクから誰でも訓練に参加できます。
+                        </p>
+                        <div style={{
+                            padding: '0.75rem',
+                            background: '#F8FAFC',
+                            borderRadius: '12px',
+                            border: '1px solid #E2E8F0',
+                            marginBottom: '1.25rem'
+                        }}>
+                            <img
+                                src={qrUrl}
+                                alt="参加用QRコード"
+                                style={{ display: 'block', width: '200px', height: '200px', borderRadius: '8px' }}
+                            />
+                        </div>
                         <button
-                            onClick={() => setShowShareModal(false)}
-                            style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}
+                            className="button button--primary"
+                            onClick={handleCopyLink}
+                            style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
                         >
-                            &times;
+                            {copySuccess ? '✅ 参加URLをコピーしました！' : '📋 参加URLをコピー'}
                         </button>
                     </div>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)', marginBottom: '1rem', textAlign: 'center' }}>
-                        セッション:&nbsp;<strong>{currentSessionTitle || '（タイトルなし）'}</strong><br />
-                        このQRを読み取ると役割選択画面にアクセスできます
-                    </p>
-                    <div style={{
-                        padding: '0.5rem',
-                        background: 'var(--gray-50)',
-                        borderRadius: '8px',
-                        border: 'var(--border)',
-                        marginBottom: '1rem'
-                    }}>
-                        <img
-                            src={qrUrl}
-                            alt="参加用QRコード"
-                            style={{ display: 'block', width: '160px', height: '160px' }}
-                        />
-                    </div>
-                    <button
-                        className="button button--secondary"
-                        onClick={handleCopyLink}
-                        style={{ width: 'auto', padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
-                    >
-                        {copySuccess ? '✅ コピー完了' : '📋 参加URLをコピー'}
-                    </button>
                 </div>
             )}
         </div>

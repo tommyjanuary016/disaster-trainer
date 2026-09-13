@@ -41,7 +41,6 @@ export const PROCEDURE_NAMES: Record<string, string> = {
     fast:               'FAST',
     ample:              'AMPLE',
     background:         '背景聴取',
-    diagnosis:          '診断',
     // 気道・呼吸
     oxygen: '酸素投与',
     hfnc: 'ハイフロー開始 (HFNC)',
@@ -139,7 +138,7 @@ const TreatmentScanPage: React.FC = () => {
         }
     }, [patientId])
 
-    const [isCameraActive, setIsCameraActive] = useState(false)
+    const [isCameraActive, setIsCameraActive] = useState(true)
 
     useEffect(() => {
         if (patientId) {

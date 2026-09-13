@@ -89,7 +89,7 @@ const QRScannerPage: React.FC = () => {
         setShowSessionModal(false)
     }
 
-    const [isCameraActive, setIsCameraActive] = useState(false)
+    const [isCameraActive, setIsCameraActive] = useState(true)
 
     useEffect(() => {
         if (showModal || activeTab !== 'qr' || !isCameraActive) return

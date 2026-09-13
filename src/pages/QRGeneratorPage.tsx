@@ -17,7 +17,6 @@ const PROCEDURES = [
     { id: 'fast',               name: 'FAST',               category: '診察手技' },
     { id: 'ample',              name: 'AMPLE',              category: '診察手技' },
     { id: 'background',         name: '背景聴取',           category: '診察手技' },
-    { id: 'diagnosis',          name: '診断',               category: '診察手技' },
     // 気道・呼吸
     { id: 'oxygen',             name: '酸素投与',           category: '気道・呼吸' },
     { id: 'hfnc',               name: 'ハイフロー開始 (HFNC)', category: '気道・呼吸' },

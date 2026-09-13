@@ -41,14 +41,17 @@ const AdminPage: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false)
     const location = useLocation()
 
-    // 全経路パスワード保護ステート（画面アクセス毎に要求）
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+    // 全経路パスワード保護ステート（トップ認証または管理画面認証を共有）
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        return sessionStorage.getItem('admin_authenticated') === 'true'
+    })
     const [authInput, setAuthInput] = useState('')
     const [authError, setAuthError] = useState(false)
 
     const handleAdminAuthSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (authInput === 'komonji') {
+            sessionStorage.setItem('admin_authenticated', 'true')
             setIsAuthenticated(true)
             setAuthError(false)
         } else {

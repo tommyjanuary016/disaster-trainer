@@ -126,15 +126,15 @@ const PatientDetailPage: React.FC = () => {
                 />
             )}
 
-            {/* シンプルヘッダー（トリアージカラーなし） */}
-            <header className="patient-header" style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '-0.8rem', left: '0' }}>
+            {/* ヘッダー */}
+            <header className="patient-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div>
                     <button onClick={() => navigate('/training')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                         患者スキャン
                     </button>
                 </div>
-                <div className="patient-header__identity" style={{ marginTop: '1rem' }}>
+                <div className="patient-header__identity">
                     <PatientPictogram age={patient.age} gender={patient.gender} size={52} className="patient-header__pictogram" />
                     <h1 className="patient-header__name">
                         {getAgeGroup(patient.age)} {getGenderText(patient.gender)}

@@ -111,8 +111,16 @@ const RoleSelectionPage: React.FC = () => {
 
             <div className="role-selection__content">
                 {/* ヘッダー */}
-                <header className="role-selection__header">
-                    <div className="role-selection__header-badge">SESSION ACTIVE</div>
+                <header className="role-selection__header" style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="button button--secondary"
+                        style={{ position: 'absolute', left: 0, top: 0, width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        アプリトップ
+                    </button>
+                    <div className="role-selection__header-badge" style={{ marginTop: '2.5rem' }}>SESSION ACTIVE</div>
                     <h1 className="role-selection__title">役割を選択</h1>
                     <p className="role-selection__subtitle">担当する役割を選んで訓練を開始します</p>
                 </header>
@@ -168,12 +176,12 @@ const RoleSelectionPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* セッション選択に戻る */}
+                {/* アプリトップに戻る */}
                 <button
                     className="role-selection__back-btn"
                     onClick={() => navigate('/')}
                 >
-                    ← セッション選択に戻る
+                    ← アプリトップ
                 </button>
             </div>
 

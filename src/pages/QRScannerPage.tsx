@@ -215,9 +215,9 @@ const QRScannerPage: React.FC = () => {
             )}
 
             <div style={{ padding: '1rem 1rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <button onClick={() => navigate('/')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <button onClick={() => navigate('/role-select')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                    アプリトップへ戻る
+                    役割選択
                 </button>
                 {sessionTitle && (
                     <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary)' }}>

@@ -392,9 +392,9 @@ const TreatmentScanPage: React.FC = () => {
 
             <header className="treatment-header" style={{ position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '-0.8rem', left: '0' }}>
-                    <button onClick={() => navigate(`/training/patient/${patientId}`)} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', border: 'none', background: 'transparent', color: 'var(--primary)' }}>
+                    <button onClick={() => navigate(`/training/patient/${patientId}`)} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                        患者ステータスへ戻る
+                        患者ステータス
                     </button>
                 </div>
                 <div style={{ marginTop: '1rem' }}>

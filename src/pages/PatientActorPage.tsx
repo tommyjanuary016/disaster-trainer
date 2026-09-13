@@ -147,7 +147,7 @@ const PatientActorPage: React.FC = () => {
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M15 18l-6-6 6-6" />
                     </svg>
-                    一覧へ戻る
+                    模擬患者選択
                 </button>
                 <h2>模擬患者モード</h2>
                 <button

@@ -248,7 +248,7 @@ const LauncherPage: React.FC = () => {
                         <div className="launcher-hero__icon-glow" />
                         {/* SVGアイコン（画像不要・常に表示） */}
                         <div className="launcher-hero__icon-svg">
-                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                             </svg>
                         </div>

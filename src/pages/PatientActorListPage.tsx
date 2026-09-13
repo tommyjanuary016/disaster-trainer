@@ -35,7 +35,7 @@ const PatientActorListPage: React.FC = () => {
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M15 18l-6-6 6-6" />
                     </svg>
-                    訓練トップへ戻る
+                    役割選択
                 </button>
                 <h2 className="actor-title" style={{ margin: 0, paddingLeft: '1rem' }}>担当患者を選択</h2>
             </header>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom'
-import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, deleteAllCustomPatients } from '../lib/firestore'
-import { Patient } from '../types/patient'
+import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, fetchActiveSessions, deleteAllCustomPatients } from '../lib/firestore'
+import { Patient, TrainingSession } from '../types/patient'
 import PatientForm from '../components/PatientForm'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/csv'
@@ -76,6 +76,28 @@ const AdminPage: React.FC = () => {
     // 抽出可能なシナリオタグ一覧
     const availableScenarios = Array.from(new Set(patients.map(p => p.scenario_tag || '基本')))
 
+    const [activeSessionsList, setActiveSessionsList] = useState<TrainingSession[]>([])
+    const [showMasterAll, setShowMasterAll] = useState(false) // 全セッション混在マスター表示の明示的トグル
+
+    // アクティブなセッション一覧をロード
+    const loadActiveSessions = async () => {
+        try {
+            const sessions = await fetchActiveSessions()
+            setActiveSessionsList(sessions)
+            // displaySessionId が null の場合、アクティブな最新セッションがあれば自動選択
+            if (!displaySessionId && sessions.length > 0) {
+                setDisplaySessionId(sessions[0].id)
+                setCurrentSessionId(sessions[0].id)
+            }
+        } catch (e) {
+            console.error('アクティブセッション取得失敗:', e)
+        }
+    }
+
+    useEffect(() => {
+        loadActiveSessions()
+    }, [])
+
     useEffect(() => {
         if (location.state?.action === 'new_session') {
             setIsSessionModalOpen(true)
@@ -85,12 +107,16 @@ const AdminPage: React.FC = () => {
     }, [location.state?.action])
 
     useEffect(() => {
-        // displaySessionId に応じて訪読する患者を制限する
+        // displaySessionId または showMasterAll に応じて購読する患者を制限する
+        // displaySessionId がある、または showMasterAll が false の場合はセッションで絞り込む
+        const filterSessionId = displaySessionId ?? (showMasterAll ? undefined : (activeSessionId ?? undefined))
+        const sessionIdOnly = !showMasterAll && (filterSessionId !== undefined)
+
         const unsubscribe = subscribeToAllPatients((data) => {
             setPatients(data)
-        }, displaySessionId !== null, displaySessionId ?? undefined)
+        }, sessionIdOnly, filterSessionId)
         return () => unsubscribe()
-    }, [displaySessionId])
+    }, [displaySessionId, showMasterAll])
 
     // セッションタイトルおよび終了状態を取得する
     useEffect(() => {
@@ -206,6 +232,7 @@ const AdminPage: React.FC = () => {
             const newSessionId = await createTrainingSession(sessionConfig)
             setCurrentSessionId(newSessionId)
             setDisplaySessionId(newSessionId)
+            setShowMasterAll(false)
             setSessionEnded(false)
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
@@ -417,11 +444,54 @@ const AdminPage: React.FC = () => {
                                     — このセッションのまとめを表示中
                                 </span>
                             </div>
-                        ) : (
-                            <p style={{fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.2rem 0 0'}}>
-                                マスターデータ編集中
-                            </p>
-                        )}
+                         ) : (
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
+                                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gray-700)' }}>
+                                     {showMasterAll ? '全登録患者（マスター・過去ログ全件）' : '表示セッション:'}
+                                 </span>
+                                 {activeSessionsList.length > 0 && !showMasterAll ? (
+                                     <select
+                                         value={displaySessionId || ''}
+                                         onChange={(e) => {
+                                             const val = e.target.value
+                                             if (val === 'ALL_MASTER') {
+                                                 setShowMasterAll(true)
+                                                 setDisplaySessionId(null)
+                                             } else {
+                                                 setShowMasterAll(false)
+                                                 setDisplaySessionId(val || null)
+                                                 setCurrentSessionId(val || null)
+                                             }
+                                         }}
+                                         style={{
+                                             padding: '0.3rem 0.6rem',
+                                             borderRadius: '6px',
+                                             border: '1px solid var(--gray-300)',
+                                             fontSize: '0.85rem',
+                                             fontWeight: 'bold',
+                                             backgroundColor: '#fff'
+                                         }}
+                                     >
+                                         <option value="">-- セッションを選択 --</option>
+                                         {activeSessionsList.map(s => (
+                                             <option key={s.id} value={s.id}>
+                                                 {s.title || '無題セッション'} ({s.id.replace('session_', '')})
+                                             </option>
+                                         ))}
+                                         <option value="ALL_MASTER">🌐 過去ログ・マスター全件表示</option>
+                                     </select>
+                                 ) : showMasterAll ? (
+                                     <button
+                                         onClick={() => { setShowMasterAll(false); loadActiveSessions(); }}
+                                         style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', background: 'var(--gray-200)', border: 'none', cursor: 'pointer' }}
+                                     >
+                                         ← セッション別表示に戻る
+                                     </button>
+                                 ) : (
+                                     <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>アクティブセッションなし</span>
+                                 )}
+                             </div>
+                         )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => navigate('/role-select')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>

@@ -2166,27 +2166,35 @@ select.input {
    ====================================================== */
 .qr-modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  z-index: 9000;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 1rem;
+  box-sizing: border-box;
   animation: fadeIn 0.2s ease both;
 }
 
 .qr-modal {
-  background: rgba(255, 255, 255, 0.85);
+  margin: auto;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 360px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
   animation: scaleIn 0.25s ease both;
   overflow: hidden;
 }

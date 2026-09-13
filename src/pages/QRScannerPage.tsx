@@ -179,16 +179,6 @@ const QRScannerPage: React.FC = () => {
         setPendingPatient(null)
     }
 
-    const getStatusColor = (status: Patient['status']) => {
-        switch (status) {
-            case '初期状態': return 'var(--gray-500)'
-            case '処置中': return 'var(--primary)'
-            case 'アセスメント完了': return 'var(--status-green)'
-            case '処置完了': return '#2563eb' // blue-600
-            default: return 'var(--gray-500)'
-        }
-    }
-
     return (
         <div className="page qr-scanner-page">
             {/* セッション選択モーダル */}
@@ -351,14 +341,13 @@ const QRScannerPage: React.FC = () => {
                             <button
                                 key={p.id}
                                 className="button button--secondary"
-                                style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
+                                style={{ padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
                                 onClick={() => handleScan(String(p.id))}
                             >
-                                <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
-                                    {p.triage_color}
+                                <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--primary)' }}>No.{idx + 1}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
+                                    {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
                                 </span>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginTop: '0.4rem' }}>No.{idx + 1}</span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{p.name}</span>
                             </button>
                         ))}
                     </div>
@@ -367,12 +356,12 @@ const QRScannerPage: React.FC = () => {
                 <div className="manual-entry">
                     <form onSubmit={handleManualSubmit} className="manual-entry__form">
                         <div className="form-group">
-                            <label>患者番号（1番, 2番…）または患者ID（101, 102…）を直接入力</label>
+                            <label>患者番号（1番, 2番…）を直接入力</label>
                             <input
                                 type="text"
                                 value={manualId}
                                 onChange={(e) => setManualId(e.target.value)}
-                                placeholder="例: 1 または 101"
+                                placeholder="例: 1 または 2"
                                 className="input"
                             />
                         </div>
@@ -397,28 +386,21 @@ const QRScannerPage: React.FC = () => {
                                 onClick={() => navigate(`/training/patient/${p.id}`)}
                                 style={{
                                     flexShrink: 0,
-                                    width: '140px',
+                                    width: '120px',
                                     background: 'var(--white)',
                                     border: '1px solid var(--gray-200)',
                                     borderRadius: '8px',
-                                    padding: '0.75rem',
+                                    padding: '0.6rem 0.75rem',
                                     cursor: 'pointer',
                                     boxShadow: 'var(--shadow-sm)',
                                     display: 'flex',
                                     flexDirection: 'column'
                                 }}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>患者 {p.id % 1000}</span>
-                                    <div style={{
-                                        width: '12px',
-                                        height: '12px',
-                                        borderRadius: '50%',
-                                        backgroundColor: `var(--triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'})`
-                                    }} />
-                                </div>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.diagnosis || '診断未設定'}</span>
-                                <span style={{ fontSize: '0.7rem', color: getStatusColor(p.status), fontWeight: 'bold', marginTop: 'auto', paddingTop: '0.25rem' }}>{p.status}</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary)' }}>患者 ID: {p.id % 1000}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
+                                    {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -431,7 +413,7 @@ const QRScannerPage: React.FC = () => {
                         <div className="card-header">
                             <h3 className="card-title">セッション参加患者一覧</h3>
                             <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                患者をタップして詳細・処置画面へ進んでください
+                                患者をタップして詳細・アセスメント画面へ進んでください
                             </p>
                         </div>
                         <div className="card-body">
@@ -467,40 +449,24 @@ const QRScannerPage: React.FC = () => {
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
+                                                justifyContent: 'space-between',
                                                 gap: '1rem',
                                                 transition: 'all 0.2s ease',
                                                 backgroundColor: 'white'
                                             }}
                                             onClick={() => navigate(`/training/patient/${p.id}`)}
                                         >
-                                            <div style={{
-                                                width: '24px',
-                                                height: '24px',
-                                                borderRadius: '50%',
-                                                backgroundColor: `var(--triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'})`,
-                                                flexShrink: 0
-                                            }} />
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                                    No.{idx + 1} {p.name} <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {p.base_patient_id || p.id})</span>
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--gray-900)' }}>
+                                                    No.{idx + 1}
                                                 </div>
-                                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                                    年齢/性別: {p.age}歳 {p.gender} | {p.diagnosis || '（診断未設定）'}
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginTop: '0.25rem' }}>
+                                                    性別: {p.gender === 'M' ? '男性' : '女性'} | 年齢層: {Math.floor(p.age / 10) * 10}代
                                                 </div>
                                             </div>
-                                            <div style={{
-                                                padding: '0.3rem 0.6rem',
-                                                borderRadius: '4px',
-                                                fontSize: '0.8rem',
-                                                fontWeight: 'bold',
-                                                backgroundColor: `${getStatusColor(p.status)}20`,
-                                                color: getStatusColor(p.status),
-                                            }}>
-                                                {p.status}
-                                            </div>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M9 18L15 12L9 6" stroke="var(--gray-400)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: '600' }}>
+                                                詳細を開く →
+                                            </span>
                                         </div>
                                     ))}
                                 </div>

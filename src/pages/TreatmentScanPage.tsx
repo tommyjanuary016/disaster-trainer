@@ -331,6 +331,7 @@ const TreatmentScanPage: React.FC = () => {
         }
 
         try {
+            let latest: Patient | null = null
             if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage' || EXAM_IDS.includes(treatId)) {
                 // 即時完了手技：タイマーを作らず直接 completed_treatments に追加して即時反映する
                 const currentCompleted = patient?.completed_treatments || []
@@ -339,15 +340,23 @@ const TreatmentScanPage: React.FC = () => {
                 if (treatId === 'triage' && !patient?.triage_time_ms) updates.triage_time_ms = now
                 if (treatId === 'vitals' && !patient?.initial_vs_time_ms) updates.initial_vs_time_ms = now
                 await updatePatientFlags(pid, updates)
+                latest = patient ? { ...patient, ...updates } : null
             } else {
                 await startTreatmentTimer(pid, treatId, timerMinutes)
+                latest = patient ? {
+                    ...patient,
+                    status: '処置中',
+                    timer_started_at: now,
+                    timer_duration_ms: timerMinutes * 60 * 1000,
+                    applied_treatment_id: treatId
+                } : null
             }
 
-            // 処置完了/タイマー開始後、即座に患者詳細画面に遷移
+            // 処置完了/タイマー開始後、即座に患者詳細画面に遷移（更新データ直渡しで即時反映）
             setShowModal(false)
             setPendingProcedure(null)
             setPendingParsed(null)
-            navigate(`/training/patient/${patientId}`, { state: { refreshedAt: Date.now() } })
+            navigate(`/training/patient/${patientId}`, { state: { updatedPatient: latest } })
         } catch (err: any) {
             if (err.message === 'ALREADY_LOCKED') {
                 setError('⚠️ 他のプレイヤーが既に処置を開始しています。画面をリロードしてください。')

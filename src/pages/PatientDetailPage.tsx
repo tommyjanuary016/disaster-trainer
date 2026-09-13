@@ -1,4 +1,6 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Patient } from '../types/patient'
 import { usePatient } from '../hooks/usePatient'
 import { useTimer } from '../hooks/useTimer'
 import { useDeterioration } from '../hooks/useDeterioration'
@@ -27,8 +29,19 @@ const PROCEDURE_LABELS: Record<string, string> = {
 const PatientDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
+    const location = useLocation()
     const patientId = id ? parseInt(id) : null
-    const { patient, loading, error } = usePatient(patientId)
+    const { patient: fetchedPatient, loading, error } = usePatient(patientId)
+    const [overridePatient, setOverridePatient] = useState<Patient | null>(null)
+
+    useEffect(() => {
+        const statePatient = (location.state as { updatedPatient?: Patient })?.updatedPatient
+        if (statePatient) {
+            setOverridePatient(statePatient)
+        }
+    }, [location.state])
+
+    const patient = overridePatient || fetchedPatient
     const { isLocked, remainingDisplay } = useTimer(patient)
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
 

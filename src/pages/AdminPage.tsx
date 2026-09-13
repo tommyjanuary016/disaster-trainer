@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import ReactDOM from 'react-dom'
 import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, deleteAllCustomPatients } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import PatientForm from '../components/PatientForm'
@@ -40,17 +41,14 @@ const AdminPage: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false)
     const location = useLocation()
 
-    // 全経路パスワード保護ステート
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-        return sessionStorage.getItem('admin_authenticated') === 'true'
-    })
+    // 全経路パスワード保護ステート（画面アクセス毎に要求）
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
     const [authInput, setAuthInput] = useState('')
     const [authError, setAuthError] = useState(false)
 
     const handleAdminAuthSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (authInput === 'komonji') {
-            sessionStorage.setItem('admin_authenticated', 'true')
             setIsAuthenticated(true)
             setAuthError(false)
         } else {
@@ -419,7 +417,7 @@ const AdminPage: React.FC = () => {
                         )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => navigate('/training')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
+                        <button onClick={() => navigate('/role-select')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
                             訓練トップ
                         </button>
                         <button onClick={() => navigate('/')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
@@ -810,8 +808,8 @@ const AdminPage: React.FC = () => {
                 )}
             </main>
 
-            {/* QRコード共有モーダル（全画面オーバーレイ） */}
-            {showShareModal && currentSessionId && (
+            {/* QRコード共有モーダル（document.body 直下へPortalレンダリングして全画面中央配置） */}
+            {showShareModal && currentSessionId && ReactDOM.createPortal(
                 <div
                     style={{
                         position: 'fixed',
@@ -819,7 +817,7 @@ const AdminPage: React.FC = () => {
                         backgroundColor: 'rgba(15, 23, 42, 0.6)',
                         backdropFilter: 'blur(8px)',
                         WebkitBackdropFilter: 'blur(8px)',
-                        zIndex: 9999,
+                        zIndex: 99999,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -876,7 +874,8 @@ const AdminPage: React.FC = () => {
                             {copySuccess ? '✅ 参加URLをコピーしました！' : '📋 参加URLをコピー'}
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     )

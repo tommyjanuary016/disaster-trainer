@@ -1,4 +1,5 @@
 import React from 'react'
+import ReactDOM from 'react-dom'
 import { ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
 import { Patient } from '../types/patient'
@@ -73,7 +74,7 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
 
   const { badge, badgeClass, title, detail } = getLabel()
 
-  return (
+  return ReactDOM.createPortal(
     <div className="qr-modal-overlay" onClick={onCancel}>
       <div className="qr-modal" onClick={e => e.stopPropagation()}>
         {/* ヘッダー */}
@@ -111,7 +112,8 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

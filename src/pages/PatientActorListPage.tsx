@@ -31,7 +31,7 @@ const PatientActorListPage: React.FC = () => {
     return (
         <div className="actor-list-page">
             <header className="actor-page__header" style={{ marginBottom: '0.5rem' }}>
-                <button className="actor-page__back" onClick={() => navigate('/training')}>
+                <button className="actor-page__back" onClick={() => navigate('/role-select')}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M15 18l-6-6 6-6" />
                     </svg>

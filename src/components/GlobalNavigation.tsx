@@ -1,12 +1,10 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useRole, Role } from '../hooks/useRole'
 
 export const GlobalNavigation: React.FC = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const path = location.pathname
-    const { role, setRole } = useRole()
 
     // 管理画面（/admin）ではアプリトップのみ表示
     const isAdmin = path === '/admin'
@@ -61,25 +59,6 @@ export const GlobalNavigation: React.FC = () => {
                         <span>患者詳細</span>
                     </button>
                 )}
-            </div>
-
-            {/* ロール表示バッジ */}
-            <div className="global-navigation__role">
-                <span className="role-badge">
-                    <span className="role-badge__dot" />
-                    <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as Role)}
-                        className="role-badge__select"
-                    >
-                        <option value="未設定">未設定</option>
-                        <option value="医師">医師</option>
-                        <option value="看護師">看護師</option>
-                        <option value="放射線技師">放射線技師</option>
-                        <option value="臨床検査技師">臨床検査技師</option>
-                        <option value="管理者">管理者</option>
-                    </select>
-                </span>
             </div>
         </div>
         </>

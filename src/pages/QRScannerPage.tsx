@@ -25,9 +25,6 @@ const QRScannerPage: React.FC = () => {
     const [isLoadingPatients, setIsLoadingPatients] = useState(false)
     const [isTestMode, setIsTestMode] = useState(false)
     const [recentPatients, setRecentPatients] = useState<Patient[]>([])
-    // 連続トリアージモード
-    const [continuousMode, setContinuousMode] = useState(false)
-    const [continuousDoneCount, setContinuousDoneCount] = useState(0)
     const STORAGE_KEY = 'recent_scanned_patients'
 
     useEffect(() => {
@@ -161,15 +158,7 @@ const QRScannerPage: React.FC = () => {
     const handleConfirm = () => {
         if (pendingPatientId && pendingPatient) {
             addRecentPatient(pendingPatient)
-            if (continuousMode) {
-                // 連続モード：カルテへ遷移せず、モーダルを閉じてカメラを再起動
-                setContinuousDoneCount(c => c + 1)
-                setShowModal(false)
-                setPendingPatientId(null)
-                setPendingPatient(null)
-            } else {
-                navigate(`/training/patient/${pendingPatientId}`)
-            }
+            navigate(`/training/patient/${pendingPatientId}`)
         }
     }
 
@@ -233,27 +222,6 @@ const QRScannerPage: React.FC = () => {
                 {sessionTitle && (
                     <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary)' }}>
                         {sessionTitle}
-                    </span>
-                )}
-            </div>
-
-            {/* 連続トリアージモード トグル */}
-            <div style={{ margin: '0.75rem 1rem 0', padding: '0.6rem 1rem', background: continuousMode ? '#eff6ff' : 'var(--gray-50)', borderRadius: '10px', border: `2px solid ${continuousMode ? 'var(--primary)' : 'var(--gray-200)'}`, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', flex: 1, userSelect: 'none' }}>
-                    <input
-                        type="checkbox"
-                        checked={continuousMode}
-                        onChange={e => setContinuousMode(e.target.checked)}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
-                    />
-                    <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: continuousMode ? 'var(--primary)' : 'var(--gray-700)' }}>🔁 連続トリアージモード</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>ONにすると確認後にカメラが自動再起動します（大量患者対応）</div>
-                    </div>
-                </label>
-                {continuousMode && continuousDoneCount > 0 && (
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                        ✅ {continuousDoneCount}名完了
                     </span>
                 )}
             </div>
@@ -336,20 +304,38 @@ const QRScannerPage: React.FC = () => {
             {isTestMode ? (
                 <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
                     <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>検証用: 患者カード（直接アクセス）</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
-                        {sessionPatients.map((p, idx) => (
-                            <button
-                                key={p.id}
-                                className="button button--secondary"
-                                style={{ padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
-                                onClick={() => handleScan(String(p.id))}
-                            >
-                                <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--primary)' }}>No.{idx + 1}</span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
-                                    {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
-                                </span>
-                            </button>
-                        ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                        {sessionPatients.map((p, idx) => {
+                            const triageBg = p.triage_color === '赤' ? '#fef2f2' : p.triage_color === '黄' ? '#fefce8' : p.triage_color === '緑' ? '#f0fdf4' : '#f4f4f5'
+                            const triageColor = p.triage_color === '赤' ? '#b91c1c' : p.triage_color === '黄' ? '#854d0e' : p.triage_color === '緑' ? '#166534' : '#27272a'
+                            const triageBorder = p.triage_color === '赤' ? '#fca5a5' : p.triage_color === '黄' ? '#fde047' : p.triage_color === '緑' ? '#86efac' : '#a1a1aa'
+
+                            return (
+                                <button
+                                    key={p.id}
+                                    className="button button--secondary"
+                                    style={{ padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', position: 'relative' }}
+                                    onClick={() => handleScan(String(p.id))}
+                                >
+                                    <span style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: 'bold',
+                                        padding: '0.1rem 0.4rem',
+                                        borderRadius: '4px',
+                                        marginBottom: '0.25rem',
+                                        backgroundColor: triageBg,
+                                        color: triageColor,
+                                        border: `1px solid ${triageBorder}`
+                                    }}>
+                                        {p.triage_color || '未'}
+                                    </span>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-900)' }}>No.{idx + 1} {p.name}</span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
+                                        {p.age}歳 {p.gender === 'M' ? '男性' : '女性'}
+                                    </span>
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
             ) : (

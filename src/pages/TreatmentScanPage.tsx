@@ -138,7 +138,7 @@ const TreatmentScanPage: React.FC = () => {
         }
     }, [patientId])
 
-    const [isCameraActive, setIsCameraActive] = useState(true)
+    const [isCameraActive, setIsCameraActive] = useState(false)
 
     useEffect(() => {
         if (patientId) {
@@ -331,23 +331,23 @@ const TreatmentScanPage: React.FC = () => {
         }
 
         try {
-            await startTreatmentTimer(pid, treatId, timerMinutes)
-
-            // トリアージ手技完了時 → triage_time_ms を記録
-            if (treatId === 'triage' && patient && !patient.triage_time_ms) {
-                await updatePatientFlags(pid, { triage_time_ms: now })
+            if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage' || EXAM_IDS.includes(treatId)) {
+                // 即時完了手技：タイマーを作らず直接 completed_treatments に追加して即時反映する
+                const currentCompleted = patient?.completed_treatments || []
+                const newCompleted = currentCompleted.includes(treatId) ? currentCompleted : [...currentCompleted, treatId]
+                const updates: Partial<Patient> = { completed_treatments: newCompleted }
+                if (treatId === 'triage' && !patient?.triage_time_ms) updates.triage_time_ms = now
+                if (treatId === 'vitals' && !patient?.initial_vs_time_ms) updates.initial_vs_time_ms = now
+                await updatePatientFlags(pid, updates)
+            } else {
+                await startTreatmentTimer(pid, treatId, timerMinutes)
             }
 
-            // バイタルサイン測定手技完了時 → initial_vs_time_ms を記録
-            if (treatId === 'vitals' && patient && !patient.initial_vs_time_ms) {
-                await updatePatientFlags(pid, { initial_vs_time_ms: now })
-            }
-
-            // 処置タイマー開始後、即座に患者詳細画面に遷移
+            // 処置完了/タイマー開始後、即座に患者詳細画面に遷移
             setShowModal(false)
             setPendingProcedure(null)
             setPendingParsed(null)
-            navigate(`/training/patient/${patientId}`)
+            navigate(`/training/patient/${patientId}`, { state: { refreshedAt: Date.now() } })
         } catch (err: any) {
             if (err.message === 'ALREADY_LOCKED') {
                 setError('⚠️ 他のプレイヤーが既に処置を開始しています。画面をリロードしてください。')

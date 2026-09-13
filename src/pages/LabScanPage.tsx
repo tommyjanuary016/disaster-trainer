@@ -11,7 +11,7 @@ const LabScanPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null)
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
-    const [isCameraActive, setIsCameraActive] = useState(true)
+    const [isCameraActive, setIsCameraActive] = useState(false)
 
     useEffect(() => {
         if (patient || !isCameraActive) return

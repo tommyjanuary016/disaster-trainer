@@ -193,27 +193,31 @@ export async function fetchPatientFlexible(queryIdStr: string | number): Promise
 // すべての患者データを取得する（Admin用）
 // ------------------------------------------------------------------
 
-export async function fetchAllPatients(sessionIdOnly = true): Promise<Patient[]> {
+export async function fetchAllPatients(sessionIdOnly = true, explicitSessionId?: string): Promise<Patient[]> {
+    const targetSessionId = explicitSessionId !== undefined ? explicitSessionId : (sessionIdOnly ? activeSessionId : null)
     if (USE_MOCK || !db) {
         const all = Array.from(mockStore.values()).map(p => {
             checkAutoTimerExpiration(p)
             return p
         })
-        if (sessionIdOnly && activeSessionId) {
-            return all.filter(p => p.session_id === activeSessionId)
+        if (targetSessionId) {
+            return all.filter(p => p.session_id === targetSessionId)
         }
         return all
     }
     const collRef = collection(db, 'patients')
-    const snap = await getDocs(collRef)
+    let snap
+    if (targetSessionId) {
+        const q = query(collRef, where('session_id', '==', targetSessionId))
+        snap = await getDocs(q)
+    } else {
+        snap = await getDocs(collRef)
+    }
     let docs = snap.docs.map(doc => {
         const p = doc.data() as Patient
         checkAutoTimerExpiration(p)
         return p
     })
-    if (sessionIdOnly && activeSessionId) {
-        docs = docs.filter(p => p.session_id === activeSessionId)
-    }
     return docs
 }
 
@@ -227,7 +231,7 @@ export function subscribeToAllPatients(
     sessionIdOnly = true,
     explicitSessionId?: string // 明示的に指定する場合（未指定時は activeSessionId を使用）
 ): Unsubscribe {
-    const targetSessionId = explicitSessionId ?? (sessionIdOnly ? activeSessionId : null)
+    const targetSessionId = explicitSessionId !== undefined ? explicitSessionId : (sessionIdOnly ? activeSessionId : null)
     if (USE_MOCK || !db) {
         // モックモード: 初回の通知
         const notify = () => {

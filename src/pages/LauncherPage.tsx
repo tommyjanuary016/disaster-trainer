@@ -49,6 +49,7 @@ const LauncherPage: React.FC = () => {
     const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (passwordInput === 'komonji') {
+            sessionStorage.setItem('admin_authenticated', 'true')
             setShowPasswordModal(false)
             // パスワード成功後、管理メニューモーダルを表示
             setIsLoadingSessions(true)
@@ -298,7 +299,27 @@ const LauncherPage: React.FC = () => {
                     </button>
                 </div>
 
-                <p className="launcher-version">DISASTER LOGIC {APP_VERSION} (改訂日: {APP_LAST_UPDATED})</p>
+                <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '999px',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        border: '1px solid var(--gray-300)',
+                        boxShadow: 'var(--shadow-sm)',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        color: 'var(--gray-700)'
+                    }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
+                        DISASTER LOGIC {APP_VERSION}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>
+                            (最終更新: {APP_LAST_UPDATED})
+                        </span>
+                    </span>
+                </div>
             </div>
         </div>
     )

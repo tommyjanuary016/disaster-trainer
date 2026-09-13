@@ -1,7 +1,7 @@
 // 患者データをFirestoreからリアルタイム購読するカスタムフック
 import { useState, useEffect } from 'react'
 import { Patient } from '../types/patient'
-import { subscribeToPatient } from '../lib/firestore'
+import { subscribeToPatient, fetchPatient } from '../lib/firestore'
 
 interface UsePatientResult {
     patient: Patient | null
@@ -23,13 +23,28 @@ export function usePatient(patientId: number | null): UsePatientResult {
         setLoading(true)
         setError(null)
 
+        let isMounted = true
+
+        // マウント時に即座に最新データをダイレクト取得（ナビゲーション後の反映遅延対策）
+        fetchPatient(patientId).then((fresh: Patient | null) => {
+            if (isMounted && fresh) {
+                setPatient(fresh)
+                setLoading(false)
+            }
+        }).catch((e: unknown) => console.error(e))
+
         try {
             const unsubscribe = subscribeToPatient(patientId, (data) => {
-                setPatient(data)
-                setLoading(false)
+                if (isMounted) {
+                    setPatient(data)
+                    setLoading(false)
+                }
             })
 
-            return () => unsubscribe()
+            return () => {
+                isMounted = false
+                unsubscribe()
+            }
         } catch (e) {
             setError('患者データの取得に失敗しました')
             setLoading(false)

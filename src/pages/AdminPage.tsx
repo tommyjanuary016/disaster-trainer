@@ -40,6 +40,25 @@ const AdminPage: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false)
     const location = useLocation()
 
+    // 全経路パスワード保護ステート
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        return sessionStorage.getItem('admin_authenticated') === 'true'
+    })
+    const [authInput, setAuthInput] = useState('')
+    const [authError, setAuthError] = useState(false)
+
+    const handleAdminAuthSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (authInput === 'komonji') {
+            sessionStorage.setItem('admin_authenticated', 'true')
+            setIsAuthenticated(true)
+            setAuthError(false)
+        } else {
+            setAuthError(true)
+            setAuthInput('')
+        }
+    }
+
     const shareUrl = currentSessionId ? `${window.location.origin}/?session_id=${currentSessionId}` : ''
     const qrUrl = shareUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}` : ''
 
@@ -72,12 +91,18 @@ const AdminPage: React.FC = () => {
         return () => unsubscribe()
     }, [displaySessionId])
 
-    // セッションタイトルを取得する
+    // セッションタイトルおよび終了状態を取得する
     useEffect(() => {
         const targetId = displaySessionId
         if (targetId) {
             fetchTrainingSession(targetId).then(session => {
-                if (session) setCurrentSessionTitle(session.title || null)
+                if (session) {
+                    setCurrentSessionTitle(session.title || null)
+                    if (session.isActive === false) {
+                        setSessionEnded(true)
+                        setCurrentSessionId(null)
+                    }
+                }
             }).catch(e => console.error('セッション情報取得エラー', e))
         } else {
             setCurrentSessionTitle(null)
@@ -239,6 +264,88 @@ const AdminPage: React.FC = () => {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1.5rem'
+            }}>
+                <div style={{
+                    backgroundColor: 'var(--white)',
+                    borderRadius: '16px',
+                    padding: '2rem',
+                    maxWidth: '380px',
+                    width: '100%',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
+                    textAlign: 'center'
+                }}>
+                    <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        color: 'var(--danger)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 1rem'
+                    }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" strokeLinecap="round"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--gray-900)' }}>管理者認証が必要</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.5rem' }}>
+                        管理画面にアクセスするにはパスワードを入力してください。<br/>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>（病院名小文字）</span>
+                    </p>
+                    <form onSubmit={handleAdminAuthSubmit}>
+                        <input
+                            type="password"
+                            placeholder="パスワードを入力"
+                            value={authInput}
+                            onChange={(e) => setAuthInput(e.target.value)}
+                            className="input"
+                            style={{ marginBottom: '1rem', textAlign: 'center', fontSize: '1.1rem', letterSpacing: '0.2em' }}
+                            autoFocus
+                        />
+                        {authError && (
+                            <p style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                                ❌ パスワードが違います
+                            </p>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                type="button"
+                                className="button button--secondary"
+                                onClick={() => navigate('/')}
+                                style={{ flex: 1 }}
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                type="submit"
+                                className="button button--primary"
+                                style={{ flex: 1 }}
+                            >
+                                認証する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )
     }
 
     return (

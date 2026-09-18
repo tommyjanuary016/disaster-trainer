@@ -531,6 +531,7 @@ export interface SessionConfig {
     useBasePatients: boolean     // 基礎25名（アプリ内蔵）を使用するか
     examLockTimeMinutes: number  // 検査（画像・採血など）のデフォルト拘束時間
     treatmentLockTimeMinutes: number // 手技（点滴・外科処置など）のデフォルト拘束時間
+    customProcedureLockTimes?: Record<string, number> // 手技別個別拘束時間設定 (分)
     isTestMode?: boolean         // 動作確認モード：全拘束時間を5秒に短縮
     selectedScenarios?: string[] // 使用するシナリオタグのリスト（空なら全対象）
     useExactScenarioMatch?: boolean // 指定したシナリオの患者を「そのまま全員」使用する（割合抽出を無視）
@@ -634,13 +635,16 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
         timer_duration_ms: null,
         applied_treatment_id: null,
         completed_treatments: [],
-        // 動作確認モード時は拘束時間を一律5秒に強制上書き
-        ...(config.isTestMode && p.required_treatments ? {
-            required_treatments: p.required_treatments.map(rt => ({
-                ...rt,
-                lock_timer_minutes: TEST_MODE_LOCK_MINUTES
-            }))
-        } : {})
+        // 動作確認モード時は拘束時間を一律5秒に強制上書き、または個別カスタム時間が設定されていればそれを適用
+        required_treatments: p.required_treatments?.map(rt => {
+            if (config.isTestMode) {
+                return { ...rt, lock_timer_minutes: TEST_MODE_LOCK_MINUTES }
+            }
+            if (config.customProcedureLockTimes && config.customProcedureLockTimes[rt.treatment_id] !== undefined) {
+                return { ...rt, lock_timer_minutes: config.customProcedureLockTimes[rt.treatment_id] }
+            }
+            return rt
+        }) || []
     }))
 
     // セッションメタデータを作成

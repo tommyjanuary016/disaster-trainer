@@ -272,7 +272,7 @@ const PatientDetailPage: React.FC = () => {
 
 
                 {/* ===== 所見詳細 ===== */}
-                <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} consciousnessLevel={patient.consciousness_level} />
+                <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} consciousnessLevel={patient.consciousness_level} patient={patient} />
 
                 {/* ===== FASTエコー結果（FAST実施済み時にアンロック） ===== */}
                 {uniqueCompleted.includes('fast') && patient.findings.fast && (

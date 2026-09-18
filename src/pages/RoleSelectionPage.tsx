@@ -80,13 +80,24 @@ const RoleSelectionPage: React.FC = () => {
 
     if (!activeSessionId) {
         return (
-            <div className="role-selection-page">
-                <div className="role-selection__error">
-                    <div className="role-selection__error-icon">⚠</div>
-                    <p className="role-selection__error-text">セッションが選択されていません</p>
-                    <button className="button button--primary" style={{ marginTop: '1.5rem' }} onClick={() => navigate('/')}>
-                        トップに戻る
-                    </button>
+            <div className="role-selection-page" style={{ padding: '2rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="card card--elevated" style={{ maxWidth: '420px', width: '100%', textAlign: 'center', padding: '2rem', borderRadius: '16px' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏁</div>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--gray-900)', marginBottom: '0.5rem' }}>
+                        訓練セッション終了
+                    </h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--gray-600)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                        現在アクティブな訓練セッションはありません。<br />
+                        訓練が終了したか、参加用URLから再度アクセスしてください。
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <button className="button button--primary" onClick={() => navigate('/')}>
+                            🏠 アプリトップに戻る
+                        </button>
+                        <button className="button button--secondary" onClick={() => navigate('/admin')}>
+                            ⚙️ 管理者画面へ
+                        </button>
+                    </div>
                 </div>
             </div>
         )

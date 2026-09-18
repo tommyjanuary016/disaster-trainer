@@ -107,11 +107,16 @@ const TreatmentScanPage: React.FC = () => {
     const [isTestMode, setIsTestMode] = useState(false)
     const TEST_LOCK_MIN = 5 / 60 // 5秒
 
+    const [sessionMeta, setSessionMeta] = useState<any>(null)
+
     useEffect(() => {
-        // セッションの isTestMode フラグを取得
+        // セッションのメタデータおよび isTestMode フラグを取得
         if (activeSessionId) {
             fetchTrainingSession(activeSessionId).then(session => {
-                if (session?.isTestMode) setIsTestMode(true)
+                if (session) {
+                    setSessionMeta(session)
+                    if (session.isTestMode) setIsTestMode(true)
+                }
             }).catch(e => console.error(e))
         }
     }, [])
@@ -219,13 +224,22 @@ const TreatmentScanPage: React.FC = () => {
 
         // 手技名を決定
         let treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
+        
+        // 拘束時間の計算（セッション個別設定 > 項目種別デフォルト > 全体デフォルト）
         let initialMinutes = isTestMode ? TEST_LOCK_MIN : 5
+        const customLockTimes = sessionMeta?.config?.customProcedureLockTimes
+        if (customLockTimes && customLockTimes[treatmentId] !== undefined) {
+            initialMinutes = isTestMode ? TEST_LOCK_MIN : customLockTimes[treatmentId]
+        } else if (EXAM_IDS.includes(treatmentId)) {
+            initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.examLockTimeMinutes ?? 3)
+        } else if (isTreatmentOption(treatmentId)) {
+            initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.treatmentLockTimeMinutes ?? 5)
+        }
 
         if (patient) {
             const matched = patient.required_treatments?.find(rt => rt.treatment_id === treatmentId)
-            if (matched) {
+            if (matched && matched.lock_timer_minutes !== undefined) {
                 treatmentName = matched.treatment_name
-                // テストモードは必須処置の拘束時間も上書き
                 initialMinutes = isTestMode ? TEST_LOCK_MIN : matched.lock_timer_minutes
             } else {
                 treatmentName = PROCEDURE_NAMES[treatmentId] ?? '各種処置'
@@ -332,8 +346,8 @@ const TreatmentScanPage: React.FC = () => {
 
         try {
             let latest: Patient | null = null
-            if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage' || EXAM_IDS.includes(treatId)) {
-                // 即時完了手技：タイマーを作らず直接 completed_treatments に追加して即時反映する
+            if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage') {
+                // 即時完了手技：バイタル測定等のみタイマーを作らず直接 completed_treatments に追加して即時反映する
                 const currentCompleted = patient?.completed_treatments || []
                 const newCompleted = currentCompleted.includes(treatId) ? currentCompleted : [...currentCompleted, treatId]
                 const updates: Partial<Patient> = { completed_treatments: newCompleted }

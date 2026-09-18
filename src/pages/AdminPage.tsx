@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/csv'
 import DashboardTab from '../components/DashboardTab'
 import { exportToGoogleSheets } from '../lib/sheetsExport'
+import { PROCEDURE_NAMES } from './TreatmentScanPage'
 
 const AdminPage: React.FC = () => {
     const [patients, setPatients] = useState<Patient[]>([])
@@ -563,132 +564,214 @@ const AdminPage: React.FC = () => {
             </header>
 
             <main className="page__content">
-                {isSessionModalOpen && (
-                    <div className="card card--elevated" style={{ marginBottom: '2rem' }}>
-                        <h3 className="card__title">新規訓練セッション設定</h3>
-                        <div className="form-grid">
-                            <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                <label className="form-label">訓練タイトル</label>
-                                <input type="text" placeholder="例: 2026年度 災害時BCP訓練" value={sessionConfig.title} onChange={e => setSessionConfig({...sessionConfig, title: e.target.value})} className="input" />
+                {isSessionModalOpen && ReactDOM.createPortal(
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                            zIndex: 99999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '1rem',
+                            overflowY: 'auto'
+                        }}
+                        onClick={() => setIsSessionModalOpen(false)}
+                    >
+                        <div
+                            className="card card--elevated"
+                            style={{
+                                maxWidth: '560px',
+                                width: '100%',
+                                maxHeight: '90vh',
+                                overflowY: 'auto',
+                                margin: 'auto',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+                                background: '#ffffff',
+                                borderRadius: '16px',
+                                padding: '1.5rem'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 className="card__title" style={{ margin: 0 }}>新規訓練セッション設定</h3>
+                                <button
+                                    onClick={() => setIsSessionModalOpen(false)}
+                                    style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}
+                                >
+                                    &times;
+                                </button>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">対象患者数</label>
-                                <input type="number" min="1" value={sessionConfig.totalPatients} onChange={e => setSessionConfig({...sessionConfig, totalPatients: parseInt(e.target.value) || 10})} className="input" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">搬入順 (トリアージ優先)</label>
-                                <select value={sessionConfig.sortBySeverity ? 'yes' : 'no'} onChange={e => setSessionConfig({...sessionConfig, sortBySeverity: e.target.value === 'yes'})} className="input">
-                                    <option value="yes">重症度順（優先度高い順）</option>
-                                    <option value="no">完全ランダム</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">検査デフォルト拘束時間 (分)</label>
-                                <input type="number" min="0" value={sessionConfig.examLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, examLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
-                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>X線, CT, 採血などに適用</span>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">手技デフォルト拘束時間 (分)</label>
-                                <input type="number" min="0" value={sessionConfig.treatmentLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, treatmentLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
-                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>点滴や外科処置などに適用</span>
-                            </div>
-                            <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                <label className="form-label">基礎患者（25名）の使用</label>
-                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0'}}>
-                                    <input
-                                        type="checkbox"
-                                        checked={sessionConfig.useBasePatients}
-                                        onChange={e => setSessionConfig({...sessionConfig, useBasePatients: e.target.checked})}
-                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
-                                    />
-                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>アプリ内蔵の基礎患者25名をプールに含める</span>
-                                </label>
-                                {!sessionConfig.useBasePatients && (
-                                    <p style={{fontSize: '0.78rem', color: 'var(--warning)', marginTop: '0.2rem'}}>
-                                        ⚠ Firestoreのカスタム患者のみが対象になります
-                                    </p>
-                                )}
-                            </div>
-                            <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                <label className="form-label">動作確認モード（検証用）</label>
-                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
-                                    <input
-                                        type="checkbox"
-                                        checked={sessionConfig.isTestMode || false}
-                                        onChange={e => setSessionConfig({...sessionConfig, isTestMode: e.target.checked})}
-                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
-                                    />
-                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>検証用モードを有効にする</span>
-                                </label>
-                            </div>
-                            <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                <label className="form-label">対象シナリオ (空欄で全て)</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
-                                    {availableScenarios.map(tag => (
-                                        <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={sessionConfig.selectedScenarios?.includes(tag) || false}
-                                                onChange={e => {
-                                                    const current = sessionConfig.selectedScenarios || []
-                                                    if (e.target.checked) {
-                                                        setSessionConfig({...sessionConfig, selectedScenarios: [...current, tag]})
-                                                    } else {
-                                                        setSessionConfig({...sessionConfig, selectedScenarios: current.filter(t => t !== tag)})
-                                                    }
-                                                }}
-                                            />
-                                            {tag}
-                                        </label>
-                                    ))}
+
+                            <div className="form-grid">
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">訓練タイトル</label>
+                                    <input type="text" placeholder="例: 2026年度 災害時BCP訓練" value={sessionConfig.title} onChange={e => setSessionConfig({...sessionConfig, title: e.target.value})} className="input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">対象患者数</label>
+                                    <input type="number" min="1" value={sessionConfig.totalPatients} onChange={e => setSessionConfig({...sessionConfig, totalPatients: parseInt(e.target.value) || 10})} className="input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">搬入順 (トリアージ優先)</label>
+                                    <select value={sessionConfig.sortBySeverity ? 'yes' : 'no'} onChange={e => setSessionConfig({...sessionConfig, sortBySeverity: e.target.value === 'yes'})} className="input">
+                                        <option value="yes">重症度順（優先度高い順）</option>
+                                        <option value="no">完全ランダム</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">検査デフォルト拘束時間 (分)</label>
+                                    <input type="number" min="0" value={sessionConfig.examLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, examLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
+                                    <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>X線, CT, 採血などに適用</span>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">手技デフォルト拘束時間 (分)</label>
+                                    <input type="number" min="0" value={sessionConfig.treatmentLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, treatmentLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
+                                    <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>点滴や外科処置などに適用</span>
+                                </div>
+
+                                {/* 手技別個別時間設定アコーディオン */}
+                                <div className="form-group" style={{gridColumn: 'span 2', marginTop: '0.5rem'}}>
+                                    <details style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                        <summary style={{ fontWeight: 'bold', fontSize: '0.88rem', cursor: 'pointer', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            ⚙️ 手技別の個別拘束時間をカスタマイズする（任意）
+                                        </summary>
+                                        <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+                                            指定した手技のみ個別の拘束時間（分）が適用されます。空欄または未設定の手技は上記の一律デフォルト時間が適用されます。
+                                        </p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                                            {Object.entries(PROCEDURE_NAMES as Record<string, string>).map(([id, name]) => (
+                                                <div key={id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: '#fff', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                                                    <span style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.5"
+                                                            placeholder={`${['head_and_neck','chest','abdomen_and_pelvis','limbs','fast','ample','background'].includes(id) ? sessionConfig.examLockTimeMinutes : sessionConfig.treatmentLockTimeMinutes}分`}
+                                                            value={sessionConfig.customProcedureLockTimes?.[id] ?? ''}
+                                                            onChange={e => {
+                                                                const val = e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0)
+                                                                const updated = { ...(sessionConfig.customProcedureLockTimes || {}) }
+                                                                if (val === undefined) {
+                                                                    delete updated[id]
+                                                                } else {
+                                                                    updated[id] = val
+                                                                }
+                                                                setSessionConfig({ ...sessionConfig, customProcedureLockTimes: updated })
+                                                            }}
+                                                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #cbd5e1', width: '70px' }}
+                                                        />
+                                                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>分</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </details>
+                                </div>
+
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">基礎患者（25名）の使用</label>
+                                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0'}}>
+                                        <input
+                                            type="checkbox"
+                                            checked={sessionConfig.useBasePatients}
+                                            onChange={e => setSessionConfig({...sessionConfig, useBasePatients: e.target.checked})}
+                                            style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                        />
+                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>アプリ内蔵の基礎患者25名をプールに含める</span>
+                                    </label>
+                                    {!sessionConfig.useBasePatients && (
+                                        <p style={{fontSize: '0.78rem', color: 'var(--warning)', marginTop: '0.2rem'}}>
+                                            ⚠ Firestoreのカスタム患者のみが対象になります
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">動作確認モード（検証用）</label>
+                                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
+                                        <input
+                                            type="checkbox"
+                                            checked={sessionConfig.isTestMode || false}
+                                            onChange={e => setSessionConfig({...sessionConfig, isTestMode: e.target.checked})}
+                                            style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                        />
+                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>検証用モードを有効にする</span>
+                                    </label>
+                                </div>
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">対象シナリオ (空欄で全て)</label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
+                                        {availableScenarios.map(tag => (
+                                            <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={sessionConfig.selectedScenarios?.includes(tag) || false}
+                                                    onChange={e => {
+                                                        const current = sessionConfig.selectedScenarios || []
+                                                        if (e.target.checked) {
+                                                            setSessionConfig({...sessionConfig, selectedScenarios: [...current, tag]})
+                                                        } else {
+                                                            setSessionConfig({...sessionConfig, selectedScenarios: current.filter(t => t !== tag)})
+                                                        }
+                                                    }}
+                                                />
+                                                {tag}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">抽出モード</label>
+                                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
+                                        <input
+                                            type="checkbox"
+                                            checked={sessionConfig.useExactScenarioMatch || false}
+                                            onChange={e => setSessionConfig({...sessionConfig, useExactScenarioMatch: e.target.checked})}
+                                            style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                        />
+                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>プールにある対象患者を「そのまま全員」使う (割合・人数指定を無視)</span>
+                                    </label>
                                 </div>
                             </div>
-                            <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                <label className="form-label">抽出モード</label>
-                                <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
-                                    <input
-                                        type="checkbox"
-                                        checked={sessionConfig.useExactScenarioMatch || false}
-                                        onChange={e => setSessionConfig({...sessionConfig, useExactScenarioMatch: e.target.checked})}
-                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
-                                    />
-                                    <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>プールにある対象患者を「そのまま全員」使う (割合・人数指定を無視)</span>
-                                </label>
+                            
+                            <div style={{ opacity: sessionConfig.useExactScenarioMatch ? 0.4 : 1, pointerEvents: sessionConfig.useExactScenarioMatch ? 'none' : 'auto' }}>
+                                <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
+                                <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
+                                    <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
+                                    <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
+                                    <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
+                                    <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
+                                </div>
+                                <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
+                                        <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
+                                        <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
+                                        <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
+                                        <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button onClick={handleCreateSession} className="button button--primary" style={{ flex: 1 }}>生成実行</button>
+                                <button onClick={() => setIsSessionModalOpen(false)} className="button button--secondary" style={{ flex: 1 }}>キャンセル</button>
                             </div>
                         </div>
-                        
-                        <div style={{ opacity: sessionConfig.useExactScenarioMatch ? 0.4 : 1, pointerEvents: sessionConfig.useExactScenarioMatch ? 'none' : 'auto' }}>
-                            <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
-                            <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
-                                <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
-                                <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
-                                <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
-                                <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
-                            </div>
-                            <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
-                                <div className="form-group">
-                                    <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
-                                    <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
-                                    <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
-                                    <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
-                                    <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
-                                </div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button onClick={handleCreateSession} className="button button--primary">生成実行</button>
-                            <button onClick={() => setIsSessionModalOpen(false)} className="button button--secondary">キャンセル</button>
-                        </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
                 {isFormVisible ? (
                     <PatientForm

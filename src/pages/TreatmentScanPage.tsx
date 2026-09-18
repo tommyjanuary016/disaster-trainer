@@ -288,8 +288,14 @@ const TreatmentScanPage: React.FC = () => {
             return
         }
 
-        // 必須IVルートの有無判定
+        // 治療処置（点滴・挿管・手術等）が既に完了している場合は重複実施不可
         const completed = patient.completed_treatments || []
+        if (isTreatmentOption(resolved.treatment_id) && completed.includes(resolved.treatment_id)) {
+            setError('※ この治療処置は既に完了しています。同じ治療処置を重複して行うことはできません。')
+            return
+        }
+
+        // 必須IVルートの有無判定
         const hasAnyIvAccess = completed.includes('iv_access') || completed.includes('cv_access') || completed.includes('quinton_catheter') || completed.includes('iv_access_2')
 
         const requireIvMeds = ['vasopressor', 'antihypertensive', 'antibiotics', 'sedation', 'iv_fluid', 'blood_transfusion']
@@ -517,53 +523,53 @@ const TreatmentScanPage: React.FC = () => {
                                     </optgroup>
 
                                     <optgroup label="治療処置: 気道・呼吸" disabled={!hasVitalsOrExams}>
-                                        <option value="oxygen">{PROCEDURE_NAMES.oxygen}</option>
-                                        <option value="hfnc">{PROCEDURE_NAMES.hfnc}</option>
-                                        <option value="intubation">{PROCEDURE_NAMES.intubation}</option>
-                                        <option value="surgical_airway">{PROCEDURE_NAMES.surgical_airway}</option>
-                                        <option value="ventilator">{PROCEDURE_NAMES.ventilator}</option>
-                                        <option value="needle_decompression">{PROCEDURE_NAMES.needle_decompression}</option>
-                                        <option value="chest_tube">{PROCEDURE_NAMES.chest_tube}</option>
-                                        <option value="gauze_towel_fixation">{PROCEDURE_NAMES.gauze_towel_fixation}</option>
-                                        <option value="three_sided_taping">{PROCEDURE_NAMES.three_sided_taping}</option>
+                                        <option value="oxygen" disabled={completedList.includes('oxygen')}>{PROCEDURE_NAMES.oxygen}{completedList.includes('oxygen') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="hfnc" disabled={completedList.includes('hfnc')}>{PROCEDURE_NAMES.hfnc}{completedList.includes('hfnc') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="intubation" disabled={completedList.includes('intubation')}>{PROCEDURE_NAMES.intubation}{completedList.includes('intubation') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="surgical_airway" disabled={completedList.includes('surgical_airway')}>{PROCEDURE_NAMES.surgical_airway}{completedList.includes('surgical_airway') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="ventilator" disabled={completedList.includes('ventilator')}>{PROCEDURE_NAMES.ventilator}{completedList.includes('ventilator') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="needle_decompression" disabled={completedList.includes('needle_decompression')}>{PROCEDURE_NAMES.needle_decompression}{completedList.includes('needle_decompression') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="chest_tube" disabled={completedList.includes('chest_tube')}>{PROCEDURE_NAMES.chest_tube}{completedList.includes('chest_tube') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="gauze_towel_fixation" disabled={completedList.includes('gauze_towel_fixation')}>{PROCEDURE_NAMES.gauze_towel_fixation}{completedList.includes('gauze_towel_fixation') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="three_sided_taping" disabled={completedList.includes('three_sided_taping')}>{PROCEDURE_NAMES.three_sided_taping}{completedList.includes('three_sided_taping') ? ' (✅完了済み)' : ''}</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 循環・輸液・輸血" disabled={!hasVitalsOrExams}>
-                                        <option value="iv_access">{PROCEDURE_NAMES.iv_access}</option>
-                                        {completedList.includes('iv_access') && <option value="iv_access_2">{PROCEDURE_NAMES.iv_access_2}</option>}
-                                        <option value="cv_access">{PROCEDURE_NAMES.cv_access}</option>
-                                        <option value="quinton_catheter">{PROCEDURE_NAMES.quinton_catheter}</option>
+                                        <option value="iv_access" disabled={completedList.includes('iv_access')}>{PROCEDURE_NAMES.iv_access}{completedList.includes('iv_access') ? ' (✅完了済み)' : ''}</option>
+                                        {completedList.includes('iv_access') && <option value="iv_access_2" disabled={completedList.includes('iv_access_2')}>{PROCEDURE_NAMES.iv_access_2}{completedList.includes('iv_access_2') ? ' (✅完了済み)' : ''}</option>}
+                                        <option value="cv_access" disabled={completedList.includes('cv_access')}>{PROCEDURE_NAMES.cv_access}{completedList.includes('cv_access') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="quinton_catheter" disabled={completedList.includes('quinton_catheter')}>{PROCEDURE_NAMES.quinton_catheter}{completedList.includes('quinton_catheter') ? ' (✅完了済み)' : ''}</option>
                                         
-                                        <option value="iv_fluid" disabled={!hasAnyIvAccess}>{PROCEDURE_NAMES.iv_fluid}</option>
-                                        <option value="blood_transfusion" disabled={!hasAnyIvAccess}>{PROCEDURE_NAMES.blood_transfusion}</option>
-                                        <option value="tourniquet">{PROCEDURE_NAMES.tourniquet}</option>
+                                        <option value="iv_fluid" disabled={!hasAnyIvAccess || completedList.includes('iv_fluid')}>{PROCEDURE_NAMES.iv_fluid}{completedList.includes('iv_fluid') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="blood_transfusion" disabled={!hasAnyIvAccess || completedList.includes('blood_transfusion')}>{PROCEDURE_NAMES.blood_transfusion}{completedList.includes('blood_transfusion') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="tourniquet" disabled={completedList.includes('tourniquet')}>{PROCEDURE_NAMES.tourniquet}{completedList.includes('tourniquet') ? ' (✅完了済み)' : ''}</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 薬剤投与 (※ルート確保必須)" disabled={!hasVitalsOrExams || !hasAnyIvAccess}>
-                                        <option value="vasopressor">{PROCEDURE_NAMES.vasopressor}</option>
-                                        <option value="antihypertensive">{PROCEDURE_NAMES.antihypertensive}</option>
-                                        <option value="antibiotics">{PROCEDURE_NAMES.antibiotics}</option>
-                                        <option value="sedation">{PROCEDURE_NAMES.sedation}</option>
+                                        <option value="vasopressor" disabled={completedList.includes('vasopressor')}>{PROCEDURE_NAMES.vasopressor}{completedList.includes('vasopressor') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="antihypertensive" disabled={completedList.includes('antihypertensive')}>{PROCEDURE_NAMES.antihypertensive}{completedList.includes('antihypertensive') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="antibiotics" disabled={completedList.includes('antibiotics')}>{PROCEDURE_NAMES.antibiotics}{completedList.includes('antibiotics') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="sedation" disabled={completedList.includes('sedation')}>{PROCEDURE_NAMES.sedation}{completedList.includes('sedation') ? ' (✅完了済み)' : ''}</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 蘇生・外科的介入・高度医療" disabled={!hasVitalsOrExams}>
-                                        <option value="pelvic_binder">{PROCEDURE_NAMES.pelvic_binder}</option>
-                                        <option value="cpr">{PROCEDURE_NAMES.cpr}</option>
-                                        <option value="fasciotomy">{PROCEDURE_NAMES.fasciotomy}</option>
-                                        <option value="open_cardiac_massage">{PROCEDURE_NAMES.open_cardiac_massage}</option>
-                                        <option value="aortic_cross_clamping">{PROCEDURE_NAMES.aortic_cross_clamping}</option>
-                                        <option value="exploratory_laparotomy">{PROCEDURE_NAMES.exploratory_laparotomy}</option>
-                                        <option value="emergency_c_section">{PROCEDURE_NAMES.emergency_c_section}</option>
-                                        <option value="iabo">{PROCEDURE_NAMES.iabo}</option>
-                                        <option value="iabp">{PROCEDURE_NAMES.iabp}</option>
-                                        <option value="pcps">{PROCEDURE_NAMES.pcps}</option>
+                                        <option value="pelvic_binder" disabled={completedList.includes('pelvic_binder')}>{PROCEDURE_NAMES.pelvic_binder}{completedList.includes('pelvic_binder') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="cpr" disabled={completedList.includes('cpr')}>{PROCEDURE_NAMES.cpr}{completedList.includes('cpr') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="fasciotomy" disabled={completedList.includes('fasciotomy')}>{PROCEDURE_NAMES.fasciotomy}{completedList.includes('fasciotomy') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="open_cardiac_massage" disabled={completedList.includes('open_cardiac_massage')}>{PROCEDURE_NAMES.open_cardiac_massage}{completedList.includes('open_cardiac_massage') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="aortic_cross_clamping" disabled={completedList.includes('aortic_cross_clamping')}>{PROCEDURE_NAMES.aortic_cross_clamping}{completedList.includes('aortic_cross_clamping') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="exploratory_laparotomy" disabled={completedList.includes('exploratory_laparotomy')}>{PROCEDURE_NAMES.exploratory_laparotomy}{completedList.includes('exploratory_laparotomy') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="emergency_c_section" disabled={completedList.includes('emergency_c_section')}>{PROCEDURE_NAMES.emergency_c_section}{completedList.includes('emergency_c_section') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="iabo" disabled={completedList.includes('iabo')}>{PROCEDURE_NAMES.iabo}{completedList.includes('iabo') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="iabp" disabled={completedList.includes('iabp')}>{PROCEDURE_NAMES.iabp}{completedList.includes('iabp') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="pcps" disabled={completedList.includes('pcps')}>{PROCEDURE_NAMES.pcps}{completedList.includes('pcps') ? ' (✅完了済み)' : ''}</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 整形・その他" disabled={!hasVitalsOrExams}>
-                                        <option value="pericardiocentesis">{PROCEDURE_NAMES.pericardiocentesis}</option>
-                                        <option value="splint">{PROCEDURE_NAMES.splint}</option>
-                                        <option value="traction">{PROCEDURE_NAMES.traction}</option>
-                                        <option value="suture">{PROCEDURE_NAMES.suture}</option>
+                                        <option value="pericardiocentesis" disabled={completedList.includes('pericardiocentesis')}>{PROCEDURE_NAMES.pericardiocentesis}{completedList.includes('pericardiocentesis') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="splint" disabled={completedList.includes('splint')}>{PROCEDURE_NAMES.splint}{completedList.includes('splint') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="traction" disabled={completedList.includes('traction')}>{PROCEDURE_NAMES.traction}{completedList.includes('traction') ? ' (✅完了済み)' : ''}</option>
+                                        <option value="suture" disabled={completedList.includes('suture')}>{PROCEDURE_NAMES.suture}{completedList.includes('suture') ? ' (✅完了済み)' : ''}</option>
                                     </optgroup>
                                 </select>
                                 {!hasVitalsOrExams && (

@@ -123,6 +123,7 @@ const PatientDetailPage: React.FC = () => {
                     remainingDisplay={remainingDisplay}
                     treatmentName={patient.applied_treatment_id || '処置'}
                     patientId={patientId}
+                    patient={patient}
                 />
             )}
 

@@ -127,7 +127,7 @@ const PatientActorListPage: React.FC = () => {
                                             </span>
                                         </div>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
-                                            番号: {index + 1}番 | {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
+                                            番号: {index + 1}番 (ID: {patient.base_patient_id || patient.id}) | {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
                                         </div>
                                         {patient.findings?.background && (
                                             <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>

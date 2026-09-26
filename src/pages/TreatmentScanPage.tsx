@@ -355,7 +355,9 @@ const TreatmentScanPage: React.FC = () => {
             if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage') {
                 // 即時完了手技：バイタル測定等のみタイマーを作らず直接 completed_treatments に追加して即時反映する
                 const currentCompleted = patient?.completed_treatments || []
-                const newCompleted = currentCompleted.includes(treatId) ? currentCompleted : [...currentCompleted, treatId]
+                const newCompleted = (treatId === 'vitals')
+                    ? [...currentCompleted, treatId]
+                    : (currentCompleted.includes(treatId) ? currentCompleted : [...currentCompleted, treatId])
                 const updates: Partial<Patient> = { completed_treatments: newCompleted }
                 if (treatId === 'triage' && !patient?.triage_time_ms) updates.triage_time_ms = now
                 if (treatId === 'vitals' && !patient?.initial_vs_time_ms) updates.initial_vs_time_ms = now

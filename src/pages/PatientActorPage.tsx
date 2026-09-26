@@ -6,9 +6,13 @@ import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
 
 // 痛みの強度に応じた素人向け説明を生成する
-const generateLaymanGuide = (patient: any): string[] => {
+const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlockedReason: string): string[] => {
     const guides: string[] = []
     const findings = patient?.findings
+
+    if (isSpeechBlocked) {
+        guides.push(`🚨 【最優先】あなたは現在「${speechBlockedReason}」です。声を出して会話することはできません。目を閉じて無反応を保つか、首を振る・うめき声のみの演技をしてください。`)
+    }
 
     // acting_instructionsがあれば最優先で追加
     if (patient?.acting_instructions) {
@@ -40,7 +44,7 @@ const generateLaymanGuide = (patient: any): string[] => {
         guides.push('🦵 足（または手）が強く打たれています。その足（手）をできるだけ動かさないようにし、触られたら「痛い！」と言ってください。')
     }
 
-    if (guides.length === 0) {
+    if (guides.length === 0 && !isSpeechBlocked) {
         guides.push('痛みは少なく、比較的落ち着いた様子で座っていてください。質問には普通に答えてください。')
     }
 
@@ -118,6 +122,24 @@ const PatientActorPage: React.FC = () => {
         )
     }
 
+    // 会話不能条件のチェック (気管挿管・鎮静・意識障害)
+    const completedTreatments = patient.completed_treatments || []
+    const hasIntubation = completedTreatments.includes('intubation') || completedTreatments.includes('surgical_airway')
+    const hasSedation = completedTreatments.includes('sedation')
+    let isUnconscious = false
+    if (patient.consciousness_level) {
+        const level = String(patient.consciousness_level).toLowerCase()
+        if (level.includes('3桁') || level.includes('200') || level.includes('300') || level.includes('100') || level.includes('20') || level.includes('30')) {
+            isUnconscious = true
+        }
+    }
+    const isSpeechBlocked = hasIntubation || hasSedation || isUnconscious
+    const speechBlockedReason = hasIntubation 
+        ? '気管挿管中' 
+        : hasSedation 
+            ? '鎮静薬投与中' 
+            : '意識障害（JCS 20以上/3桁等）'
+
     const parseVitals = (text: string) => {
         let hr = 80
         let rr = 15
@@ -138,7 +160,7 @@ const PatientActorPage: React.FC = () => {
         rr = parsed.rr
     }
 
-    const laymanGuides = generateLaymanGuide(patient)
+    const laymanGuides = generateLaymanGuide(patient, isSpeechBlocked, speechBlockedReason)
 
     return (
         <div className="actor-page">
@@ -166,6 +188,30 @@ const PatientActorPage: React.FC = () => {
                     🖨️ 手技/バイタルQR
                 </button>
             </header>
+
+            {/* 会話不能状態の強調バナー */}
+            {isSpeechBlocked && (
+                <div style={{
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    padding: '0.875rem 1rem',
+                    margin: '0.5rem 1rem 0',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    fontSize: '0.95rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+                    animation: 'pulse-ring 2s infinite'
+                }}>
+                    <span style={{ fontSize: '1.4rem' }}>🚨</span>
+                    <div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>【全画面演技指示】会話不能状態</div>
+                        <div>あなたは現在【{speechBlockedReason}】のため喋れません！問診には答えず無反応または首振り等の演技をしてください。</div>
+                    </div>
+                </div>
+            )}
 
             {/* フラッシュ通知バナー */}
             {flashNotice && (
@@ -268,7 +314,7 @@ const PatientActorPage: React.FC = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 {[
                                     { step: '1', text: '病着（ゼッケン）を着て、このアプリを開いた状態で待機してください' },
-                                    { step: '2', text: '医療スタッフが近づいてきたら「どこが痛いですか？」などと聞かれます。あなたの役の状況に合わせて答えてください（下の「演技のポイント」を参考に）' },
+                                    { step: '2', text: isSpeechBlocked ? `【注意】現在は「${speechBlockedReason}」です。医療スタッフに声をかけられても喋らず無反応・うめき声のみの演技をしてください。` : '医療スタッフが近づいてきたら「どこが痛いですか？」などと聞かれます。あなたの役の状況に合わせて答えてください（下の「演技のポイント」を参考に）' },
                                     { step: '3', text: '「スキャンします」と言われたら、このQRコード画面をかざしてください' },
                                     { step: '4', text: '「脈をみます」「呼吸をみます」と言われたら下のボタンを押してスタッフに端末を見せてください' },
                                 ].map(({ step, text }) => (
@@ -313,28 +359,35 @@ const PatientActorPage: React.FC = () => {
 
                         {/* 答え方のヒント */}
                         <div style={{
-                            backgroundColor: '#f0fdf4',
-                            border: '1px solid #86efac',
+                            backgroundColor: isSpeechBlocked ? '#fef2f2' : '#f0fdf4',
+                            border: `1px solid ${isSpeechBlocked ? '#fca5a5' : '#86efac'}`,
                             borderRadius: '12px',
                             padding: '1rem',
                         }}>
-                            <h3 style={{ margin: '0 0 0.8rem 0', color: '#166534', fontSize: '1rem' }}>
+                            <h3 style={{ margin: '0 0 0.8rem 0', color: isSpeechBlocked ? '#991b1b' : '#166534', fontSize: '1rem' }}>
                                 💬 よく聞かれる質問と答え方
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
-                                <div>
-                                    <strong>「アレルギーはありますか？」</strong><br/>
-                                    <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/アレルギー[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
+                            {isSpeechBlocked ? (
+                                <div style={{ color: '#991b1b', fontSize: '0.9rem', fontWeight: 'bold', lineHeight: 1.6 }}>
+                                    ⚠️【問診不可状態】現在は「{speechBlockedReason}」のため質問に答えることはできません。<br/>
+                                    質問に対して声を出さず、目を閉じて無反応、または首を横に振る・うめき声のみの演技をしてください。
                                 </div>
-                                <div>
-                                    <strong>「飲んでいるお薬はありますか？」</strong><br/>
-                                    <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/内服薬[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+                                    <div>
+                                        <strong>「アレルギーはありますか？」</strong><br/>
+                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/アレルギー[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
+                                    </div>
+                                    <div>
+                                        <strong>「飲んでいるお薬はありますか？」</strong><br/>
+                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/内服薬[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
+                                    </div>
+                                    <div>
+                                        <strong>「いつ怪我をしましたか？」「何があったんですか？」</strong><br/>
+                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.background?.slice(0, 60) || '交通事故に遭いました'}」</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <strong>「いつ怪我をしましたか？」「何があったんですか？」</strong><br/>
-                                    <span style={{ color: '#166534' }}>→ 「{patient.findings.background?.slice(0, 60) || '交通事故に遭いました'}」</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 )}

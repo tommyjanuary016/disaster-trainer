@@ -14,6 +14,9 @@ export default defineConfig({
                 skipWaiting: true,
                 clientsClaim: true,
             },
+            devOptions: {
+                enabled: false,
+            },
             manifest: {
                 name: '災害医療訓練システム',
                 short_name: '訓練システム',
@@ -37,4 +40,8 @@ export default defineConfig({
             },
         }),
     ],
+    build: {
+        target: 'esnext',
+        outDir: 'dist',
+    },
 })

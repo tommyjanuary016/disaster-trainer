@@ -337,7 +337,7 @@ const AdminPage: React.FC = () => {
                     <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--gray-900)' }}>管理者認証が必要</h2>
                     <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.5rem' }}>
                         管理画面にアクセスするにはパスワードを入力してください。<br/>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>（病院名小文字）</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>（ヒント: このアプリを作成した病院）</span>
                     </p>
                     <form onSubmit={handleAdminAuthSubmit}>
                         <input
@@ -379,31 +379,46 @@ const AdminPage: React.FC = () => {
 
     return (
         <div className="page admin-page">
-            <header className="admin-header" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '1rem'}}>
-                <button onClick={() => navigate('/')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                    アプリトップ
-                </button>
-                <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center'}}>
+            <header className="admin-header" style={{flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem', padding: '1rem', width: '100%'}}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button onClick={() => navigate('/')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        アプリトップ
+                    </button>
+                    {(displaySessionId || activeTab !== 'patients') && (
+                        <button
+                            onClick={() => {
+                                handleReturnToMaster()
+                                setActiveTab('patients')
+                            }}
+                            className="button button--secondary"
+                            style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', backgroundColor: '#f1f5f9', color: 'var(--gray-800)' }}
+                        >
+                            🏠 管理画面トップに戻る
+                        </button>
+                    )}
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'}}>
                     <div>
-                        <h1>管理画面 (Admin)</h1>
+                        <h1 style={{ fontSize: '1.4rem', margin: 0, whiteSpace: 'nowrap' }}>管理画面 (Admin)</h1>
                         {currentSessionId ? (
-                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem'}}>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap'}}>
                                 <span style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                                     padding: '0.25rem 0.75rem',
                                     borderRadius: '999px',
                                     backgroundColor: 'rgba(5, 150, 105, 0.12)',
                                     border: '1px solid rgba(5, 150, 105, 0.4)',
-                                    fontSize: '0.82rem', fontWeight: '600', color: '#065f46'
+                                    fontSize: '0.82rem', fontWeight: '600', color: '#065f46',
+                                    whiteSpace: 'nowrap'
                                 }}>
-                                    <span style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse-beat 1.5s ease-in-out infinite'}} />
+                                    <span style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse-beat 1.5s ease-in-out infinite', flexShrink: 0}} />
                                     訓練中
                                 </span>
-                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)'}}>
+                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)', whiteSpace: 'nowrap'}}>
                                     {currentSessionTitle || '（タイトルなし）'}
                                 </span>
-                                <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace'}}>
+                                <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace', whiteSpace: 'nowrap'}}>
                                     ID: {currentSessionId.replace('session_', '')}
                                 </span>
                                 <button
@@ -427,18 +442,19 @@ const AdminPage: React.FC = () => {
                                 </button>
                             </div>
                         ) : sessionEnded && displaySessionId ? (
-                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem'}}>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap'}}>
                                 <span style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                                     padding: '0.25rem 0.75rem',
                                     borderRadius: '999px',
                                     backgroundColor: 'rgba(37, 99, 235, 0.1)',
                                     border: '1px solid rgba(37, 99, 235, 0.3)',
-                                    fontSize: '0.82rem', fontWeight: '600', color: '#1d4ed8'
+                                    fontSize: '0.82rem', fontWeight: '600', color: '#1d4ed8',
+                                    whiteSpace: 'nowrap'
                                 }}>
                                     訓練終了
                                 </span>
-                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)'}}>
+                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)', whiteSpace: 'nowrap'}}>
                                     {currentSessionTitle || '（タイトルなし）'}
                                 </span>
                                 <span style={{fontSize: '0.75rem', color: 'var(--gray-500)', marginLeft: '0.3rem'}}>
@@ -446,8 +462,8 @@ const AdminPage: React.FC = () => {
                                 </span>
                             </div>
                          ) : (
-                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
-                                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gray-700)' }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+                                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
                                      {showMasterAll ? '全登録患者（マスター・過去ログ全件）' : '表示セッション:'}
                                  </span>
                                  {activeSessionsList.length > 0 && !showMasterAll ? (

@@ -41,6 +41,17 @@ const PatientDetailPage: React.FC = () => {
         }
     }, [location.state])
 
+    // fetchedPatient 側が更新された（手技完了やタイマー同期など）場合、古い overridePatient をクリアして最新の Firestore データを優先
+    useEffect(() => {
+        if (fetchedPatient && overridePatient) {
+            const fetchedCompletedCount = fetchedPatient.completed_treatments?.length || 0
+            const overrideCompletedCount = overridePatient.completed_treatments?.length || 0
+            if (fetchedCompletedCount > overrideCompletedCount || fetchedPatient.status !== overridePatient.status) {
+                setOverridePatient(null)
+            }
+        }
+    }, [fetchedPatient])
+
     const patient = overridePatient || fetchedPatient
     const { isLocked, remainingDisplay } = useTimer(patient)
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
@@ -274,32 +285,6 @@ const PatientDetailPage: React.FC = () => {
 
                 {/* ===== 所見詳細 ===== */}
                 <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} consciousnessLevel={patient.consciousness_level} patient={patient} />
-
-                {/* ===== FASTエコー結果（FAST実施済み時にアンロック） ===== */}
-                {uniqueCompleted.includes('fast') && patient.findings.fast && (
-                    <div className="card" style={{ marginTop: '1.5rem', borderLeft: '4px solid #0ea5e9' }}>
-                        <div className="card__label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0ea5e9', fontWeight: 'bold' }}>
-                            <span>🔓</span>
-                            <span>エコー（FAST）結果</span>
-                        </div>
-                        <h4 style={{ fontSize: '0.95rem', margin: '0.5rem 0 0.75rem 0', color: '#0369a1' }}>
-                            FAST所見
-                        </h4>
-                        <pre style={{
-                            whiteSpace: 'pre-wrap',
-                            fontSize: '0.9rem',
-                            color: 'var(--gray-800)',
-                            backgroundColor: '#f0f9ff',
-                            padding: '0.875rem',
-                            borderRadius: 'var(--radius-md)',
-                            fontFamily: 'var(--font-mono)',
-                            lineHeight: 1.7,
-                            margin: 0,
-                        }}>
-                            {patient.findings.fast}
-                        </pre>
-                    </div>
-                )}
 
                 {/* ===== 特別検査結果 ===== */}
                 {((patient.tests_completed && patient.image_urls && patient.image_urls.length > 0) || 

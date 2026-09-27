@@ -80,9 +80,14 @@ const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose })
 
     const durationSeconds = 60 / cpm
 
+    useEffect(() => {
+        // 表示時にスクロール位置を最上部に固定
+        window.scrollTo(0, 0)
+    }, [])
+
     return (
         <div className="actor-animation-overlay">
-            <button className="actor-animation-overlay__close" onClick={onClose}>
+            <button className="actor-animation-overlay__close" onClick={onClose} aria-label="閉じる">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <div className="breathing-container" style={{ animationDuration: `${durationSeconds}s` }}>
@@ -100,6 +105,27 @@ const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose })
 
                 <div className="breathing-text">RR: {cpm} 回/分</div>
             </div>
+            <button
+                onClick={onClose}
+                className="button button--secondary"
+                style={{
+                    position: 'absolute',
+                    bottom: '2rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 'auto',
+                    padding: '0.6rem 2rem',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.4)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 10000
+                }}
+            >
+                ✕ 画面を閉じる
+            </button>
         </div>
     )
 }

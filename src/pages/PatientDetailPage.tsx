@@ -169,10 +169,9 @@ const PatientDetailPage: React.FC = () => {
                                     <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             )}
-                            {overallStatus === 'complete' ? '全手技完了' :
-                             overallStatus === 'in_progress' ? '手技実施中' : '未着手'}
+                            {overallStatus === 'complete' ? '実施完了' :
+                             overallStatus === 'in_progress' ? '対応中' : '未対応'}
                         </div>
-                        <div className="status-panel__progress-text">{totalDone} / {totalAll}</div>
                     </div>
                     <div className="status-panel__bar-track">
                         <div
@@ -181,7 +180,7 @@ const PatientDetailPage: React.FC = () => {
                         />
                     </div>
 
-                    {/* 3カテゴリそれぞれの進捗 */}
+                    {/* 3カテゴリそれぞれの進捗（完了フラグのみ） */}
                     <div className="status-panel__metrics">
                         <div className={`status-metric ${vitalsAny ? 'status-metric--done' : ''}`}>
                             <span className="status-metric__icon">
@@ -189,25 +188,25 @@ const PatientDetailPage: React.FC = () => {
                             </span>
                             <div>
                                 <div className="status-metric__name">バイタル</div>
-                                <div className="status-metric__count">{vitalsCount}回測定</div>
+                                <div className="status-metric__count">{vitalsAny ? '測定済' : '未測定'}</div>
                             </div>
                         </div>
                         <div className={`status-metric ${examCount === examTotal && examTotal > 0 ? 'status-metric--done' : examCount > 0 ? 'status-metric--partial' : ''}`}>
                             <span className="status-metric__icon">
-                                {examCount === examTotal && examTotal > 0 ? '✓' : examCount > 0 ? `${examCount}` : '—'}
+                                {examCount === examTotal && examTotal > 0 ? '✓' : examCount > 0 ? '••' : '—'}
                             </span>
                             <div>
                                 <div className="status-metric__name">診察</div>
-                                <div className="status-metric__count">{examCount} / {examTotal} 部位</div>
+                                <div className="status-metric__count">{examCount > 0 ? '実施あり' : '未実施'}</div>
                             </div>
                         </div>
                         <div className={`status-metric ${allRequiredCompleted ? 'status-metric--done' : treatmentCount > 0 ? 'status-metric--partial' : ''}`}>
                             <span className="status-metric__icon">
-                                {allRequiredCompleted ? '✓' : treatmentCount > 0 ? `${treatmentCount}` : '—'}
+                                {allRequiredCompleted ? '✓' : treatmentCount > 0 ? '••' : '—'}
                             </span>
                             <div>
                                 <div className="status-metric__name">治療処置</div>
-                                <div className="status-metric__count">{treatmentCount} / {treatmentTotal} 完了</div>
+                                <div className="status-metric__count">{treatmentCount > 0 ? '実施あり' : '未実施'}</div>
                             </div>
                         </div>
                     </div>

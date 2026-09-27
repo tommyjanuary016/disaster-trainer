@@ -82,31 +82,25 @@ export function startRobustQRScanner(
 
         if (isStopped) return
 
-        // 第2優先: 高解像度・オートフォーカス指定（Android一部端末用）
+        // 第2優先: { facingMode: { exact: "environment" } } (一部Android)
         try {
-            const highResConstraint = {
-                facingMode: { exact: "environment" },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-            } as unknown as MediaTrackConstraints
-
-            await html5Qrcode.start(highResConstraint, config, handleSuccess, handleFailure)
+            await html5Qrcode.start({ facingMode: { exact: "environment" } }, config, handleSuccess, handleFailure)
             enforcePlaysInline()
             return
         } catch (e2) {
-            console.warn('[QRScanner] High-res exact environment failed:', e2)
+            console.warn('[QRScanner] Exact environment facingMode failed:', e2)
         }
 
         if (isStopped) return
 
-        // 第3優先: getCameras() によるデバイス特定（背面カメラマッチング）
+        // 第3優先: getCameras() によるデバイス特定（カメラ一覧取得）
         try {
             const cameras = await Html5Qrcode.getCameras()
             if (isStopped) return
             if (cameras && cameras.length > 0) {
                 const rearCam = cameras.find(c => {
                     const label = c.label.toLowerCase()
-                    return label.includes('back') || label.includes('rear') || label.includes('環境') || label.includes('背面')
+                    return label.includes('back') || label.includes('rear') || label.includes('環境') || label.includes('背面') || label.includes('アウト') || label.includes('広角')
                 }) || cameras[cameras.length - 1]
 
                 await html5Qrcode.start(rearCam.id, config, handleSuccess, handleFailure)
@@ -119,14 +113,25 @@ export function startRobustQRScanner(
 
         if (isStopped) return
 
-        // 第4優先: フォールバック（標準フロント/任意カメラ）
+        // 第4優先: 空制約 {} （端末デフォルトカメラ）
+        try {
+            await html5Qrcode.start({} as any, config, handleSuccess, handleFailure)
+            enforcePlaysInline()
+            return
+        } catch (e4) {
+            console.warn('[QRScanner] Empty constraints fallback failed:', e4)
+        }
+
+        if (isStopped) return
+
+        // 第5優先: フォールバック（標準フロント/任意カメラ）
         try {
             await html5Qrcode.start({ facingMode: "user" }, config, handleSuccess, handleFailure)
             enforcePlaysInline()
             return
-        } catch (e4) {
-            console.error('[QRScanner] All camera start attempts failed:', e4)
-            if (onError) onError(e4)
+        } catch (e5) {
+            console.error('[QRScanner] All camera start attempts failed:', e5)
+            if (onError) onError(e5)
         }
     }
 

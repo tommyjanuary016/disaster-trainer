@@ -210,42 +210,85 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients }) => {
                         <tr>
                             <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>患者</th>
                             <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>色</th>
+                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>必須手技(完了/総数)</th>
+                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>V/S変化設定</th>
+                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>状態悪化設定</th>
                             <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>T完了</th>
                             <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>初期V/S</th>
                             <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>処置完了</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>状態</th>
+                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>ステータス</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {patients.map(p => (
-                            <tr key={p.id} style={{ borderBottom: '1px solid var(--gray-100)', background: p.status === '悪化' ? '#fff8f8' : 'white' }}>
-                                <td style={{ padding: '0.6rem 0.75rem' }}>
-                                    <div style={{ fontWeight: '500' }}>{p.name || `ID:${p.id}`}</div>
-                                </td>
-                                <td style={{ padding: '0.6rem 0.75rem' }}>
-                                    <span style={{
-                                        display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
-                                        background: p.triage_color === '赤' ? '#dc2626' : p.triage_color === '黄' ? '#f59e0b' : p.triage_color === '緑' ? '#059669' : '#0f172a',
-                                        color: 'white'
-                                    }}>
-                                        {p.triage_color}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.triage_time_ms ? '✅' : '—'}</td>
-                                <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.initial_vs_time_ms ? '✅' : '—'}</td>
-                                <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.post_vs_time_ms ? '✅' : '—'}</td>
-                                <td style={{ padding: '0.6rem 0.75rem' }}>
-                                    <span style={{
-                                        display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
-                                        backgroundColor: p.status === '処置完了' ? '#dbeafe' : p.status === '処置中' ? '#fef3c7' :
-                                            p.status === 'アセスメント完了' ? '#d1fae5' : p.status === '悪化' ? '#fee2e2' : 'var(--gray-100)',
-                                        color: p.status === '処置完了' ? '#1e40af' : p.status === '悪化' ? '#991b1b' : p.status === '処置中' ? '#92400e' : p.status === 'アセスメント完了' ? '#065f46' : 'var(--gray-600)',
-                                    }}>
-                                        {p.status}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
+                        {patients.map(p => {
+                            const reqList = p.required_treatments || []
+                            const reqCount = reqList.length
+                            const doneTreatments = p.completed_treatments || []
+                            const doneReqCount = reqList.filter(rt => doneTreatments.includes(rt.treatment_id)).length
+                            const hasVitalsDeterioration = !!p.vitals_post_struct || !!p.vitals_deterioration_struct
+                            const hasDeterioration = !!p.deterioration_enabled
+
+                            return (
+                                <tr key={p.id} style={{ borderBottom: '1px solid var(--gray-100)', background: p.status === '悪化' ? '#fff8f8' : 'white' }}>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        <div style={{ fontWeight: '500' }}>{p.name || `ID:${p.id}`}</div>
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        <span style={{
+                                            display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
+                                            background: p.triage_color === '赤' ? '#dc2626' : p.triage_color === '黄' ? '#f59e0b' : p.triage_color === '緑' ? '#059669' : '#0f172a',
+                                            color: 'white'
+                                        }}>
+                                            {p.triage_color}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        {reqCount > 0 ? (
+                                            <span style={{
+                                                fontSize: '0.75rem', fontWeight: 'bold', padding: '0.15rem 0.4rem', borderRadius: '4px',
+                                                backgroundColor: doneReqCount === reqCount ? '#d1fae5' : doneReqCount > 0 ? '#fef3c7' : '#f3f4f6',
+                                                color: doneReqCount === reqCount ? '#065f46' : doneReqCount > 0 ? '#92400e' : '#374151',
+                                            }}>
+                                                ⚙️ {doneReqCount}/{reqCount}完了
+                                            </span>
+                                        ) : (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        {hasVitalsDeterioration ? (
+                                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#2563eb', backgroundColor: '#eff6ff', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                                📈 あり
+                                            </span>
+                                        ) : (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        {hasDeterioration ? (
+                                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626', backgroundColor: '#fef2f2', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                                ⚠️ あり ({p.deterioration_time_minutes || 30}分)
+                                            </span>
+                                        ) : (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.triage_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.initial_vs_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.post_vs_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                        <span style={{
+                                            display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
+                                            backgroundColor: p.status === '処置完了' ? '#dbeafe' : p.status === '処置中' ? '#fef3c7' :
+                                                p.status === 'アセスメント完了' ? '#d1fae5' : p.status === '悪化' ? '#fee2e2' : 'var(--gray-100)',
+                                            color: p.status === '処置完了' ? '#1e40af' : p.status === '悪化' ? '#991b1b' : p.status === '処置中' ? '#92400e' : p.status === 'アセスメント完了' ? '#065f46' : 'var(--gray-600)',
+                                        }}>
+                                            {p.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>

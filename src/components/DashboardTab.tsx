@@ -5,6 +5,7 @@ import { exportCSV } from '../lib/csv'
 
 interface DashboardTabProps {
     patients: Patient[]
+    isSessionEndedParent?: boolean
 }
 
 // ミリ秒を「M分S秒」表示に変換
@@ -23,12 +24,45 @@ function msToDisplay(ms: number): string {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-const DashboardTab: React.FC<DashboardTabProps> = ({ patients }) => {
+// 初期V/Sと処置後V/Sに明確な数値変化があるかチェックする判定関数
+function checkVitalsChanged(p: Patient): boolean {
+    if (p.vitals_deterioration_struct) return true
+    const i = p.vitals_initial_struct
+    const post = p.vitals_post_struct
+    if (i && post) {
+        if (
+            i.sbp !== post.sbp ||
+            i.dbp !== post.dbp ||
+            i.hr !== post.hr ||
+            i.rr !== post.rr ||
+            i.spo2 !== post.spo2 ||
+            i.temp !== post.temp ||
+            i.gcs_e !== post.gcs_e ||
+            i.gcs_v !== post.gcs_v ||
+            i.gcs_m !== post.gcs_m
+        ) {
+            return true
+        }
+    }
+    if (p.vitals_initial && p.vitals_post && p.vitals_initial.trim() !== p.vitals_post.trim()) {
+        return true
+    }
+    return false
+}
+
+const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedParent }) => {
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
-    const [isSessionEnded, setIsSessionEnded] = useState(false)
+    const [isSessionEnded, setIsSessionEnded] = useState(isSessionEndedParent || false)
     const [frozenElapsedSec, setFrozenElapsedSec] = useState<number | null>(null)
     const [showSummary, setShowSummary] = useState(false)
     const [sessionStartMs, setSessionStartMs] = useState<number | null>(null)
+    const [isCompactView, setIsCompactView] = useState(false) // 一覧性・視認性両立用のコンパクトモードトグル
+
+    useEffect(() => {
+        if (isSessionEndedParent) {
+            setIsSessionEnded(true)
+        }
+    }, [isSessionEndedParent])
 
     // セッション開始時刻をFirestoreメタデータから取得（なければ受付時刻最小値で代用）
     useEffect(() => {
@@ -203,20 +237,29 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients }) => {
             </div>
 
             {/* 患者別ステータス一覧 */}
-            <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>患者別ステータス一覧</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 'bold' }}>患者別ステータス一覧</h3>
+                <button
+                    onClick={() => setIsCompactView(!isCompactView)}
+                    className="button button--secondary"
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                    {isCompactView ? '🔍 標準表示に切替' : '⚡ コンパクト表示に切替'}
+                </button>
+            </div>
             <div style={{ overflowX: 'auto', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                    <thead style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: isCompactView ? '0.78rem' : '0.85rem' }}>
+                    <thead style={{ background: 'var(--gray-50)', borderBottom: '2px solid var(--gray-200)' }}>
                         <tr>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>患者</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>色</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>必須手技(完了/総数)</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>V/S変化設定</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>状態悪化設定</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>T完了</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>初期V/S</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>処置完了</th>
-                            <th style={{ padding: '0.6rem 0.75rem', color: 'var(--gray-600)' }}>ステータス</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>患者 ID/氏名</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>区分</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>必須手技 (完了/総数)</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>V/S変化設定</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>状態悪化設定</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', textAlign: 'center', whiteSpace: 'nowrap' }}>T完了</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', textAlign: 'center', whiteSpace: 'nowrap' }}>初期V/S</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', textAlign: 'center', whiteSpace: 'nowrap' }}>処置完了</th>
+                            <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>現在のステータス</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -225,60 +268,62 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients }) => {
                             const reqCount = reqList.length
                             const doneTreatments = p.completed_treatments || []
                             const doneReqCount = reqList.filter(rt => doneTreatments.includes(rt.treatment_id)).length
-                            const hasVitalsDeterioration = !!p.vitals_post_struct || !!p.vitals_deterioration_struct
+                            const hasVitalsChange = checkVitalsChanged(p)
                             const hasDeterioration = !!p.deterioration_enabled
 
+                            const pad = isCompactView ? '0.35rem 0.5rem' : '0.6rem 0.75rem'
+
                             return (
-                                <tr key={p.id} style={{ borderBottom: '1px solid var(--gray-100)', background: p.status === '悪化' ? '#fff8f8' : 'white' }}>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
-                                        <div style={{ fontWeight: '500' }}>{p.name || `ID:${p.id}`}</div>
+                                <tr key={p.id} style={{ borderBottom: '1px solid var(--gray-100)', background: p.status === '悪化' ? '#fff8f8' : 'white', whiteSpace: 'nowrap' }}>
+                                    <td style={{ padding: pad }}>
+                                        <div style={{ fontWeight: '600', color: 'var(--gray-900)' }}>{p.name || `ID:${p.id}`}</div>
                                     </td>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                    <td style={{ padding: pad }}>
                                         <span style={{
-                                            display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
+                                            display: 'inline-block', padding: '0.1rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 'bold',
                                             background: p.triage_color === '赤' ? '#dc2626' : p.triage_color === '黄' ? '#f59e0b' : p.triage_color === '緑' ? '#059669' : '#0f172a',
                                             color: 'white'
                                         }}>
                                             {p.triage_color}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                    <td style={{ padding: pad }}>
                                         {reqCount > 0 ? (
                                             <span style={{
-                                                fontSize: '0.75rem', fontWeight: 'bold', padding: '0.15rem 0.4rem', borderRadius: '4px',
+                                                fontSize: '0.72rem', fontWeight: 'bold', padding: '0.12rem 0.4rem', borderRadius: '4px',
                                                 backgroundColor: doneReqCount === reqCount ? '#d1fae5' : doneReqCount > 0 ? '#fef3c7' : '#f3f4f6',
                                                 color: doneReqCount === reqCount ? '#065f46' : doneReqCount > 0 ? '#92400e' : '#374151',
                                             }}>
-                                                ⚙️ {doneReqCount}/{reqCount}完了
+                                                ⚙️ {doneReqCount}/{reqCount} 完了
                                             </span>
                                         ) : (
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                            <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>なし</span>
                                         )}
                                     </td>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
-                                        {hasVitalsDeterioration ? (
-                                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#2563eb', backgroundColor: '#eff6ff', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                    <td style={{ padding: pad }}>
+                                        {hasVitalsChange ? (
+                                            <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#2563eb', backgroundColor: '#eff6ff', padding: '0.12rem 0.4rem', borderRadius: '4px' }}>
                                                 📈 あり
                                             </span>
                                         ) : (
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                            <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>なし</span>
                                         )}
                                     </td>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                    <td style={{ padding: pad }}>
                                         {hasDeterioration ? (
-                                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626', backgroundColor: '#fef2f2', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#dc2626', backgroundColor: '#fef2f2', padding: '0.12rem 0.4rem', borderRadius: '4px' }}>
                                                 ⚠️ あり ({p.deterioration_time_minutes || 30}分)
                                             </span>
                                         ) : (
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>なし</span>
+                                            <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>なし</span>
                                         )}
                                     </td>
-                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.triage_time_ms ? '✅' : '—'}</td>
-                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.initial_vs_time_ms ? '✅' : '—'}</td>
-                                    <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>{p.post_vs_time_ms ? '✅' : '—'}</td>
-                                    <td style={{ padding: '0.6rem 0.75rem' }}>
+                                    <td style={{ padding: pad, textAlign: 'center' }}>{p.triage_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: pad, textAlign: 'center' }}>{p.initial_vs_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: pad, textAlign: 'center' }}>{p.post_vs_time_ms ? '✅' : '—'}</td>
+                                    <td style={{ padding: pad }}>
                                         <span style={{
-                                            display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
+                                            display: 'inline-block', padding: '0.12rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
                                             backgroundColor: p.status === '処置完了' ? '#dbeafe' : p.status === '処置中' ? '#fef3c7' :
                                                 p.status === 'アセスメント完了' ? '#d1fae5' : p.status === '悪化' ? '#fee2e2' : 'var(--gray-100)',
                                             color: p.status === '処置完了' ? '#1e40af' : p.status === '悪化' ? '#991b1b' : p.status === '処置中' ? '#92400e' : p.status === 'アセスメント完了' ? '#065f46' : 'var(--gray-600)',

@@ -301,6 +301,17 @@ function findTreatment(nameOrId: string): { id: string; name: string; time: numb
 // セッション中でない場合にダウンロードされる「患者雛形CSV」として使用
 // ------------------------------------------------------------------
 export function exportMasterCSV(patients: Patient[]): string {
+    // 重複・セッション複製データの除外（オリジナルマスター患者のみにフィルタリング）
+    const uniqueMap = new Map<number | string, Patient>()
+    patients.forEach(p => {
+        const key = p.base_patient_id ?? p.id
+        // セッション非依存の純粋なマスターデータがあればそれを優先
+        if (!uniqueMap.has(key) || !p.session_id) {
+            uniqueMap.set(key, p)
+        }
+    })
+    const masterPatients = Array.from(uniqueMap.values())
+
     // ヘッダー列定義（Patient型の全フィールドに対応）
     const headers = [
         'シナリオタグ',
@@ -355,7 +366,7 @@ export function exportMasterCSV(patients: Patient[]): string {
         'ROSC目標_RR', 'ROSC目標_SpO2', 'ROSC目標_Temp',
     ]
 
-    const rows = patients.map(p => {
+    const rows = masterPatients.map(p => {
         const vs_t = p.vitals_triage_struct
         const vs_i = p.vitals_initial_struct
         const vs_p = p.vitals_post_struct
@@ -431,71 +442,82 @@ export function exportMasterCSV(patients: Patient[]): string {
 // ------------------------------------------------------------------
 // 訓練結果の振り返り用CSV（セッション中に使う従来のexportCSV）
 // ------------------------------------------------------------------
+// ------------------------------------------------------------------
+// 訓練結果の振り返り評価用CSV (必要項目を整理したレポート出力)
+// ------------------------------------------------------------------
 export function exportCSV(patients: Patient[]): string {
     const headers = [
-        '管理番号', '患者氏名', 'シナリオタグ', '年齢', '性別', '想定トリアージ区分', '現場トリアージ区分', '診断名',
-        '現在ステータス', 'トリアージ完了日時', '初期V/S完了日時', '最終処置完了日時',
-        '処置済み項目', '画像検査実施', '血液検査実施', 
-        '初期V/S_SBP', '初期V/S_DBP', '初期V/S_HR', '初期V/S_RR', '初期V/S_SpO2', '初期V/S_Temp', '初期V/S_GCS_E', '初期V/S_GCS_V', '初期V/S_GCS_M',
-        '最新V/S(テキスト)',
-        'KPI_病着からトリアージまでの時間(分)', 'KPI_トリアージから初期評価までの時間(分)', 'KPI_病着から根本治療までの時間(分)', 'KPI_急変の有無', 'KPI_トリアージ乖離'
+        '管理番号', '患者氏名', '年齢', '性別', '想定トリアージ', '現場トリアージ', '診断名', '最終ステータス',
+        '診療開始時刻(病着)', 'トリアージ完了時刻', '初期V/S測定時刻', '処置・安定化完了時刻',
+        'キー手技到達時間(病着から)', 'トリアージ所要時間', '初期評価所要時間',
+        '状態改善・安定化達成', '急変・悪化の有無', 'トリアージ判定', '実施完了した手技・処置'
     ]
 
     const formatTime = (ms?: number | null) => {
-        if (!ms) return ''
+        if (!ms) return '—'
         const d = new Date(ms)
         return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
     }
 
-    const rows = patients.map(p => {
-        const vs_i = p.vitals_initial_struct
+    const formatDurationMs = (startMs?: number | null, endMs?: number | null) => {
+        if (!startMs || !endMs) return '—'
+        const diffSec = Math.floor((endMs - startMs) / 1000)
+        if (diffSec < 0) return '0分0秒'
+        const m = Math.floor(diffSec / 60)
+        const s = diffSec % 60
+        return `${m}分${s}秒`
+    }
 
-        // KPI計算用
-        const calcMinutes = (start?: number, end?: number) => {
-            if (!start || !end) return ''
-            const diffMs = end - start
-            if (diffMs < 0) return '0'
-            return (diffMs / (1000 * 60)).toFixed(1)
-        }
+    const rows = patients.map(p => {
+        const reqList = p.required_treatments || []
+        const doneList = p.completed_treatments || []
+        const isImprovementAchieved = p.stabilization_completed || (reqList.length > 0 && reqList.every(rt => doneList.includes(rt.treatment_id)))
+        const isDeteriorated = p.status === '悪化' || p.status === '急変'
 
         const triageDiff = () => {
-            if (!p.scene_triage_color) return ''
+            if (!p.scene_triage_color) return '未測定'
             if (p.scene_triage_color === p.triage_color) return '一致'
-            // 簡易的な乖離判定（重さ: 赤>黄>緑>黒 とみなす）
-            const severity = { '赤': 4, '黄': 3, '緑': 2, '黒': 1 }
+            const severity: Record<string, number> = { '赤': 4, '黄': 3, '緑': 2, '黒': 1 }
             const sceneSev = severity[p.scene_triage_color] || 0
             const realSev = severity[p.triage_color] || 0
             if (sceneSev > realSev) return 'オーバートリアージ'
             if (sceneSev < realSev) return 'アンダートリアージ'
-            return ''
+            return '不整合'
         }
+
+        // 実施された処置名称リストの生成
+        const completedNames = doneList.map(id => {
+            const matchedReq = reqList.find(r => r.treatment_id === id)
+            return matchedReq ? matchedReq.treatment_name : id
+        }).join(' / ') || 'なし'
 
         const row = [
             p.id,
             p.name,
-            p.scenario_tag || '基本',
             p.age,
             p.gender === 'M' ? '男性' : '女性',
             p.triage_color,
-            p.scene_triage_color || '',
+            p.scene_triage_color || '未測定',
             p.diagnosis || '',
             p.status,
+            formatTime(p.reception_time_ms),
             formatTime(p.triage_time_ms),
             formatTime(p.initial_vs_time_ms),
-            formatTime(p.post_vs_time_ms), // 最終処置完了日時とみなす
-            p.completed_treatments?.join(',') || 'なし',
-            p.tests_completed ? '済' : '未',
-            p.stabilization_completed ? '済' : '未',
-            vs_i?.sbp ?? '', vs_i?.dbp ?? '', vs_i?.hr ?? '',
-            vs_i?.rr ?? '', vs_i?.spo2 ?? '', vs_i?.temp ?? '', vs_i?.gcs_e ?? '', vs_i?.gcs_v ?? '', vs_i?.gcs_m ?? '',
-            // ログ用に改行を空白に変換
-            (structToText(p.vitals_initial_struct) || p.vitals_initial || '').replace(/\n/g, ' '),
-            // KPIs
-            calcMinutes(p.reception_time_ms, p.triage_time_ms),
-            calcMinutes(p.triage_time_ms, p.initial_vs_time_ms),
-            calcMinutes(p.reception_time_ms, p.post_vs_time_ms),
-            (p.status === '急変' || p.status === '悪化') ? '発生' : 'なし',
-            triageDiff()
+            formatTime(p.post_vs_time_ms),
+            // キー手技到達時間 (病着から処置完了まで)
+            formatDurationMs(p.reception_time_ms, p.post_vs_time_ms),
+            // トリアージ所要時間
+            formatDurationMs(p.reception_time_ms, p.triage_time_ms),
+            // 初期評価所要時間
+            formatDurationMs(p.triage_time_ms || p.reception_time_ms, p.initial_vs_time_ms),
+            // 状態改善・安定化達成
+            isImprovementAchieved ? '達成(安定化)' : (reqList.length === 0 ? '経過観察' : '未完了'),
+            // 急変・悪化の有無
+            p.status === '急変' ? '🚨 急変発生' : p.status === '悪化' ? '⚠️ 悪化発生' : 'なし',
+            // トリアージ判定
+            triageDiff(),
+            // 実施完了処置
+            completedNames
         ]
         return row.map(cell => escapeCSV(cell as string)).join(',')
     })

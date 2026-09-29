@@ -131,6 +131,17 @@ const RoleSelectionPage: React.FC = () => {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                         アプリトップ
                     </button>
+                    <div style={{ position: 'absolute', right: 0, top: 0, display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            onClick={() => navigate('/admin')}
+                            className="button button--secondary"
+                            style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', opacity: 0.7, background: 'transparent', border: '1px solid var(--gray-300)', color: 'var(--gray-600)' }}
+                            title="管理者画面"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            管理画面
+                        </button>
+                    </div>
                     <div className="role-selection__header-badge" style={{ marginTop: '2.5rem' }}>SESSION ACTIVE</div>
                     <h1 className="role-selection__title">役割を選択</h1>
                     <p className="role-selection__subtitle">担当する役割を選んで訓練を開始します</p>
@@ -187,13 +198,23 @@ const RoleSelectionPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* アプリトップに戻る */}
-                <button
-                    className="role-selection__back-btn"
-                    onClick={() => navigate('/')}
-                >
-                    ← アプリトップ
-                </button>
+                {/* アプリトップ・管理画面に戻る */}
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+                    <button
+                        className="role-selection__back-btn"
+                        onClick={() => navigate('/')}
+                        style={{ margin: 0 }}
+                    >
+                        ← アプリトップ
+                    </button>
+                    <button
+                        className="role-selection__back-btn"
+                        onClick={() => navigate('/admin')}
+                        style={{ margin: 0, opacity: 0.6 }}
+                    >
+                        ⚙️ 管理画面
+                    </button>
+                </div>
             </div>
 
             {/* QRコード共有モーダル */}

@@ -819,7 +819,7 @@ const AdminPage: React.FC = () => {
                         </div>
 
                         {activeTab === 'dashboard' ? (
-                            <DashboardTab patients={patients} />
+                            <DashboardTab patients={patients} isSessionEndedParent={sessionEnded} />
                         ) : activeTab === 'settings' ? (
                             <div className="card card--elevated">
                                 <h3 className="card__title">Google Sheets 連携 (GAS Webhook)</h3>

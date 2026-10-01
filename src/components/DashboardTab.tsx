@@ -16,14 +16,6 @@ function msToMinSec(ms: number): string {
     return `${m}分${String(s).padStart(2, '0')}秒`
 }
 
-// ミリ秒を「MM:SS」表示に変換
-function msToDisplay(ms: number): string {
-    const totalSec = Math.floor(ms / 1000)
-    const m = Math.floor(totalSec / 60)
-    const s = totalSec % 60
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
 // 初期V/Sと処置後V/Sに明確な数値変化があるかチェックする判定関数
 function checkVitalsChanged(p: Patient): boolean {
     if (p.vitals_deterioration_struct) return true
@@ -50,6 +42,15 @@ function checkVitalsChanged(p: Patient): boolean {
     return false
 }
 
+
+// ミリ秒を「MM:SS」表示に変換
+function msToDisplay(ms: number): string {
+    const totalSec = Math.floor(ms / 1000)
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedParent }) => {
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [isSessionEnded, setIsSessionEnded] = useState(isSessionEndedParent || false)
@@ -64,28 +65,26 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
         }
     }, [isSessionEndedParent])
 
-    // セッション開始時刻をFirestoreメタデータから取得（なければ受付時刻最小値で代用）
+    // セッション開始時刻をFirestoreメタデータから取得
+    // activeSessionId がない場合はタイマーを起動しない（患者受付時刻でのフォールバックは使わない）
     useEffect(() => {
-        if (activeSessionId) {
-            fetchTrainingSession(activeSessionId).then(session => {
-                if (session?.sessionStartMs) {
-                    setSessionStartMs(session.sessionStartMs)
-                } else {
-                    const validTimes = patients.map(p => p.reception_time_ms).filter(Boolean) as number[]
-                    if (validTimes.length > 0) setSessionStartMs(Math.min(...validTimes))
-                }
-            }).catch(() => {
-                const validTimes = patients.map(p => p.reception_time_ms).filter(Boolean) as number[]
-                if (validTimes.length > 0) setSessionStartMs(Math.min(...validTimes))
-            })
-        } else {
-            const validTimes = patients.map(p => p.reception_time_ms).filter(Boolean) as number[]
-            if (validTimes.length > 0) setSessionStartMs(Math.min(...validTimes))
+        if (!activeSessionId) {
+            setSessionStartMs(null)
+            return
         }
-    }, [patients.length])
+        fetchTrainingSession(activeSessionId).then(session => {
+            if (session?.sessionStartMs) {
+                setSessionStartMs(session.sessionStartMs)
+            }
+            // sessionStartMs が取得できない場合はタイマーを表示しない
+        }).catch(() => {
+            // エラー時もタイマーを表示しない
+        })
+    }, [activeSessionId])
 
+    // タイマー更新（activeSessionId がありかつ sessionStartMs が確定している場合のみ動作）
     useEffect(() => {
-        if (isSessionEnded || !sessionStartMs) return
+        if (isSessionEnded || !sessionStartMs || !activeSessionId) return
         const updateTimer = () => {
             setElapsedSeconds(Math.floor((Date.now() - sessionStartMs) / 1000))
         }
@@ -96,6 +95,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
 
     const displaySec = isSessionEnded && frozenElapsedSec !== null ? frozenElapsedSec : elapsedSeconds
     const formattedTime = msToDisplay(displaySec * 1000)
+    // セッションがある場合のみタイマーを表示する
+    const showTimer = !!activeSessionId && sessionStartMs !== null
 
     const handleEndSession = async () => {
         if (window.confirm('訓練を終了しますか？タイマーを停止し、セッションを完了状態にします。')) {
@@ -144,31 +145,34 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
             {/* ヘッダー行 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>全体の概況</h2>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* 経過タイマー */}
-                    <div className="card card--elevated" style={{ padding: '0.5rem 1rem', background: isSessionEnded ? '#064e3b' : 'var(--gray-800)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'background 0.5s' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--gray-300)' }}>{isSessionEnded ? '訓練終了' : '訓練経過時間'}</span>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{formattedTime}</span>
+                {/* アクティブなセッションがある場合のみタイマーとボタンを表示 */}
+                {showTimer && (
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* 経過タイマー */}
+                        <div className="card card--elevated" style={{ padding: '0.5rem 1rem', background: isSessionEnded ? '#064e3b' : 'var(--gray-800)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'background 0.5s' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-300)' }}>{isSessionEnded ? '訓練終了' : '訓練経過時間'}</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{formattedTime}</span>
+                        </div>
+                        {/* 訓練終了ボタン */}
+                        {!isSessionEnded ? (
+                            <button
+                                onClick={handleEndSession}
+                                className="button button--danger"
+                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                            >
+                                訓練終了
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setShowSummary(true)}
+                                className="button button--primary"
+                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', background: '#059669', borderColor: '#059669' }}
+                            >
+                                📋 セッションサマリー
+                            </button>
+                        )}
                     </div>
-                    {/* 訓練終了ボタン */}
-                    {!isSessionEnded ? (
-                        <button
-                            onClick={handleEndSession}
-                            className="button button--danger"
-                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                        >
-                            訓練終了
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => setShowSummary(true)}
-                            className="button button--primary"
-                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', background: '#059669', borderColor: '#059669' }}
-                        >
-                            📋 セッションサマリー
-                        </button>
-                    )}
-                </div>
+                )}
             </div>
 
             {/* 患者数カード（各重症度の投入数/総数を表示） */}

@@ -472,7 +472,6 @@ export function exportCSV(patients: Patient[]): string {
         const reqList = p.required_treatments || []
         const doneList = p.completed_treatments || []
         const isImprovementAchieved = p.stabilization_completed || (reqList.length > 0 && reqList.every(rt => doneList.includes(rt.treatment_id)))
-        const isDeteriorated = p.status === '悪化' || p.status === '急変'
 
         const triageDiff = () => {
             if (!p.scene_triage_color) return '未測定'

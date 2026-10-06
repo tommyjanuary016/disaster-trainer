@@ -145,22 +145,6 @@ const TreatmentScanPage: React.FC = () => {
     }, [patientId])
 
     const [isCameraActive, setIsCameraActive] = useState(false)
-
-    useEffect(() => {
-        if (patientId) {
-            fetchPatient(parseInt(patientId)).then(p => {
-                if (p) {
-                    setPatient(p)
-                    const done = p.completed_treatments?.some(
-                        id => id === 'vitals' || id === 'triage' || EXAM_IDS.includes(id)
-                    ) || false
-                    setHasVitalsOrExams(done)
-                }
-            })
-        }
-    }, [patientId])
-
-    const [isCameraActive, setIsCameraActive] = useState(false)
     const [cameraError, setCameraError] = useState<any>(null)
 
     useEffect(() => {

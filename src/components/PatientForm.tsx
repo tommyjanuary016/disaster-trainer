@@ -391,7 +391,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
     return (
         <div className="patient-form card card--elevated" style={{ maxWidth: '800px', margin: '0 auto', padding: '1.5rem' }}>
             {/* ヘッダー */}
-            <header className="patient-form__header" style={{ marginBottom: '1.25rem', borderBottom: '1px solid var(--gray-200)', pb: '1rem' }}>
+            <header className="patient-form__header" style={{ marginBottom: '1.25rem', borderBottom: '1px solid var(--gray-200)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 className="card__title" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                         {initialPatient ? '✏️ 患者情報を編集' : '➕ 患者データを新規登録'}

@@ -135,8 +135,9 @@ const TreatmentScanPage: React.FC = () => {
             fetchPatient(parseInt(patientId)).then(p => {
                 if (p) {
                     setPatient(p)
+                    // 診療エリアでの処置開始ゲート：診療エリアV/S測定（vitals）または系統的身体診察が必要（トリアージのみでは不可）
                     const done = p.completed_treatments?.some(
-                        id => id === 'vitals' || id === 'triage' || EXAM_IDS.includes(id)
+                        id => id === 'vitals' || EXAM_IDS.includes(id)
                     ) || false
                     setHasVitalsOrExams(done)
                 }
@@ -272,9 +273,9 @@ const TreatmentScanPage: React.FC = () => {
             }
         }
 
-        // 治療処置の場合、バイタル・診察未実施ならブロック
+        // 治療処置の場合、診療エリアでのバイタル・診察未実施ならブロック
         if (isTreatmentOption(resolved.treatment_id) && !hasVitalsOrExams) {
-            setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。')
+            setError('※ 治療処置を実施する前に、初療室・診療エリアでのバイタルサイン測定または身体診察を行ってください。')
             return
         }
 
@@ -501,7 +502,7 @@ const TreatmentScanPage: React.FC = () => {
                                         const val = e.target.value
                                         setManualTreatmentId(val)
                                         if (val && isTreatmentOption(val) && !hasVitalsOrExams) {
-                                            setError('※ 治療処置を実施する前に、バイタルサイン測定または診察手技を行ってください。')
+                                            setError('※ 治療処置を実施する前に、初療室・診療エリアでのバイタルサイン測定または身体診察を行ってください。')
                                             setManualTreatmentId('')
                                         } else {
                                             setError(null)
@@ -510,11 +511,7 @@ const TreatmentScanPage: React.FC = () => {
                                 >
                                     <option value="">-- 手技を選択 --</option>
 
-                                    <optgroup label="トリアージ">
-                                        <option value="triage">{PROCEDURE_NAMES.triage}</option>
-                                    </optgroup>
-
-                                    <optgroup label="バイタル">
+                                    <optgroup label="診療エリア評価">
                                         <option value="vitals">{PROCEDURE_NAMES.vitals}</option>
                                     </optgroup>
 

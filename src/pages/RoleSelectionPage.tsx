@@ -6,10 +6,26 @@ import { activeSessionId } from '../lib/firestore'
 // 各ロールの定義
 const ROLES = [
     {
+        role: 'トリアージ担当' as Role,
+        label: 'トリアージ担当',
+        sublabel: '病院入口・迅速評価',
+        description: '病院受入れ口で2分間の迅速評価（バイタル＋全身観察）を行い、紙カルテに記入・エリア振り分けを行う',
+        path: '/training',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+        ),
+        colorClass: 'role-card--red',
+    },
+    {
         role: '医師' as Role,
-        label: '医師 / 看護師',
-        sublabel: '診察・治療判断',
-        description: '患者の初期評価・バイタル測定・診断・治療処置を担当する',
+        label: '診療エリア担当（医師・看護師）',
+        sublabel: '初療・系統的診察・治療',
+        description: '赤・黄・緑エリアで紙カルテを受け取り、系統的身体診察・詳細バイタル測定・画像/採血・各種治療処置を行う',
         path: '/training',
         icon: (
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export type Role = '未設定' | '医師' | '看護師' | '放射線技師' | '臨床検査技師' | '管理者'
+export type Role = '未設定' | 'トリアージ担当' | '医師' | '看護師' | '放射線技師' | '臨床検査技師' | '管理者'
 
 const ROLE_STORAGE_KEY = 'disaster_training_user_role'
 

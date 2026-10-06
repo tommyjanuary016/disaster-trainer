@@ -3391,6 +3391,18 @@ select.input {
 .role-card:hover .role-card__glow { opacity: 0.35; }
 
 /* カラーテーマ */
+.role-card--red {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.role-card--red:hover {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+}
+.role-card--red .role-card__glow { background: #ef4444; }
+.role-card--red .role-card__icon { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.role-card--red .role-card__label { color: #fca5a5; }
+.role-card--red .role-card__arrow { color: rgba(239, 68, 68, 0.6); }
+
 .role-card--blue {
   border-color: rgba(59, 130, 246, 0.2);
 }

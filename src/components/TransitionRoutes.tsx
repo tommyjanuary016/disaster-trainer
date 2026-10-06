@@ -11,6 +11,7 @@ import PatientActorPage from '../pages/PatientActorPage'
 import QRGeneratorPage from '../pages/QRGeneratorPage'
 import RadiologyScanPage from '../pages/RadiologyScanPage'
 import LabScanPage from '../pages/LabScanPage'
+import TriagePatientPage from '../pages/TriagePatientPage'
 
 // 画面遷移時に表示するメッセージをランダムで選択
 const TRANSITION_MESSAGES = [
@@ -106,6 +107,7 @@ export const TransitionRoutes: React.FC = () => {
                 {/* 訓練系ルート（/training/ プレフィックス） */}
                 <Route path="/training" element={<QRScannerPage />} />
                 <Route path="/training/patient/:id" element={<PatientDetailPage />} />
+                <Route path="/training/triage-patient/:id" element={<TriagePatientPage />} />
                 <Route path="/training/treatment-scan/:patientId" element={<TreatmentScanPage />} />
                 <Route path="/training/actor" element={<PatientActorListPage />} />
                 <Route path="/training/actor/:id" element={<PatientActorPage />} />

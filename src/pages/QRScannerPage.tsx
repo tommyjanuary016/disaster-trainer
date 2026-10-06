@@ -6,9 +6,11 @@ import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
 import { CameraFallbackUI } from '../components/CameraFallbackUI'
+import { useRole } from '../hooks/useRole'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
+    const { role } = useRole()
     const [activeTab, setActiveTab] = useState<'qr' | 'list'>('qr')
     const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
@@ -159,10 +161,14 @@ const QRScannerPage: React.FC = () => {
         } catch (e) { console.error('Failed to save recent patient', e) }
     }
 
+    const getPatientPath = (id: string | number) => {
+        return role === 'トリアージ担当' ? `/training/triage-patient/${id}` : `/training/patient/${id}`
+    }
+
     const handleConfirm = () => {
         if (pendingPatientId && pendingPatient) {
             addRecentPatient(pendingPatient)
-            navigate(`/training/patient/${pendingPatientId}`)
+            navigate(getPatientPath(pendingPatientId))
         }
     }
 
@@ -387,7 +393,7 @@ const QRScannerPage: React.FC = () => {
                         {recentPatients.map(p => (
                             <div
                                 key={p.id}
-                                onClick={() => navigate(`/training/patient/${p.id}`)}
+                                onClick={() => navigate(getPatientPath(p.id))}
                                 style={{
                                     flexShrink: 0,
                                     width: '120px',
@@ -458,7 +464,7 @@ const QRScannerPage: React.FC = () => {
                                                 transition: 'all 0.2s ease',
                                                 backgroundColor: 'white'
                                             }}
-                                            onClick={() => navigate(`/training/patient/${p.id}`)}
+                                            onClick={() => navigate(getPatientPath(p.id))}
                                         >
                                             <div>
                                                 <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--gray-900)' }}>

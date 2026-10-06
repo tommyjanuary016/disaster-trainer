@@ -5,12 +5,14 @@ import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiv
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
+import { CameraFallbackUI } from '../components/CameraFallbackUI'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState<'qr' | 'list'>('qr')
     const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
+    const [cameraError, setCameraError] = useState<any>(null)
     // 確認モーダル用の状態
     const [pendingPatientId, setPendingPatientId] = useState<string | null>(null)
     const [pendingPatient, setPendingPatient] = useState<Patient | null>(null)
@@ -91,10 +93,12 @@ const QRScannerPage: React.FC = () => {
     useEffect(() => {
         if (showModal || activeTab !== 'qr' || !isCameraActive) return
 
+        setCameraError(null)
         const stopScanner = startRobustQRScanner('reader', (decodedText) => {
             handleScan(decodedText)
         }, (err) => {
             console.error('Camera init error:', err)
+            setCameraError(err)
         })
 
         return () => {
@@ -292,6 +296,20 @@ const QRScannerPage: React.FC = () => {
             {isCameraActive && (
                 <div className="qr-reader-wrapper">
                     <div id="reader" className="qr-reader custom-qr-scanner"></div>
+                </div>
+            )}
+
+            {cameraError && (
+                <div style={{ margin: '0 1.25rem 1rem' }}>
+                    <CameraFallbackUI
+                        error={cameraError}
+                        onScanSuccess={(text) => handleScan(text)}
+                        onRetry={() => {
+                            setCameraError(null)
+                            setIsCameraActive(false)
+                            setTimeout(() => setIsCameraActive(true), 100)
+                        }}
+                    />
                 </div>
             )}
 

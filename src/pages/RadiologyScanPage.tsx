@@ -4,6 +4,7 @@ import { parseQRCode } from '../types/qr'
 import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
+import { CameraFallbackUI } from '../components/CameraFallbackUI'
 
 const RadiologyScanPage: React.FC = () => {
     const navigate = useNavigate()
@@ -12,14 +13,17 @@ const RadiologyScanPage: React.FC = () => {
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
 
     const [isCameraActive, setIsCameraActive] = useState(false)
+    const [cameraError, setCameraError] = useState<any>(null)
 
     useEffect(() => {
         if (patient || !isCameraActive) return // 患者表示中またはカメラ停止中はスキャナーを停止
 
+        setCameraError(null)
         const stopScanner = startRobustQRScanner('rad-reader', (decodedText) => {
             handleScan(decodedText)
         }, (err) => {
             console.error('Radiology scanner error:', err)
+            setCameraError(err)
         })
 
         return () => {
@@ -145,6 +149,20 @@ const RadiologyScanPage: React.FC = () => {
             {isCameraActive && (
                 <div className="qr-reader-wrapper">
                     <div id="rad-reader" className="qr-reader custom-qr-scanner"></div>
+                </div>
+            )}
+
+            {cameraError && (
+                <div style={{ margin: '0 1.25rem 1rem' }}>
+                    <CameraFallbackUI
+                        error={cameraError}
+                        onScanSuccess={(text) => handleScan(text)}
+                        onRetry={() => {
+                            setCameraError(null)
+                            setIsCameraActive(false)
+                            setTimeout(() => setIsCameraActive(true), 100)
+                        }}
+                    />
                 </div>
             )}
 

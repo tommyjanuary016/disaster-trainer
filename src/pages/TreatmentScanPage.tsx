@@ -7,6 +7,7 @@ import { getMedicalItemById } from '../data/items'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { useRole } from '../hooks/useRole'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
+import { CameraFallbackUI } from '../components/CameraFallbackUI'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
@@ -159,13 +160,18 @@ const TreatmentScanPage: React.FC = () => {
         }
     }, [patientId])
 
+    const [isCameraActive, setIsCameraActive] = useState(false)
+    const [cameraError, setCameraError] = useState<any>(null)
+
     useEffect(() => {
         if (showModal || !isCameraActive) return
 
+        setCameraError(null)
         const stopScanner = startRobustQRScanner('treatment-reader', (decodedText) => {
             handleScan(decodedText)
         }, (err) => {
             console.error('Treatment scanner error:', err)
+            setCameraError(err)
         })
 
         return () => {
@@ -473,6 +479,20 @@ const TreatmentScanPage: React.FC = () => {
                     {isCameraActive && (
                         <div className="qr-reader-wrapper">
                             <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
+                        </div>
+                    )}
+
+                    {cameraError && (
+                        <div style={{ marginBottom: '1rem' }}>
+                            <CameraFallbackUI
+                                error={cameraError}
+                                onScanSuccess={(text) => handleScan(text)}
+                                onRetry={() => {
+                                    setCameraError(null)
+                                    setIsCameraActive(false)
+                                    setTimeout(() => setIsCameraActive(true), 100)
+                                }}
+                            />
                         </div>
                     )}
 

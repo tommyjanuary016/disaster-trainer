@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Patient } from '../types/patient'
 import { usePatient } from '../hooks/usePatient'
 import LoadingScreen from '../components/LoadingScreen'
 import PatientPictogram from '../components/PatientPictogram'

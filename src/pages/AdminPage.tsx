@@ -49,6 +49,20 @@ const AdminPage: React.FC = () => {
     const [authInput, setAuthInput] = useState('')
     const [authError, setAuthError] = useState(false)
 
+    // 上位マスターパスワード認証ステート（komonji@tommy）
+    const [isMasterAuthenticated, setIsMasterAuthenticated] = useState<boolean>(() => {
+        return sessionStorage.getItem('admin_master_authenticated') === 'true'
+    })
+    const [showMasterAuthModal, setShowMasterAuthModal] = useState(false)
+    const [masterAuthInput, setMasterAuthInput] = useState('')
+    const [masterAuthError, setMasterAuthError] = useState(false)
+    const [pendingMasterAction, setPendingMasterAction] = useState<(() => void) | null>(null)
+
+    // 患者検索 & フィルター用ステート
+    const [searchQuery, setSearchQuery] = useState('')
+    const [selectedScenarioFilter, setSelectedScenarioFilter] = useState<string>('ALL')
+    const [selectedTriageFilter, setSelectedTriageFilter] = useState<string>('ALL')
+
     const handleAdminAuthSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (authInput === 'komonji') {
@@ -61,155 +75,138 @@ const AdminPage: React.FC = () => {
         }
     }
 
-    const shareUrl = currentSessionId ? `${window.location.origin}/?session_id=${currentSessionId}` : ''
-    const qrUrl = shareUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}` : ''
-
-    const handleCopyLink = () => {
-        if (!shareUrl) return
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            setCopySuccess(true)
-            setTimeout(() => setCopySuccess(false), 2000)
-        }).catch(err => {
-            console.error('コピー失敗:', err)
-        })
-    }
-
-    // 抽出可能なシナリオタグ一覧
-    const availableScenarios = Array.from(new Set(patients.map(p => p.scenario_tag || '基本')))
-
-    const [activeSessionsList, setActiveSessionsList] = useState<TrainingSession[]>([])
-    const [showMasterAll, setShowMasterAll] = useState(false) // 全セッション混在マスター表示の明示的トグル
-
-    // アクティブなセッション一覧をロード
-    const loadActiveSessions = async () => {
-        try {
-            const sessions = await fetchActiveSessions()
-            setActiveSessionsList(sessions)
-            // displaySessionId が null の場合、アクティブな最新セッションがあれば自動選択
-            if (!displaySessionId && sessions.length > 0) {
-                setDisplaySessionId(sessions[0].id)
-                setCurrentSessionId(sessions[0].id)
-            }
-        } catch (e) {
-            console.error('アクティブセッション取得失敗:', e)
-        }
-    }
-
-    useEffect(() => {
-        loadActiveSessions()
-    }, [])
-
-    useEffect(() => {
-        if (location.state?.action === 'new_session') {
-            setIsSessionModalOpen(true)
-            // clear state so it doesn't reopen on refresh
-            window.history.replaceState({}, document.title)
-        }
-    }, [location.state?.action])
-
-    useEffect(() => {
-        // displaySessionId または showMasterAll に応じて購読する患者を制限する
-        // displaySessionId がある、または showMasterAll が false の場合はセッションで絞り込む
-        const filterSessionId = displaySessionId ?? (showMasterAll ? undefined : (activeSessionId ?? undefined))
-        const sessionIdOnly = !showMasterAll && (filterSessionId !== undefined)
-
-        const unsubscribe = subscribeToAllPatients((data) => {
-            setPatients(data)
-        }, sessionIdOnly, filterSessionId)
-        return () => unsubscribe()
-    }, [displaySessionId, showMasterAll])
-
-    // セッションタイトルおよび終了状態を取得する
-    useEffect(() => {
-        const targetId = displaySessionId
-        if (targetId) {
-            fetchTrainingSession(targetId).then(session => {
-                if (session) {
-                    setCurrentSessionTitle(session.title || null)
-                    if (session.isActive === false) {
-                        setSessionEnded(true)
-                        setCurrentSessionId(null)
-                    }
-                }
-            }).catch(e => console.error('セッション情報取得エラー', e))
+    // 上位パスワード保護アクション実行時のラッパー関数
+    const requireMasterAuth = (action: () => void) => {
+        if (isMasterAuthenticated) {
+            action()
         } else {
-            setCurrentSessionTitle(null)
+            setPendingMasterAction(() => action)
+            setMasterAuthInput('')
+            setMasterAuthError(false)
+            setShowMasterAuthModal(true)
         }
-    }, [displaySessionId])
+    }
+
+    const handleMasterAuthSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (masterAuthInput === 'komonji@tommy') {
+            sessionStorage.setItem('admin_master_authenticated', 'true')
+            setIsMasterAuthenticated(true)
+            setMasterAuthError(false)
+            setShowMasterAuthModal(false)
+            if (pendingMasterAction) {
+                pendingMasterAction()
+                setPendingMasterAction(null)
+            }
+        } else {
+            setMasterAuthError(true)
+            setMasterAuthInput('')
+        }
+    }
 
     const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        const reader = new FileReader()
-        reader.onload = async (event) => {
-            const text = event.target?.result as string
-            if (text) {
-                try {
-                    const rows = parseCSV(text)
-                    const newPatients = mapCSVToPatients(rows)
-                    if (newPatients.length > 0) {
-                        if (window.confirm(`${newPatients.length}件の患者データをインポートしますか？\n(既存の同IDデータは上書きされます)`)) {
-                            // 簡易ローディング表示の代わり
-                            document.body.style.cursor = 'wait'
-                            await seedPatientsToFirestore(newPatients)
-                            document.body.style.cursor = 'default'
-                            alert('CSVインポートが完了しました。')
+        requireMasterAuth(() => {
+            const reader = new FileReader()
+            reader.onload = async (event) => {
+                const text = event.target?.result as string
+                if (text) {
+                    try {
+                        const rows = parseCSV(text)
+                        const newPatients = mapCSVToPatients(rows)
+                        if (newPatients.length > 0) {
+                            if (window.confirm(`${newPatients.length}件の患者データをインポートしますか？\n(既存の同IDデータは上書きされます)`)) {
+                                document.body.style.cursor = 'wait'
+                                await seedPatientsToFirestore(newPatients)
+                                document.body.style.cursor = 'default'
+                                alert('CSVインポートが完了しました。')
+                            }
+                        } else {
+                            alert('有効なデータが見つかりませんでした。ヘッダー行を確認してください。')
                         }
-                    } else {
-                        alert('有効なデータが見つかりませんでした。ヘッダー行を確認してください。')
+                    } catch (err) {
+                        console.error('CSV Parsing error:', err)
+                        alert('CSVの解析中にエラーが発生しました。')
                     }
-                } catch (err) {
-                    console.error('CSV Parsing error:', err)
-                    alert('CSVの解析中にエラーが発生しました。')
                 }
             }
-        }
-        reader.readAsText(file)
-        // 同じファイルを選び直せるようにリセット
+            reader.readAsText(file)
+        })
         e.target.value = ''
     }
 
     const handleDeleteAllCustom = async () => {
-        if (window.confirm('追加された全てのカスタム患者データを削除しますか？\n(※アプリ内蔵の基本データは削除されません)')) {
-            document.body.style.cursor = 'wait'
-            await deleteAllCustomPatients()
-            document.body.style.cursor = 'default'
-            alert('カスタム患者を全件削除しました。')
-        }
+        requireMasterAuth(async () => {
+            if (window.confirm('追加された全てのカスタム患者データを削除しますか？\n(※アプリ内蔵の基本データは削除されません)')) {
+                document.body.style.cursor = 'wait'
+                await deleteAllCustomPatients()
+                document.body.style.cursor = 'default'
+                alert('カスタム患者を全件削除しました。')
+            }
+        })
     }
 
     const handleAddClick = () => {
-        // IDの自動連番 (現在の最大ID + 1)
-        const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
-        const nextId = maxId >= 1000000000000 ? 101 : maxId + 1 // 古いDate.nowのIDがあればリセット気味に
-        
-        // フォームにはまだ initialPatient を渡さない設計になっているため、PatientForm側で props を受け取るか、
-        // 編集モードとして渡す形になりますが、新規追加であることがわかるようにします。
-        // ここでは新規追加用のダミー患者オブジェクトを渡します。
-        setEditingPatient({
-            id: nextId,
-            name: '',
-            age: 30,
-            gender: 'M',
-            triage_color: '緑',
-            vitals_triage: '',
-            vitals_initial: '',
-            vitals_post: '',
-            findings: { head_and_neck: '', chest: '', abdomen_and_pelvis: '', limbs: '', fast: '', ample: '', background: '' },
-            diagnosis: '',
-            required_treatments: [],
-            status: '初期状態',
-            assessment_completed: false,
-            timer_started_at: null,
-            timer_duration_ms: null,
-            applied_treatment_id: null
-        } as unknown as Patient)
-        setIsFormVisible(true)
+        requireMasterAuth(() => {
+            const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
+            const nextId = maxId >= 1000000000000 ? 101 : maxId + 1
+
+            setEditingPatient({
+                id: nextId,
+                name: '',
+                age: 30,
+                gender: 'M',
+                triage_color: '緑',
+                vitals_triage: '',
+                vitals_initial: '',
+                vitals_post: '',
+                findings: { head_and_neck: '', chest: '', abdomen_and_pelvis: '', limbs: '', fast: '', ample: '', background: '' },
+                diagnosis: '',
+                required_treatments: [],
+                status: '初期状態',
+                assessment_completed: false,
+                timer_started_at: null,
+                timer_duration_ms: null,
+                applied_treatment_id: null
+            } as unknown as Patient)
+            setIsFormVisible(true)
+        })
     }
 
     const handleEditClick = (patient: Patient) => {
-        setEditingPatient(patient)
-        setIsFormVisible(true)
+        requireMasterAuth(() => {
+            setEditingPatient(patient)
+            setIsFormVisible(true)
+        })
+    }
+
+    const handleDeleteSinglePatient = (patient: Patient) => {
+        requireMasterAuth(async () => {
+            if (window.confirm(`患者「No.${patient.id} ${patient.name}」を削除しますか？`)) {
+                document.body.style.cursor = 'wait'
+                const { deletePatient } = await import('../lib/firestore')
+                await deletePatient(patient.id)
+                document.body.style.cursor = 'default'
+                alert('削除しました。')
+            }
+        })
+    }
+
+    const handleDuplicatePatient = (patient: Patient) => {
+        requireMasterAuth(async () => {
+            const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
+            const nextId = maxId >= 1000000000000 ? 101 : maxId + 1
+            const newPatient: Patient = {
+                ...JSON.parse(JSON.stringify(patient)),
+                id: nextId,
+                name: `${patient.name} (複製)`
+            }
+            document.body.style.cursor = 'wait'
+            await createPatient(newPatient)
+            document.body.style.cursor = 'default'
+            alert(`患者「No.${patient.id}」を「No.${nextId} ${newPatient.name}」として複製しました。`)
+        })
     }
 
     const handleFormSubmit = async (patient: Patient) => {
@@ -278,6 +275,31 @@ const AdminPage: React.FC = () => {
         link.click()
         document.body.removeChild(link)
     }
+
+    // 抽出可能なシナリオタグ一覧
+    const availableScenarios = Array.from(new Set(patients.map(p => p.scenario_tag || '基本')))
+
+    // 患者フィルター処理
+    const filteredPatients = patients.filter(p => {
+        // キーワード検索（ID, 氏名, 診断名）
+        if (searchQuery.trim()) {
+            const q = searchQuery.trim().toLowerCase()
+            const matchId = String(p.id).includes(q)
+            const matchName = p.name ? p.name.toLowerCase().includes(q) : false
+            const matchDiag = p.diagnosis ? p.diagnosis.toLowerCase().includes(q) : false
+            if (!matchId && !matchName && !matchDiag) return false
+        }
+        // シナリオタグフィルター
+        if (selectedScenarioFilter !== 'ALL') {
+            const tag = p.scenario_tag || '基本'
+            if (tag !== selectedScenarioFilter) return false
+        }
+        // トリアージ区分フィルター
+        if (selectedTriageFilter !== 'ALL') {
+            if (p.triage_color !== selectedTriageFilter) return false
+        }
+        return true
+    })
 
     const handleExportMasterCSV = () => {
         if (patients.length === 0) {
@@ -914,77 +936,248 @@ const AdminPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                                    <h2 style={{fontSize: '1.1rem', fontWeight: '700'}}>患者データ一覧</h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    <div>
+                                        <h2 style={{fontSize: '1.1rem', fontWeight: '700', margin: 0}}>患者マスター管理</h2>
+                                        <p style={{fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.2rem 0 0'}}>
+                                            全 {filteredPatients.length} / {patients.length} 件表示中
+                                        </p>
+                                    </div>
                                     {!currentSessionId && (
                                         <button onClick={handleAddClick} className="button button--primary" style={{width: 'auto', padding: '0.5rem 1rem'}}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '4px'}}>
                                                 <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                             </svg>
-                                            追加
+                                            新規患者を追加
                                         </button>
                                     )}
                                 </div>
 
-                        <div className="patient-list">
-                            {patients.length === 0 ? (
-                                <p style={{textAlign: 'center', color: 'var(--gray-500)', padding: '2rem'}}>患者データがありません。</p>
-                            ) : (
-                                patients.map((p, index) => (
-                                    <div key={p.id} className="patient-list-item" style={{ '--index': index } as React.CSSProperties}>
-                                        <div className="patient-list-item__header">
-                                            <div>
-                                                <div className="patient-list-item__name">{p.name} <span style={{fontSize: '0.75rem', background: 'var(--gray-200)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{p.scenario_tag || '基本'}</span></div>
-                                                <div className="patient-list-item__meta">ID: {String(p.id).padStart(4, '0')}</div>
-                                            </div>
-                                            <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
-                                                {p.triage_color}
-                                            </span>
+                                {/* 検索 & フィルターコントロール */}
+                                <div className="card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', backgroundColor: '#f8fafc', border: '1px solid var(--gray-200)' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                        {/* フリーワード検索 */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--gray-600)' }}>🔍 検索 (ID・氏名・診断名)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="例: 10, 山田, 骨折"
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="input"
+                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                            />
                                         </div>
-                                        <div className="info-row" style={{padding: '0.25rem 0'}}>
-                                            <span className="info-row__label">診断</span>
-                                            <span className="info-row__value">{p.diagnosis}</span>
+
+                                        {/* シナリオタグフィルター */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--gray-600)' }}>🏷️ シナリオタグ</label>
+                                            <select
+                                                value={selectedScenarioFilter}
+                                                onChange={(e) => setSelectedScenarioFilter(e.target.value)}
+                                                className="input"
+                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                            >
+                                                <option value="ALL">すべてのシナリオ ({patients.length}件)</option>
+                                                {availableScenarios.map(scen => (
+                                                    <option key={scen} value={scen}>
+                                                        {scen} ({patients.filter(p => (p.scenario_tag || '基本') === scen).length}件)
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <div className="info-row" style={{padding: '0.25rem 0'}}>
-                                            <span className="info-row__label">必要処置</span>
-                                            <span className="info-row__value">
-                                                {p.required_treatments?.map(rt => rt.treatment_name).join(', ') || 'なし'}
-                                            </span>
-                                        </div>
-                                        <div className="info-row" style={{padding: '0.25rem 0'}}>
-                                            <span className="info-row__label">拘束時間</span>
-                                            <span className="info-row__value">
-                                                {p.required_treatments?.map(rt => `${rt.lock_timer_minutes}分`).join(', ') || 'なし'}
-                                            </span>
-                                        </div>
-                                        {!currentSessionId ? (
-                                            <div className="actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: 'var(--border)' }}>
-                                                <button
-                                                    className="button button--secondary"
-                                                    onClick={() => handleEditClick(p)}
-                                                    style={{padding: '0.5rem'}}
-                                                >
-                                                    編集
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: 'var(--border)' }}>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', display: 'block', textAlign: 'center' }}>
-                                                    ※セッション中は編集不可
-                                                </span>
-                                            </div>
+                                    </div>
+
+                                    {/* トリアージ区分タブボタン */}
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--gray-600)', marginRight: '0.4rem' }}>トリアージ区分:</span>
+                                        {[
+                                            { key: 'ALL', label: 'すべて', color: 'var(--gray-700)', bg: '#f1f5f9' },
+                                            { key: '赤', label: '🔴 赤', color: '#b91c1c', bg: '#fef2f2' },
+                                            { key: '黄', label: '🟡 黄', color: '#854d0e', bg: '#fefce8' },
+                                            { key: '緑', label: '🟢 緑', color: '#166534', bg: '#f0fdf4' },
+                                            { key: '黒', label: '⚫ 黒', color: '#27272a', bg: '#f4f4f5' }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.key}
+                                                type="button"
+                                                onClick={() => setSelectedTriageFilter(tab.key)}
+                                                style={{
+                                                    padding: '0.25rem 0.6rem',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 'bold',
+                                                    borderRadius: '6px',
+                                                    border: selectedTriageFilter === tab.key ? `2px solid ${tab.color}` : '1px solid var(--gray-300)',
+                                                    backgroundColor: selectedTriageFilter === tab.key ? tab.bg : '#ffffff',
+                                                    color: tab.color,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease'
+                                                }}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                        {(searchQuery || selectedScenarioFilter !== 'ALL' || selectedTriageFilter !== 'ALL') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSearchQuery(''); setSelectedScenarioFilter('ALL'); setSelectedTriageFilter('ALL'); }}
+                                                style={{ fontSize: '0.75rem', color: 'var(--gray-500)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 'auto' }}
+                                            >
+                                                フィルター解除
+                                            </button>
                                         )}
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                </div>
+
+                                <div className="patient-list">
+                                    {filteredPatients.length === 0 ? (
+                                        <p style={{textAlign: 'center', color: 'var(--gray-500)', padding: '2rem'}}>条件に一致する患者データが見つかりません。</p>
+                                    ) : (
+                                        filteredPatients.map((p, index) => (
+                                            <div key={p.id} className="patient-list-item" style={{ '--index': index } as React.CSSProperties}>
+                                                <div className="patient-list-item__header">
+                                                    <div>
+                                                        <div className="patient-list-item__name">
+                                                            No.{p.id} {p.name}
+                                                            <span style={{fontSize: '0.75rem', background: 'var(--gray-200)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>{p.scenario_tag || '基本'}</span>
+                                                        </div>
+                                                        <div className="patient-list-item__meta">{p.age}歳 {p.gender === 'M' ? '男性' : '女性'}</div>
+                                                    </div>
+                                                    <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
+                                                        {p.triage_color}
+                                                    </span>
+                                                </div>
+                                                <div className="info-row" style={{padding: '0.25rem 0'}}>
+                                                    <span className="info-row__label">診断</span>
+                                                    <span className="info-row__value">{p.diagnosis}</span>
+                                                </div>
+                                                <div className="info-row" style={{padding: '0.25rem 0'}}>
+                                                    <span className="info-row__label">必要処置</span>
+                                                    <span className="info-row__value">
+                                                        {p.required_treatments?.map(rt => rt.treatment_name).join(', ') || 'なし'}
+                                                    </span>
+                                                </div>
+                                                <div className="actions" style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: 'var(--border)', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        className="button button--secondary"
+                                                        onClick={() => handleDuplicatePatient(p)}
+                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                                                        title="複製して新しい患者データを作成"
+                                                    >
+                                                        📋 複製
+                                                    </button>
+                                                    <button
+                                                        className="button button--secondary"
+                                                        onClick={() => handleEditClick(p)}
+                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                                                    >
+                                                        ✏️ 編集
+                                                    </button>
+                                                    <button
+                                                        className="button button--secondary"
+                                                        onClick={() => handleDeleteSinglePatient(p)}
+                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                                    >
+                                                        🗑️ 削除
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </>
                         )}
                     </>
                 )}
             </main>
 
-            {/* QRコード共有モーダル（document.body 直下へPortalレンダリングして全画面中央配置） */}
+            {/* 上位マスターパスワード認証モーダル (komonji@tommy) */}
+            {showMasterAuthModal && ReactDOM.createPortal(
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        zIndex: 99999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1.5rem'
+                    }}
+                    onClick={() => setShowMasterAuthModal(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'var(--white)',
+                            borderRadius: '16px',
+                            padding: '2rem',
+                            maxWidth: '380px',
+                            width: '100%',
+                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
+                            textAlign: 'center'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            color: '#6d28d9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1rem'
+                        }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--gray-900)' }}>上位管理者認証が必要</h2>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+                            患者マスターの変更・作成・削除を行うには上位パスワードを入力してください。
+                        </p>
+                        <form onSubmit={handleMasterAuthSubmit}>
+                            <input
+                                type="password"
+                                placeholder="上位パスワードを入力"
+                                value={masterAuthInput}
+                                onChange={(e) => setMasterAuthInput(e.target.value)}
+                                className="input"
+                                style={{ marginBottom: '1rem', textAlign: 'center', fontSize: '1rem' }}
+                                autoFocus
+                            />
+                            {masterAuthError && (
+                                <p style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                                    ❌ 上位パスワードが違います
+                                </p>
+                            )}
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="button button--secondary"
+                                    onClick={() => setShowMasterAuthModal(false)}
+                                    style={{ flex: 1 }}
+                                >
+                                    キャンセル
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="button button--primary"
+                                    style={{ flex: 1, backgroundColor: '#6d28d9', borderColor: '#6d28d9' }}
+                                >
+                                    認証実行
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* QRコード共有モーダル */}
             {showShareModal && currentSessionId && ReactDOM.createPortal(
                 <div
                     style={{

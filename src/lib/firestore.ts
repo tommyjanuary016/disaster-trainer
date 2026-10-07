@@ -323,6 +323,27 @@ export async function createPatient(patient: Patient): Promise<void> {
 }
 
 // ------------------------------------------------------------------
+// 単一患者データを削除する
+// ------------------------------------------------------------------
+export async function deletePatient(patientId: number): Promise<void> {
+    if (USE_MOCK || !db) {
+        mockStore.delete(patientId)
+        return
+    }
+    const { deleteDoc } = await import('firebase/firestore')
+    const docRef = doc(db, 'patients', String(patientId))
+    await deleteDoc(docRef)
+    
+    // custom_patients にも存在すれば併せて削除
+    try {
+        const customRef = doc(db, 'custom_patients', String(patientId))
+        await deleteDoc(customRef)
+    } catch (e) {
+        // 無視
+    }
+}
+
+// ------------------------------------------------------------------
 // アセスメント完了フラグを更新する
 // ------------------------------------------------------------------
 export async function updateAssessmentCompleted(

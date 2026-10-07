@@ -482,45 +482,4 @@ const QRScannerPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                    {sessionPatients.map((p, idx) => (
-                                        <div
-                                            key={p.id}
-                                            className="list-item"
-                                            style={{
-                                                padding: '1rem',
-                                                border: '1px solid var(--gray-200)',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: '1rem',
-                                                transition: 'all 0.2s ease',
-                                                backgroundColor: 'white'
-                                            }}
-                                            onClick={() => navigate(getPatientPath(p.id))}
-                                        >
-                                            <div>
-                                                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--gray-900)' }}>
-                                                    No.{idx + 1}
-                                                </div>
-                                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginTop: '0.25rem' }}>
-                                                    性別: {p.gender === 'M' ? '男性' : '女性'} | 年齢層: {Math.floor(p.age / 10) * 10}代
-                                                </div>
-                                            </div>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: '600' }}>
-                                                詳細を開く →
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
-
-export default QRScannerPage
+           

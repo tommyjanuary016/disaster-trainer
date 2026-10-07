@@ -327,39 +327,73 @@ const QRScannerPage: React.FC = () => {
 
             {isTestMode ? (
                 <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>検証用: 患者カード（直接アクセス）</h3>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>
+                        ⚡ 検証用: 患者カード（直接アクセス）
+                    </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                        {sessionPatients.map((p, idx) => {
-                            const triageBg = p.triage_color === '赤' ? '#fef2f2' : p.triage_color === '黄' ? '#fefce8' : p.triage_color === '緑' ? '#f0fdf4' : '#f4f4f5'
-                            const triageColor = p.triage_color === '赤' ? '#b91c1c' : p.triage_color === '黄' ? '#854d0e' : p.triage_color === '緑' ? '#166534' : '#27272a'
-                            const triageBorder = p.triage_color === '赤' ? '#fca5a5' : p.triage_color === '黄' ? '#fde047' : p.triage_color === '緑' ? '#86efac' : '#a1a1aa'
-
-                            return (
-                                <button
-                                    key={p.id}
-                                    className="button button--secondary"
-                                    style={{ padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', position: 'relative' }}
-                                    onClick={() => handleScan(String(p.id))}
+                        {isLoadingPatients ? (
+                            /* ローディング中: スケルトンカードを表示 */
+                            Array.from({ length: 6 }).map((_, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        padding: '0.6rem 0.5rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--gray-200)',
+                                        backgroundImage: 'linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%)',
+                                        backgroundSize: '200% 100%',
+                                        minHeight: '80px',
+                                        animation: 'shimmer 1.5s ease-in-out infinite'
+                                    }}
                                 >
-                                    <span style={{
-                                        fontSize: '0.7rem',
-                                        fontWeight: 'bold',
-                                        padding: '0.1rem 0.4rem',
-                                        borderRadius: '4px',
-                                        marginBottom: '0.25rem',
-                                        backgroundColor: triageBg,
-                                        color: triageColor,
-                                        border: `1px solid ${triageBorder}`
-                                    }}>
-                                        {p.triage_color || '未'}
-                                    </span>
-                                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-900)' }}>No.{idx + 1} {p.name}</span>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
-                                        {p.age}歳 {p.gender === 'M' ? '男性' : '女性'}
-                                    </span>
-                                </button>
-                            )
-                        })}
+                                    <div style={{ width: '40px', height: '18px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                    <div style={{ width: '80%', height: '14px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                    <div style={{ width: '60%', height: '12px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                </div>
+                            ))
+                        ) : sessionPatients.length === 0 ? (
+                            /* データ取得完了後も患者が0件の場合 */
+                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                                セッションに患者データがありません
+                            </div>
+                        ) : (
+                            /* 患者カードを表示 */
+                            sessionPatients.map((p, idx) => {
+                                const triageBg = p.triage_color === '赤' ? '#fef2f2' : p.triage_color === '黄' ? '#fefce8' : p.triage_color === '緑' ? '#f0fdf4' : '#f4f4f5'
+                                const triageColor = p.triage_color === '赤' ? '#b91c1c' : p.triage_color === '黄' ? '#854d0e' : p.triage_color === '緑' ? '#166534' : '#27272a'
+                                const triageBorder = p.triage_color === '赤' ? '#fca5a5' : p.triage_color === '黄' ? '#fde047' : p.triage_color === '緑' ? '#86efac' : '#a1a1aa'
+
+                                return (
+                                    <button
+                                        key={p.id}
+                                        className="button button--secondary"
+                                        style={{ padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', position: 'relative' }}
+                                        onClick={() => handleScan(String(p.id))}
+                                    >
+                                        <span style={{
+                                            fontSize: '0.7rem',
+                                            fontWeight: 'bold',
+                                            padding: '0.1rem 0.4rem',
+                                            borderRadius: '4px',
+                                            marginBottom: '0.25rem',
+                                            backgroundColor: triageBg,
+                                            color: triageColor,
+                                            border: `1px solid ${triageBorder}`
+                                        }}>
+                                            {p.triage_color || '未'}
+                                        </span>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-900)' }}>No.{idx + 1} {p.name}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: '0.2rem' }}>
+                                            {p.age}歳 {p.gender === 'M' ? '男性' : '女性'}
+                                        </span>
+                                    </button>
+                                )
+                            })
+                        )}
                     </div>
                 </div>
             ) : (

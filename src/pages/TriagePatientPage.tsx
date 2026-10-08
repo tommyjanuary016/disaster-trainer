@@ -16,6 +16,7 @@ const TriagePatientPage: React.FC = () => {
     const patientId = id ? parseInt(id) : null
     const { patient, loading, error } = usePatient(patientId)
 
+    const [isSessionLoaded, setIsSessionLoaded] = useState(false)
     const [isTestMode, setIsTestMode] = useState(false)
     const durationSec = isTestMode ? TEST_TRIAGE_DURATION_SEC : STANDARD_TRIAGE_DURATION_SEC
 
@@ -26,7 +27,11 @@ const TriagePatientPage: React.FC = () => {
                 if (session?.isTestMode) {
                     setIsTestMode(true)
                 }
-            }).catch(e => console.error(e))
+            }).catch(e => console.error(e)).finally(() => {
+                setIsSessionLoaded(true)
+            })
+        } else {
+            setIsSessionLoaded(true)
         }
     }, [activeSessionId])
 
@@ -88,7 +93,7 @@ const TriagePatientPage: React.FC = () => {
         localStorage.setItem(`${STORAGE_PREFIX}${patientId}`, String(now))
     }
 
-    if (loading) return <LoadingScreen message="トリアージ患者データを取得中" subMessage="しばらくお待ちください..." />
+    if (loading || !isSessionLoaded) return <LoadingScreen message="トリアージ患者データを取得中" subMessage="しばらくお待ちください..." />
     if (error || !patient) {
         return (
             <div className="page-error">

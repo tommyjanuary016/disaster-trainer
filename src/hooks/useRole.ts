@@ -19,4 +19,5 @@ export function useRole() {
         setRoleState(newRole)
     }
 
-    r
+    return { role, setRole }
+}

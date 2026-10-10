@@ -43,5 +43,8 @@ export default defineConfig({
     build: {
         target: 'esnext',
         outDir: 'dist',
+        commonjsOptions: {
+            transformMixedEsModules: true,
+        },
     },
 })

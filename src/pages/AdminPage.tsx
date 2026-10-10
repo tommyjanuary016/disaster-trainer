@@ -40,7 +40,78 @@ const AdminPage: React.FC = () => {
     const [sessionEnded, setSessionEnded] = useState(false) // 訓練終了状態フラグ
     const [showShareModal, setShowShareModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
+    const [showMasterAll, setShowMasterAll] = useState(false)
+    const [activeSessionsList, setActiveSessionsList] = useState<TrainingSession[]>([])
     const location = useLocation()
+
+    const loadActiveSessions = async () => {
+        try {
+            const sessions = await fetchActiveSessions()
+            setActiveSessionsList(sessions)
+        } catch (e) {
+            console.error('Failed to fetch active sessions', e)
+        }
+    }
+
+    useEffect(() => {
+        loadActiveSessions()
+    }, [])
+
+    useEffect(() => {
+        if (location.state && (location.state as any).action) {
+            const action = (location.state as any).action
+            if (action === 'new_session') {
+                setIsSessionModalOpen(true)
+            } else if (action === 'master') {
+                setShowMasterAll(true)
+                setDisplaySessionId(null)
+            }
+        }
+    }, [location.state])
+
+    useEffect(() => {
+        if (showMasterAll) {
+            const unsub = subscribeToAllPatients((data) => {
+                setPatients(data)
+            }, false)
+            return () => unsub()
+        } else if (displaySessionId) {
+            const unsub = subscribeToAllPatients((data) => {
+                setPatients(data)
+            }, true, displaySessionId)
+            return () => unsub()
+        } else {
+            const unsub = subscribeToAllPatients((data) => {
+                setPatients(data)
+            }, false)
+            return () => unsub()
+        }
+    }, [displaySessionId, showMasterAll])
+
+    useEffect(() => {
+        if (displaySessionId) {
+            fetchTrainingSession(displaySessionId).then(session => {
+                if (session) {
+                    setCurrentSessionTitle(session.title)
+                }
+            }).catch(e => console.error(e))
+        } else {
+            setCurrentSessionTitle(null)
+        }
+    }, [displaySessionId])
+
+    const shareUrl = currentSessionId ? `${window.location.origin}/?session_id=${currentSessionId}` : ''
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}`
+
+    const handleCopyLink = () => {
+        if (!shareUrl) return
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            setCopySuccess(true)
+            setTimeout(() => setCopySuccess(false), 2000)
+        }).catch(err => {
+            console.error('コピー失敗:', err)
+        })
+    }
 
     // 全経路パスワード保護ステート（トップ認証または管理画面認証を共有）
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {

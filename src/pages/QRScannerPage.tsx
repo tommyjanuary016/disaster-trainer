@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, fetchAllPatients, subscribeToAllPatients } from '../lib/firestore'
+import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, subscribeToAllPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'

@@ -119,6 +119,7 @@ const AdminPage: React.FC = () => {
     })
     const [authInput, setAuthInput] = useState('')
     const [authError, setAuthError] = useState(false)
+    const [showAdminAuthPassword, setShowAdminAuthPassword] = useState(false)
 
     // 上位マスターパスワード認証ステート（komonji@tommy）
     const [isMasterAuthenticated, setIsMasterAuthenticated] = useState<boolean>(() => {
@@ -127,6 +128,7 @@ const AdminPage: React.FC = () => {
     const [showMasterAuthModal, setShowMasterAuthModal] = useState(false)
     const [masterAuthInput, setMasterAuthInput] = useState('')
     const [masterAuthError, setMasterAuthError] = useState(false)
+    const [showMasterAuthPassword, setShowMasterAuthPassword] = useState(false)
     const [pendingMasterAction, setPendingMasterAction] = useState<(() => void) | null>(null)
 
     // 患者検索 & フィルター用ステート
@@ -220,11 +222,14 @@ const AdminPage: React.FC = () => {
 
     const handleAddClick = () => {
         requireMasterAuth(() => {
-            const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
-            const nextId = maxId >= 1000000000000 ? 101 : maxId + 1
+            // セッション複製用の巨大ID(タイムスタンプ)を除外し、マスター患者としてのIDを採番
+            const regularIds = patients.map(p => p.id).filter(id => id < 1000000000)
+            const maxId = regularIds.length > 0 ? Math.max(...regularIds) : 25
+            const nextId = maxId + 1
 
             setEditingPatient({
                 id: nextId,
+                scenario_tag: '基本',
                 name: '',
                 age: 30,
                 gender: 'M',
@@ -234,6 +239,7 @@ const AdminPage: React.FC = () => {
                 vitals_post: '',
                 findings: { head_and_neck: '', chest: '', abdomen_and_pelvis: '', limbs: '', fast: '', ample: '', background: '' },
                 diagnosis: '',
+                acting_instructions: '',
                 required_treatments: [],
                 status: '初期状態',
                 assessment_completed: false,
@@ -266,8 +272,9 @@ const AdminPage: React.FC = () => {
 
     const handleDuplicatePatient = (patient: Patient) => {
         requireMasterAuth(async () => {
-            const maxId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) : 100
-            const nextId = maxId >= 1000000000000 ? 101 : maxId + 1
+            const regularIds = patients.map(p => p.id).filter(id => id < 1000000000)
+            const maxId = regularIds.length > 0 ? Math.max(...regularIds) : 25
+            const nextId = maxId + 1
             const newPatient: Patient = {
                 ...JSON.parse(JSON.stringify(patient)),
                 id: nextId,
@@ -430,18 +437,32 @@ const AdminPage: React.FC = () => {
                     <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--gray-900)' }}>管理者認証が必要</h2>
                     <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.5rem' }}>
                         管理画面にアクセスするにはパスワードを入力してください。<br/>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>（ヒント: このアプリを作成した病院）</span>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)', fontWeight: 600 }}>ヒント：作成病院名</span>
                     </p>
                     <form onSubmit={handleAdminAuthSubmit}>
-                        <input
-                            type="password"
-                            placeholder="パスワードを入力"
-                            value={authInput}
-                            onChange={(e) => setAuthInput(e.target.value)}
-                            className="input"
-                            style={{ marginBottom: '1rem', textAlign: 'center', fontSize: '1.1rem', letterSpacing: '0.2em' }}
-                            autoFocus
-                        />
+                        <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                            <input
+                                type={showAdminAuthPassword ? "text" : "password"}
+                                placeholder="パスワードを入力"
+                                value={authInput}
+                                onChange={(e) => { setAuthInput(e.target.value); setAuthError(false); }}
+                                className="input"
+                                style={{ marginBottom: 0, textAlign: 'center', fontSize: '1.1rem', letterSpacing: showAdminAuthPassword ? 'normal' : '0.2em', paddingRight: '2.5rem' }}
+                                autoFocus
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowAdminAuthPassword(!showAdminAuthPassword)}
+                                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--gray-500)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+                                title={showAdminAuthPassword ? "非表示" : "表示"}
+                            >
+                                {showAdminAuthPassword ? (
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                ) : (
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                )}
+                            </button>
+                        </div>
                         {authError && (
                             <p style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
                                 ❌ パスワードが違います
@@ -1207,19 +1228,34 @@ const AdminPage: React.FC = () => {
                             </svg>
                         </div>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--gray-900)' }}>上位管理者認証が必要</h2>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
-                            患者マスターの変更・作成・削除を行うには上位パスワードを入力してください。
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                            患者マスターの変更・作成・削除を行うには上位パスワードを入力してください。<br/>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)', fontWeight: 600 }}>ヒント：作成病院名 + @ + 作成者</span>
                         </p>
                         <form onSubmit={handleMasterAuthSubmit}>
-                            <input
-                                type="password"
-                                placeholder="上位パスワードを入力"
-                                value={masterAuthInput}
-                                onChange={(e) => setMasterAuthInput(e.target.value)}
-                                className="input"
-                                style={{ marginBottom: '1rem', textAlign: 'center', fontSize: '1rem' }}
-                                autoFocus
-                            />
+                            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                                <input
+                                    type={showMasterAuthPassword ? "text" : "password"}
+                                    placeholder="上位パスワードを入力"
+                                    value={masterAuthInput}
+                                    onChange={(e) => { setMasterAuthInput(e.target.value); setMasterAuthError(false); }}
+                                    className="input"
+                                    style={{ marginBottom: 0, textAlign: 'center', fontSize: '1rem', paddingRight: '2.5rem' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMasterAuthPassword(!showMasterAuthPassword)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--gray-500)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+                                    title={showMasterAuthPassword ? "非表示" : "表示"}
+                                >
+                                    {showMasterAuthPassword ? (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                    ) : (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    )}
+                                </button>
+                            </div>
                             {masterAuthError && (
                                 <p style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
                                     ❌ 上位パスワードが違います

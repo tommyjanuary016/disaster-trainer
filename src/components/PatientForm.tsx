@@ -389,7 +389,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
     }
 
     return (
-        <div className="patient-form card card--elevated" style={{ maxWidth: '800px', margin: '0 auto', padding: '1.5rem' }}>
+        <div className="patient-form card card--elevated" style={{ maxWidth: '800px', width: '100%', margin: '0 auto', padding: '1.25rem', boxSizing: 'border-box', overflowX: 'hidden' }}>
             {/* ヘッダー */}
             <header className="patient-form__header" style={{ marginBottom: '1.25rem', borderBottom: '1px solid var(--gray-200)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -487,8 +487,31 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--gray-800)' }}>2. 患者基本情報を確認・入力</h4>
                             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
                                 <div>
-                                    <label className="form-label">管理ID</label>
-                                    <input type="number" name="id" value={formData.id} onChange={handleNumberChange} required className="input" />
+                                    <label className="form-label">管理ID (自動採番)</label>
+                                    <input
+                                        type="number"
+                                        name="id"
+                                        value={formData.id}
+                                        readOnly
+                                        className="input"
+                                        style={{ backgroundColor: 'var(--gray-100)', color: 'var(--gray-700)', cursor: 'not-allowed', fontWeight: 'bold' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="form-label">シナリオタグ</label>
+                                    <select
+                                        name="scenario_tag"
+                                        value={formData.scenario_tag || '基本'}
+                                        onChange={handleChange}
+                                        className="input"
+                                    >
+                                        <option value="基本">基本</option>
+                                        <option value="地震・倒壊">地震・倒壊</option>
+                                        <option value="多数傷病・交通事故">多数傷病・交通事故</option>
+                                        <option value="爆発・火災">爆発・火災</option>
+                                        <option value="NBC災害・中毒">NBC災害・中毒</option>
+                                        <option value="カスタム">カスタム</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="form-label">患者氏名 <span style={{ color: 'red' }}>*</span></label>
@@ -506,7 +529,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="form-label">トリアージ区分</label>
+                                    <label className="form-label">想定トリアージ区分</label>
                                     <select name="triage_color" value={formData.triage_color} onChange={handleChange} className="input" style={{ fontWeight: 'bold' }}>
                                         <option value="赤">🔴 I 赤 (最優先)</option>
                                         <option value="黄">🟡 II 黄 (待機)</option>
@@ -514,7 +537,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                         <option value="黒">⚫ 0 黒 (死亡/救命不可)</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div style={{ gridColumn: 'span 2' }}>
                                     <label className="form-label">診断名</label>
                                     <input type="text" name="diagnosis" value={formData.diagnosis} onChange={handleChange} className="input" placeholder="例: 骨盤骨折" />
                                 </div>
@@ -529,7 +552,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                 {(formMode === 'wizard' || initialPatient) && (
                     <div>
                         {/* ウィザードナビゲーションステップ */}
-                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid var(--gray-200)' }}>
+                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid var(--gray-200)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                             {[
                                 { step: 1, label: '1. 基本情報' },
                                 { step: 2, label: '2. バイタルサイン' },
@@ -541,7 +564,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                     type="button"
                                     onClick={() => setActiveWizardStep(s.step)}
                                     style={{
-                                        flex: 1, padding: '0.55rem 0.25rem', border: 'none', background: 'none',
+                                        flex: 1, minWidth: '90px', padding: '0.55rem 0.25rem', border: 'none', background: 'none',
                                         borderBottom: activeWizardStep === s.step ? '3px solid var(--primary)' : '3px solid transparent',
                                         color: activeWizardStep === s.step ? 'var(--primary)' : 'var(--gray-600)',
                                         fontWeight: activeWizardStep === s.step ? 'bold' : 'normal',
@@ -555,10 +578,33 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
 
                         {/* Step 1: 基本情報 */}
                         {activeWizardStep === 1 && (
-                            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
                                 <div>
                                     <label className="form-label">管理番号 (ID)</label>
-                                    <input type="number" name="id" value={formData.id} onChange={handleNumberChange} required className="input" />
+                                    <input
+                                        type="number"
+                                        name="id"
+                                        value={formData.id}
+                                        readOnly
+                                        className="input"
+                                        style={{ backgroundColor: 'var(--gray-100)', color: 'var(--gray-700)', cursor: 'not-allowed', fontWeight: 'bold' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="form-label">シナリオタグ</label>
+                                    <select
+                                        name="scenario_tag"
+                                        value={formData.scenario_tag || '基本'}
+                                        onChange={handleChange}
+                                        className="input"
+                                    >
+                                        <option value="基本">基本</option>
+                                        <option value="地震・倒壊">地震・倒壊</option>
+                                        <option value="多数傷病・交通事故">多数傷病・交通事故</option>
+                                        <option value="爆発・火災">爆発・火災</option>
+                                        <option value="NBC災害・中毒">NBC災害・中毒</option>
+                                        <option value="カスタム">カスタム</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="form-label">患者氏名 <span style={{ color: 'red' }}>*</span></label>
@@ -582,16 +628,6 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                         <option value="黄">黄 (待機的治療)</option>
                                         <option value="緑">緑 (軽症)</option>
                                         <option value="黒">黒 (死亡/非救命対象)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="form-label">現場トリアージ区分</label>
-                                    <select name="scene_triage_color" value={formData.scene_triage_color || ''} onChange={handleChange} className="input">
-                                        <option value="">(選択なし - 未測定)</option>
-                                        <option value="赤">赤</option>
-                                        <option value="黄">黄</option>
-                                        <option value="緑">緑</option>
-                                        <option value="黒">黒</option>
                                     </select>
                                 </div>
                             </div>
@@ -671,9 +707,76 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                     <label className="form-label">FAST所見 (超音波検査)</label>
                                     <input type="text" name="fast" value={formData.findings?.fast || ''} onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, fast: e.target.value } }))} className="input" placeholder="例: ダグラス窩にecho free space (+)" />
                                 </div>
+                                <div style={{ background: 'var(--gray-50)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                                    <label className="form-label" style={{ fontWeight: 'bold', marginBottom: '0.5rem', display: 'block' }}>AMPLE 情報 (問診各項目)</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-600)' }}>A: アレルギー</span>
+                                            <input
+                                                type="text"
+                                                value={formData.findings?.ample_a || ''}
+                                                onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, ample_a: e.target.value } }))}
+                                                className="input"
+                                                style={{ marginBottom: 0, padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                placeholder="例: なし、ペニシリン"
+                                            />
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-600)' }}>M: 内服薬</span>
+                                            <input
+                                                type="text"
+                                                value={formData.findings?.ample_m || ''}
+                                                onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, ample_m: e.target.value } }))}
+                                                className="input"
+                                                style={{ marginBottom: 0, padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                placeholder="例: 降圧剤、抗凝固薬"
+                                            />
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-600)' }}>P: 既往歴・妊娠</span>
+                                            <input
+                                                type="text"
+                                                value={formData.findings?.ample_p || ''}
+                                                onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, ample_p: e.target.value } }))}
+                                                className="input"
+                                                style={{ marginBottom: 0, padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                placeholder="例: 高血圧、糖尿病、なし"
+                                            />
+                                        </div>
+                                        <div>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-600)' }}>L: 最終飲食</span>
+                                            <input
+                                                type="text"
+                                                value={formData.findings?.ample_l || ''}
+                                                onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, ample_l: e.target.value } }))}
+                                                className="input"
+                                                style={{ marginBottom: 0, padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                placeholder="例: 2時間前昼食"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ marginTop: '0.5rem' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-600)' }}>E: 受傷機転・イベント</span>
+                                        <textarea
+                                            value={formData.findings?.ample_e || ''}
+                                            onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, ample_e: e.target.value } }))}
+                                            className="input"
+                                            rows={2}
+                                            style={{ marginBottom: 0, padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                            placeholder="例: 多重追突事故で座席から転落し下腹部を強打"
+                                        />
+                                    </div>
+                                </div>
                                 <div>
-                                    <label className="form-label">AMPLE情履歴 (アレルギー・内服・既往等)</label>
-                                    <textarea name="ample" value={formData.findings?.ample || ''} onChange={handleFindingsChange} className="input" rows={2} placeholder="例: A:なし M:降圧剤 P:高血圧 L:2時間前昼食 E:事故転落" />
+                                    <label className="form-label">患者背景 (生活歴・家族・ADL)</label>
+                                    <input
+                                        type="text"
+                                        name="background"
+                                        value={formData.findings?.background || ''}
+                                        onChange={e => setFormData(prev => ({ ...prev, findings: { ...prev.findings, background: e.target.value } }))}
+                                        className="input"
+                                        placeholder="例: 配偶者と2人暮らし、ADL自立"
+                                    />
                                 </div>
                             </div>
                         )}

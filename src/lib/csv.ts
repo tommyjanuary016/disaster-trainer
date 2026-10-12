@@ -382,11 +382,30 @@ export function exportMasterCSV(patients: Patient[]): string {
         }
 
         // AMPLE各項目の出力（分割データ側または一括AMPLEの分解）
-        const ample_a = p.findings?.ample_a ?? ''
-        const ample_m = p.findings?.ample_m ?? ''
-        const ample_p = p.findings?.ample_p ?? ''
-        const ample_l = p.findings?.ample_l ?? ''
-        const ample_e = p.findings?.ample_e ?? ''
+        let ample_a = p.findings?.ample_a ?? ''
+        let ample_m = p.findings?.ample_m ?? ''
+        let ample_p = p.findings?.ample_p ?? ''
+        let ample_l = p.findings?.ample_l ?? ''
+        let ample_e = p.findings?.ample_e ?? ''
+
+        // 分割項目が空で、一括ampleに記載がある場合は自動抽出
+        if (!ample_a && !ample_m && !ample_p && !ample_l && !ample_e && p.findings?.ample) {
+            const raw = p.findings.ample
+            const extract = (prefix: string, nextPrefixes: string[]) => {
+                const regex = new RegExp(`[・\\s]*${prefix}[:：]?([\\s\\S]*?)(?=(?:${nextPrefixes.join('|')})|$)`, 'i')
+                const match = raw.match(regex)
+                return match ? match[1].trim().replace(/^[:：\s]+/, '') : ''
+            }
+            ample_a = extract('A(?:[:：]アレルギー)?', ['M', '・M', 'P', '・P', 'L', '・L', 'E', '・E'])
+            ample_m = extract('M(?:[:：]内服薬)?', ['P', '・P', 'L', '・L', 'E', '・E'])
+            ample_p = extract('P(?:[:：]既往歴(?:・妊娠)?)?', ['L', '・L', 'E', '・E'])
+            ample_l = extract('L(?:[:：]最終飲食)?', ['E', '・E'])
+            ample_e = extract('E(?:[:：]受傷機転)?', ['$'])
+            if (!ample_a && !ample_m && !ample_p && !ample_l && !ample_e) {
+                // 接頭辞がない場合は受傷機転に全体をフォールバック
+                ample_e = raw
+            }
+        }
 
         const row = [
             p.scenario_tag || '基本',
@@ -675,7 +694,17 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
         const ample_l = data['L:最終飲食'] || ''
         const ample_e = data['E:受傷機転'] || ''
         // 旧形式の一括AMPLEテキスト
-        const ampleRaw = data['AMPLE'] || ''
+        let ampleRaw = data['AMPLE'] || ''
+        if (!ampleRaw && (ample_a || ample_m || ample_p || ample_l || ample_e)) {
+            const parts = [
+                ample_a ? `A:アレルギー: ${ample_a}` : null,
+                ample_m ? `M:内服薬: ${ample_m}` : null,
+                ample_p ? `P:既往歴: ${ample_p}` : null,
+                ample_l ? `L:最終飲食: ${ample_l}` : null,
+                ample_e ? `E:受傷機転: ${ample_e}` : null,
+            ].filter(Boolean)
+            ampleRaw = parts.join('\n')
+        }
 
         const patient: Patient = {
             scenario_tag: data['シナリオタグ'] || 'カスタム',

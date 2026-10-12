@@ -733,39 +733,4 @@ export function mapCSVToPatients(csvRows: string[][]): Patient[] {
                 ),
                 ample: ampleRaw,
                 // AMPLE分割各項目
-                ample_a,
-                ample_m,
-                ample_p,
-                ample_l,
-                ample_e,
-                // 後方互換: '患者背景'列下位互換
-                background: data['患者背景'] || data['背景（負傷機転）'] || '',
-            },
-            diagnosis:                      data['診断名']                      || '',
-            necessary_tests_and_treatments: data['必要検査・安定処置']          || '',
-            policy:                         data['方针']                        || '',
-            acting_instructions:            data['演技・痛がり方アドバイス']    || '',
-            image_urls: data['画像ＵＲＬ（カンマ区切り）']
-                ? data['画像ＵＲＬ（カンマ区切り）'].split(',').map((s: string) => s.trim()).filter(Boolean)
-                : [],
-            // 血液検査データが空欄の場合は診断名・トリアージ色から自動生成（解決策A）
-            blood_test_data: data['血液検査データ'] || generateDefaultBloodTestData(
-                data['診断名'] || '',
-                triage_color
-            ),
-            required_treatments,
-            deterioration_enabled:       data['悪化シナリオ有効'] === '有効',
-            deterioration_time_minutes:  parseInt(data['悪化到達時間（分）']) || 30,
-            rosc_possible:               data['ROSC可能'] === '可能',
-            status: '初期状態',
-            assessment_completed: false,
-            timer_started_at: null,
-            timer_duration_ms: null,
-            applied_treatment_id: null,
-        }
-
-        patients.push(patient)
-    }
-
-    return patients
-}
+                ampl

@@ -1274,4 +1274,87 @@ const AdminPage: React.FC = () => {
                                     type="submit"
                                     className="button button--primary"
                                     style={{ flex: 1, backgroundColor: '#6d28d9', borderColor: '#6d28d9' }}
-                 
+                                >
+                                    認証実行
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* QRコード共有モーダル */}
+            {showShareModal && currentSessionId && ReactDOM.createPortal(
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        zIndex: 99999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1.5rem'
+                    }}
+                    onClick={() => setShowShareModal(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'var(--white)',
+                            borderRadius: '16px',
+                            padding: '1.5rem',
+                            maxWidth: '380px',
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+                            position: 'relative'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--gray-900)' }}>📱 プレイヤーを招待</h3>
+                            <button
+                                onClick={() => setShowShareModal(false)}
+                                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem', textAlign: 'center', lineHeight: '1.4' }}>
+                            セッション:&nbsp;<strong style={{ color: 'var(--primary)' }}>{currentSessionTitle || '（タイトルなし）'}</strong><br />
+                            以下のQRコードまたはリンクから誰でも訓練に参加できます。
+                        </p>
+                        <div style={{
+                            padding: '0.75rem',
+                            background: '#F8FAFC',
+                            borderRadius: '12px',
+                            border: '1px solid #E2E8F0',
+                            marginBottom: '1.25rem'
+                        }}>
+                            <img
+                                src={qrUrl}
+                                alt="参加用QRコード"
+                                style={{ display: 'block', width: '200px', height: '200px', borderRadius: '8px' }}
+                            />
+                        </div>
+                        <button
+                            className="button button--primary"
+                            onClick={handleCopyLink}
+                            style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
+                        >
+                            {copySuccess ? '✅ 参加URLをコピーしました！' : '📋 参加URLをコピー'}
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    )
+}
+
+export default AdminPage

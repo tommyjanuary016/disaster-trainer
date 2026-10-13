@@ -277,10 +277,20 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
         if (initialPatient) {
             const enriched = { ...initialPatient }
             if (!enriched.vitals_triage_struct) {
-                enriched.vitals_triage_struct = { sbp: 120, dbp: 80, hr: 75, rr: 16, spo2: 99, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
+                enriched.vitals_triage_struct = enriched.vitals_initial_struct 
+                    ? { ...enriched.vitals_initial_struct }
+                    : { sbp: 120, dbp: 80, hr: 75, rr: 16, spo2: 99, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
             }
             if (!enriched.vitals_initial_struct) {
-                enriched.vitals_initial_struct = { sbp: 120, dbp: 80, hr: 75, rr: 16, spo2: 99, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
+                enriched.vitals_initial_struct = enriched.vitals_triage_struct 
+                    ? { ...enriched.vitals_triage_struct }
+                    : { sbp: 120, dbp: 80, hr: 75, rr: 16, spo2: 99, temp: 36.5, gcs_e: 4, gcs_v: 5, gcs_m: 6 }
+            }
+            if (!enriched.vitals_deterioration_struct) {
+                enriched.vitals_deterioration_struct = { sbp: 90, dbp: 50, hr: 120, rr: 28, spo2: 90, temp: 36.5, gcs_e: 3, gcs_v: 4, gcs_m: 5 }
+            }
+            if (!enriched.vitals_rosc_struct) {
+                enriched.vitals_rosc_struct = { sbp: 110, dbp: 70, hr: 85, rr: 18, spo2: 96, temp: 36.5 }
             }
             setFormData(enriched)
             setFormMode('wizard') // 既存患者編集時は直接詳細ウィザードを開く
@@ -328,7 +338,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
 
     // 構造化V/S更新ヘルパー
     const updateVitalStruct = (
-        field: 'vitals_triage_struct' | 'vitals_initial_struct' | 'vitals_post_struct' | 'vitals_deterioration_struct',
+        field: 'vitals_triage_struct' | 'vitals_initial_struct' | 'vitals_post_struct' | 'vitals_deterioration_struct' | 'vitals_rosc_struct',
         key: keyof VitalSignStruct,
         rawValue: number
     ) => {
@@ -385,7 +395,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
         }
         const vitals_triage = structToText(formData.vitals_triage_struct) || formData.vitals_triage
         const vitals_initial = structToText(formData.vitals_initial_struct) || formData.vitals_initial
-        onSubmit({ ...formData, vitals_triage, vitals_initial })
+        const vitals_post = structToText(formData.vitals_post_struct) || formData.vitals_post
+        onSubmit({ ...formData, vitals_triage, vitals_initial, vitals_post })
     }
 
     return (
@@ -557,14 +568,15 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                 { step: 1, label: '1. 基本情報' },
                                 { step: 2, label: '2. バイタルサイン' },
                                 { step: 3, label: '3. 所見 & AMPLE' },
-                                { step: 4, label: '4. 診断・処置 & シナリオ' },
+                                { step: 4, label: '4. 診断・処置' },
+                                { step: 5, label: '5. 悪化シナリオ' + (formData.deterioration_enabled ? ' ⚠️' : '') },
                             ].map(s => (
                                 <button
                                     key={s.step}
                                     type="button"
                                     onClick={() => setActiveWizardStep(s.step)}
                                     style={{
-                                        flex: 1, minWidth: '90px', padding: '0.55rem 0.25rem', border: 'none', background: 'none',
+                                        flex: 1, minWidth: '95px', padding: '0.55rem 0.25rem', border: 'none', background: 'none',
                                         borderBottom: activeWizardStep === s.step ? '3px solid var(--primary)' : '3px solid transparent',
                                         color: activeWizardStep === s.step ? 'var(--primary)' : 'var(--gray-600)',
                                         fontWeight: activeWizardStep === s.step ? 'bold' : 'normal',
@@ -636,45 +648,154 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                         {/* Step 2: バイタルサイン (ワンタップ増減付) */}
                         {activeWizardStep === 2 && (
                             <div>
-                                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--gray-800)' }}>初期評価時バイタル (Primary Survey)</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', background: 'var(--gray-50)', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
+                                {/* トリアージエリアバイタル */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0, color: 'var(--gray-800)' }}>
+                                        🏷️ トリアージエリアバイタル (現場・受入時)
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (formData.vitals_initial_struct) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    vitals_triage_struct: { ...prev.vitals_initial_struct! }
+                                                }))
+                                            }
+                                        }}
+                                        className="button button--secondary"
+                                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}
+                                    >
+                                        📋 初期評価V/Sからコピー
+                                    </button>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
+                                    {[
+                                        { label: '収縮期血圧(SBP)', key: 'sbp', val: formData.vitals_triage_struct?.sbp ?? 120, unit: 'mmHg' },
+                                        { label: '拡張期血圧(DBP)', key: 'dbp', val: formData.vitals_triage_struct?.dbp ?? 80, unit: 'mmHg' },
+                                        { label: '心拍数 (HR)', key: 'hr', val: formData.vitals_triage_struct?.hr ?? 75, unit: 'bpm' },
+                                        { label: '呼吸数 (RR)', key: 'rr', val: formData.vitals_triage_struct?.rr ?? 16, unit: '/min' },
+                                        { label: 'SpO2', key: 'spo2', val: formData.vitals_triage_struct?.spo2 ?? 99, unit: '%' },
+                                        { label: '体温 (Temp)', key: 'temp', val: formData.vitals_triage_struct?.temp ?? 36.5, unit: '℃', step: '0.1' },
+                                    ].map(item => (
+                                        <div key={item.key}>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
+                                            <input
+                                                type="number"
+                                                step={item.step || '1'}
+                                                value={item.val}
+                                                onChange={e => updateVitalStruct('vitals_triage_struct', item.key as any, parseFloat(e.target.value) || 0)}
+                                                className="input"
+                                                style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                            />
+                                        </div>
+                                    ))}
+                                    <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                        {[
+                                            { label: 'GCS E (開眼 1-4)', key: 'gcs_e', val: formData.vitals_triage_struct?.gcs_e ?? 4, min: 1, max: 4 },
+                                            { label: 'GCS V (発語 1-5)', key: 'gcs_v', val: formData.vitals_triage_struct?.gcs_v ?? 5, min: 1, max: 5 },
+                                            { label: 'GCS M (運動 1-6)', key: 'gcs_m', val: formData.vitals_triage_struct?.gcs_m ?? 6, min: 1, max: 6 },
+                                        ].map(item => (
+                                            <div key={item.key} style={{ flex: 1 }}>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
+                                                <input
+                                                    type="number"
+                                                    min={item.min}
+                                                    max={item.max}
+                                                    value={item.val}
+                                                    onChange={e => updateVitalStruct('vitals_triage_struct', item.key as any, parseInt(e.target.value) || 1)}
+                                                    className="input"
+                                                    style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 初期評価時バイタル */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0, color: 'var(--gray-800)' }}>
+                                        🩺 初期評価時バイタル (Primary Survey / 処置室到着時)
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (formData.vitals_triage_struct) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    vitals_initial_struct: { ...prev.vitals_triage_struct! }
+                                                }))
+                                            }
+                                        }}
+                                        className="button button--secondary"
+                                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}
+                                    >
+                                        📋 トリアージV/Sと同じにする
+                                    </button>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', background: 'var(--gray-50)', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid var(--gray-200)' }}>
                                     {[
                                         { label: '収縮期血圧(SBP)', key: 'sbp', val: formData.vitals_initial_struct?.sbp ?? 120, unit: 'mmHg' },
                                         { label: '拡張期血圧(DBP)', key: 'dbp', val: formData.vitals_initial_struct?.dbp ?? 80, unit: 'mmHg' },
                                         { label: '心拍数 (HR)', key: 'hr', val: formData.vitals_initial_struct?.hr ?? 75, unit: 'bpm' },
                                         { label: '呼吸数 (RR)', key: 'rr', val: formData.vitals_initial_struct?.rr ?? 16, unit: '/min' },
                                         { label: 'SpO2', key: 'spo2', val: formData.vitals_initial_struct?.spo2 ?? 99, unit: '%' },
+                                        { label: '体温 (Temp)', key: 'temp', val: formData.vitals_initial_struct?.temp ?? 36.5, unit: '℃', step: '0.1' },
                                     ].map(item => (
                                         <div key={item.key}>
                                             <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <input
+                                                type="number"
+                                                step={item.step || '1'}
+                                                value={item.val}
+                                                onChange={e => updateVitalStruct('vitals_initial_struct', item.key as any, parseFloat(e.target.value) || 0)}
+                                                className="input"
+                                                style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                            />
+                                        </div>
+                                    ))}
+                                    <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                        {[
+                                            { label: 'GCS E (開眼 1-4)', key: 'gcs_e', val: formData.vitals_initial_struct?.gcs_e ?? 4, min: 1, max: 4 },
+                                            { label: 'GCS V (発語 1-5)', key: 'gcs_v', val: formData.vitals_initial_struct?.gcs_v ?? 5, min: 1, max: 5 },
+                                            { label: 'GCS M (運動 1-6)', key: 'gcs_m', val: formData.vitals_initial_struct?.gcs_m ?? 6, min: 1, max: 6 },
+                                        ].map(item => (
+                                            <div key={item.key} style={{ flex: 1 }}>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
                                                 <input
                                                     type="number"
+                                                    min={item.min}
+                                                    max={item.max}
                                                     value={item.val}
-                                                    onChange={e => updateVitalStruct('vitals_initial_struct', item.key as any, parseInt(e.target.value) || 0)}
+                                                    onChange={e => updateVitalStruct('vitals_initial_struct', item.key as any, parseInt(e.target.value) || 1)}
                                                     className="input"
                                                     style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center' }}
                                                 />
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--gray-800)' }}>処置後改善バイタル (目標V/S)</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', background: '#eff6ff', padding: '1rem', borderRadius: '8px' }}>
+                                {/* 処置後改善バイタル */}
+                                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                    ✨ 処置後改善バイタル (安定化目標V/S)
+                                </h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', background: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                                     {[
                                         { label: '収縮期血圧(SBP)', key: 'sbp', val: formData.vitals_post_struct?.sbp ?? 120 },
                                         { label: '拡張期血圧(DBP)', key: 'dbp', val: formData.vitals_post_struct?.dbp ?? 80 },
                                         { label: '心拍数 (HR)', key: 'hr', val: formData.vitals_post_struct?.hr ?? 75 },
                                         { label: '呼吸数 (RR)', key: 'rr', val: formData.vitals_post_struct?.rr ?? 16 },
                                         { label: 'SpO2', key: 'spo2', val: formData.vitals_post_struct?.spo2 ?? 99 },
+                                        { label: '体温 (Temp)', key: 'temp', val: formData.vitals_post_struct?.temp ?? 36.5, step: '0.1' },
                                     ].map(item => (
                                         <div key={item.key}>
                                             <label style={{ fontSize: '0.75rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
                                             <input
                                                 type="number"
+                                                step={item.step || '1'}
                                                 value={item.val}
-                                                onChange={e => updateVitalStruct('vitals_post_struct', item.key as any, parseInt(e.target.value) || 0)}
+                                                onChange={e => updateVitalStruct('vitals_post_struct', item.key as any, parseFloat(e.target.value) || 0)}
                                                 className="input"
                                                 style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center' }}
                                             />
@@ -781,7 +902,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                             </div>
                         )}
 
-                        {/* Step 4: 診断 & 処置・シナリオ */}
+                        {/* Step 4: 診断 & 処置 */}
                         {activeWizardStep === 4 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 <div>
@@ -830,30 +951,182 @@ const PatientForm: React.FC<PatientFormProps> = ({ initialPatient, onSubmit, onC
                                     <textarea name="acting_instructions" value={formData.acting_instructions || ''} onChange={handleChange} className="input" rows={2} placeholder="例: 右足を触られると激しく痛がる。質問には声小さく答える。" />
                                 </div>
 
-                                {/* 悪化シナリオトグル */}
-                                <div style={{ background: '#fef2f2', padding: '0.85rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#991b1b' }}>
+                                <div>
+                                    <label className="form-label">必要検査・安定処置メモ (裏方・管理者用)</label>
+                                    <textarea name="necessary_tests_and_treatments" value={formData.necessary_tests_and_treatments || ''} onChange={handleChange} className="input" rows={2} placeholder="例: 2ルート確保、輸液2L負荷、RBC4単位+FFP4単位輸血" />
+                                </div>
+
+                                <div>
+                                    <label className="form-label">治療・搬送方針</label>
+                                    <input type="text" name="policy" value={formData.policy || ''} onChange={handleChange} className="input" placeholder="例: IVR→ICU/HCU" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 5: 悪化シナリオ & ROSC詳細設定 */}
+                        {activeWizardStep === 5 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                {/* 有効/無効 スイッチ */}
+                                <div style={{ background: formData.deterioration_enabled ? '#fef2f2' : 'var(--gray-50)', padding: '1rem', borderRadius: '8px', border: `2px solid ${formData.deterioration_enabled ? '#f87171' : 'var(--gray-300)'}`, transition: 'all 0.2s' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', color: formData.deterioration_enabled ? '#b91c1c' : 'var(--gray-700)' }}>
                                         <input
                                             type="checkbox"
                                             checked={!!formData.deterioration_enabled}
                                             onChange={e => setFormData(prev => ({ ...prev, deterioration_enabled: e.target.checked }))}
+                                            style={{ width: '1.2rem', height: '1.2rem' }}
                                         />
-                                        ⚠️ 時間経過での状態悪化シナリオを有効にする
+                                        ⚠️ 時間経過での状態悪化シナリオを発動する
                                     </label>
-                                    {formData.deterioration_enabled && (
-                                        <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontSize: '0.8rem' }}>悪化発動までの時間:</span>
-                                            <input
-                                                type="number"
-                                                value={formData.deterioration_time_minutes || 30}
-                                                onChange={e => setFormData(prev => ({ ...prev, deterioration_time_minutes: parseInt(e.target.value) || 30 }))}
-                                                className="input"
-                                                style={{ width: '80px', padding: '0.2rem 0.4rem', fontSize: '0.85rem' }}
-                                            />
-                                            <span style={{ fontSize: '0.8rem' }}>分</span>
-                                        </div>
-                                    )}
+                                    <p style={{ margin: '0.35rem 0 0 1.95rem', fontSize: '0.8rem', color: 'var(--gray-600)' }}>
+                                        有効にすると、診療受付（タイマー開始）から指定した時間にかけて、初期バイタルから悪化目標バイタルへ向けて線形に変化します。
+                                    </p>
                                 </div>
+
+                                {formData.deterioration_enabled ? (
+                                    <>
+                                        {/* 悪化所要時間 */}
+                                        <div style={{ background: 'var(--white)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                                            <label style={{ fontWeight: 'bold', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                                ⏱️ 悪化完了までの所要時間
+                                            </label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="number"
+                                                    value={formData.deterioration_time_minutes || 30}
+                                                    onChange={e => setFormData(prev => ({ ...prev, deterioration_time_minutes: parseInt(e.target.value) || 30 }))}
+                                                    className="input"
+                                                    style={{ width: '100px', padding: '0.4rem', fontSize: '1rem', fontWeight: 'bold', textAlign: 'center' }}
+                                                />
+                                                <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>分間で悪化到達</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginLeft: '0.5rem' }}>(例: 30分かけて徐々にショック状態へ移行)</span>
+                                            </div>
+                                        </div>
+
+                                        {/* 悪化到達目標バイタル */}
+                                        <div style={{ background: '#fff1f2', padding: '1rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0, color: '#9f1239' }}>
+                                                    🎯 悪化到達目標バイタル (Deterioration Target V/S)
+                                                </h4>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            // ショック状態プリセット
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                vitals_deterioration_struct: { sbp: 70, dbp: 40, hr: 135, rr: 32, spo2: 88, temp: 35.5, gcs_e: 2, gcs_v: 3, gcs_m: 5 }
+                                                            }))
+                                                        }}
+                                                        className="button button--secondary"
+                                                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                                    >
+                                                        🩸 ショック型
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            // CPAプリセット
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                vitals_deterioration_struct: { sbp: 0, dbp: 0, hr: 0, rr: 0, spo2: 0, temp: 35.0, gcs_e: 1, gcs_v: 1, gcs_m: 1 }
+                                                            }))
+                                                        }}
+                                                        className="button button--secondary"
+                                                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                                    >
+                                                        🖤 CPA(心停止)型
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                                                {[
+                                                    { label: '収縮期血圧(SBP)', key: 'sbp', val: formData.vitals_deterioration_struct?.sbp ?? 90, unit: 'mmHg' },
+                                                    { label: '拡張期血圧(DBP)', key: 'dbp', val: formData.vitals_deterioration_struct?.dbp ?? 50, unit: 'mmHg' },
+                                                    { label: '心拍数 (HR)', key: 'hr', val: formData.vitals_deterioration_struct?.hr ?? 120, unit: 'bpm' },
+                                                    { label: '呼吸数 (RR)', key: 'rr', val: formData.vitals_deterioration_struct?.rr ?? 28, unit: '/min' },
+                                                    { label: 'SpO2', key: 'spo2', val: formData.vitals_deterioration_struct?.spo2 ?? 90, unit: '%' },
+                                                    { label: '体温 (Temp)', key: 'temp', val: formData.vitals_deterioration_struct?.temp ?? 36.5, unit: '℃', step: '0.1' },
+                                                ].map(item => (
+                                                    <div key={item.key}>
+                                                        <label style={{ fontSize: '0.75rem', color: '#881337', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
+                                                        <input
+                                                            type="number"
+                                                            step={item.step || '1'}
+                                                            value={item.val}
+                                                            onChange={e => updateVitalStruct('vitals_deterioration_struct', item.key as any, parseFloat(e.target.value) || 0)}
+                                                            className="input"
+                                                            style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center', borderColor: '#f43f5e' }}
+                                                        />
+                                                    </div>
+                                                ))}
+                                                <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                                    {[
+                                                        { label: 'GCS E (開眼 1-4)', key: 'gcs_e', val: formData.vitals_deterioration_struct?.gcs_e ?? 3, min: 1, max: 4 },
+                                                        { label: 'GCS V (発語 1-5)', key: 'gcs_v', val: formData.vitals_deterioration_struct?.gcs_v ?? 4, min: 1, max: 5 },
+                                                        { label: 'GCS M (運動 1-6)', key: 'gcs_m', val: formData.vitals_deterioration_struct?.gcs_m ?? 5, min: 1, max: 6 },
+                                                    ].map(item => (
+                                                        <div key={item.key} style={{ flex: 1 }}>
+                                                            <label style={{ fontSize: '0.75rem', color: '#881337', display: 'block', marginBottom: '0.2rem' }}>{item.label}</label>
+                                                            <input
+                                                                type="number"
+                                                                min={item.min}
+                                                                max={item.max}
+                                                                value={item.val}
+                                                                onChange={e => updateVitalStruct('vitals_deterioration_struct', item.key as any, parseInt(e.target.value) || 1)}
+                                                                className="input"
+                                                                style={{ padding: '0.3rem', fontSize: '0.85rem', textAlign: 'center', borderColor: '#f43f5e' }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ROSC (心拍再開) オプション */}
+                                        <div style={{ background: '#f0fdf4', padding: '1rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#166534', marginBottom: formData.rosc_possible ? '0.75rem' : 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!formData.rosc_possible}
+                                                    onChange={e => setFormData(prev => ({ ...prev, rosc_possible: e.target.checked }))}
+                                                />
+                                                💓 CPR(胸骨圧迫/ACLS)による自己心拍再開(ROSC)を可能にする
+                                            </label>
+
+                                            {formData.rosc_possible && (
+                                                <div style={{ marginTop: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>ROSC成功時の目標バイタル:</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.5rem' }}>
+                                                        {[
+                                                            { label: 'SBP', key: 'sbp', val: formData.vitals_rosc_struct?.sbp ?? 110 },
+                                                            { label: 'DBP', key: 'dbp', val: formData.vitals_rosc_struct?.dbp ?? 70 },
+                                                            { label: 'HR', key: 'hr', val: formData.vitals_rosc_struct?.hr ?? 85 },
+                                                            { label: 'RR', key: 'rr', val: formData.vitals_rosc_struct?.rr ?? 18 },
+                                                            { label: 'SpO2', key: 'spo2', val: formData.vitals_rosc_struct?.spo2 ?? 96 },
+                                                        ].map(item => (
+                                                            <div key={item.key}>
+                                                                <label style={{ fontSize: '0.7rem', color: '#14532d', display: 'block' }}>{item.label}</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.val}
+                                                                    onChange={e => updateVitalStruct('vitals_rosc_struct', item.key as any, parseInt(e.target.value) || 0)}
+                                                                    className="input"
+                                                                    style={{ padding: '0.25rem', fontSize: '0.8rem', textAlign: 'center', borderColor: '#22c55e' }}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--gray-500)', background: 'var(--gray-50)', borderRadius: '8px' }}>
+                                        悪化シナリオは現在無効です。上のチェックボックスをONにすると、所要時間や目標バイタルの詳細設定を行えます。
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

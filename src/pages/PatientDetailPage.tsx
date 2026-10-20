@@ -132,7 +132,7 @@ const PatientDetailPage: React.FC = () => {
             {isLocked && (
                 <LockTimerOverlay
                     remainingDisplay={remainingDisplay}
-                    treatmentName={patient.applied_treatment_id || '処置'}
+                    treatmentName={(patient.applied_treatment_id && PROCEDURE_NAMES[patient.applied_treatment_id]) || patient.applied_treatment_id || '処置'}
                     patientId={patientId}
                     patient={patient}
                 />

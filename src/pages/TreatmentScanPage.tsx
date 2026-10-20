@@ -80,6 +80,17 @@ export const PROCEDURE_NAMES: Record<string, string> = {
     splint: 'シーネ固定',
     traction: '直達牽引',
     suture: '挫創処置 (洗浄縫合)',
+    // 放射線科検査
+    xray: 'レントゲン検査',
+    ct: 'CT検査',
+    contrast_ct: '造影CT検査',
+    mri: 'MRI検査',
+    // 検査科検査
+    blood_test: '血液検査',
+    blood_gas: '血液ガス分析',
+    ecg: '心電図検査',
+    echocardiography: '心エコー検査',
+    other_echo: 'その他エコー検査',
 }
 
 const isTreatmentOption = (id: string) => {

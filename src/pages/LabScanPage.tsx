@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients } from '../lib/firestore'
+import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients, startTreatmentTimer } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
 import { CameraFallbackUI } from '../components/CameraFallbackUI'
@@ -59,37 +59,138 @@ const LabScanPage: React.FC = () => {
         }
     }
 
-    const handleComplete = async () => {
-        if (patient) {
-            // 血液検査結果をプレイヤーに解放するのみ（悪化タイマーは停止しない）
+    const [selectedLabExam, setSelectedLabExam] = useState<string>('blood_test')
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const LAB_EXAMS = [
+        { id: 'blood_test', name: '血液検査', minutes: 0 },
+        { id: 'blood_gas', name: '血液ガス分析', minutes: 0 },
+        { id: 'ecg', name: '心電図', minutes: 3 },
+        { id: 'echocardiography', name: '心エコー', minutes: 5 },
+        { id: 'other_echo', name: 'その他エコー', minutes: 10 },
+    ]
+
+    const handleStartLabExam = async () => {
+        if (!patient || isSubmitting) return
+        const exam = LAB_EXAMS.find(e => e.id === selectedLabExam)
+        if (!exam) return
+
+        setIsSubmitting(true)
+        try {
+            // 検査結果をプレイヤーに解放（tests_completedフラグを更新）
             await updatePatientFlags(patient.id, { tests_completed: true })
-            alert('血液検査結果を訓練プレイヤーに送信しました。(※タイマーは継続します)')
+
+            if (exam.minutes > 0) {
+                // ロックあり検査（心電図3分、心エコー5分、その他エコー10分）
+                await startTreatmentTimer(patient.id, exam.id, exam.minutes)
+                alert(`${exam.name}検査を開始しました。\n患者画面を【${exam.minutes}分間】拘束・ロックし、検査結果を送信しました。`)
+            } else {
+                // ロックなし検査（血液検査、血液ガス分析）
+                alert(`${exam.name}の結果を訓練プレイヤーに送信しました。(※患者画面ロックなし)`)
+            }
             setPatient(null)
+        } catch (err: any) {
+            console.error('Failed to start lab exam:', err)
+            if (err.message === 'ALREADY_LOCKED') {
+                alert('⚠️ 対象の患者はすでに他の処置・検査で画面ロック中です。')
+            } else {
+                alert(`エラーが発生しました: ${err.message || '処理を完了できませんでした'}`)
+            }
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
     if (patient) {
+        const currentExam = LAB_EXAMS.find(e => e.id === selectedLabExam)
         return (
-            <div className="page" style={{ padding: '1rem' }}>
-                <h2>検査科 - 血液検査結果システム</h2>
+            <div className="page" style={{ padding: '1rem', maxWidth: '600px', margin: '0 auto' }}>
+                <h2>検査科 - 検査受付・実施システム</h2>
                 <div className="card card--elevated">
-                    <h3 className="card__title">{patient.name} 様</h3>
-                    <p style={{marginBottom: '1rem'}}>
-                        依頼された血液検査情報を確認し、訓練生に結果を返却（解放）します。
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                        <h3 className="card__title" style={{ margin: 0 }}>{patient.name} 様</h3>
+                        <span className={`triage-badge triage-badge--sm triage-${patient.triage_color === '赤' ? 'red' : patient.triage_color === '黄' ? 'yellow' : patient.triage_color === '緑' ? 'green' : 'black'}`}>
+                            {patient.triage_color || '未'}
+                        </span>
+                    </div>
+
+                    <p style={{ marginBottom: '1.2rem', fontSize: '0.9rem', color: 'var(--gray-600)' }}>
+                        実施する検査内容を選択してください。心電図やエコーを選択した場合は所定時間、患者端末画面がロックされます。
                     </p>
-                    
-                    <div style={{ backgroundColor: '#f0f0f0', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-                        <h4 style={{margin: '0 0 0.5rem 0'}}>【血液データ】</h4>
-                        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+
+                    {/* 検査選択エリア */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.6rem', fontSize: '0.95rem' }}>
+                            【実施検査の選択】
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                            {LAB_EXAMS.map(exam => {
+                                const isSelected = selectedLabExam === exam.id
+                                return (
+                                    <button
+                                        key={exam.id}
+                                        type="button"
+                                        onClick={() => setSelectedLabExam(exam.id)}
+                                        style={{
+                                            padding: '0.75rem 0.6rem',
+                                            borderRadius: '8px',
+                                            border: isSelected ? '2px solid #059669' : '1px solid var(--gray-300)',
+                                            backgroundColor: isSelected ? '#ecfdf5' : '#ffffff',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.2rem',
+                                            textAlign: 'center',
+                                            boxShadow: isSelected ? '0 0 0 1px #059669' : 'none',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: isSelected ? '#065f46' : '#1f2937' }}>
+                                            {exam.name}
+                                        </span>
+                                        <span style={{ fontSize: '0.8rem', color: isSelected ? '#059669' : '#6b7280', fontWeight: 'bold' }}>
+                                            {exam.minutes > 0 ? `🔒 ロック: ${exam.minutes}分` : '🔓 ロックなし'}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#f8fafc', padding: '0.8rem 1rem', borderRadius: '8px', marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#475569' }}>選択中: {currentExam?.name}</span>
+                            <span style={{ fontSize: '0.85rem', color: currentExam && currentExam.minutes > 0 ? '#dc2626' : '#059669', fontWeight: 'bold' }}>
+                                {currentExam && currentExam.minutes > 0 ? `患者画面拘束時間: ${currentExam.minutes}分` : '患者画面拘束: なし'}
+                            </span>
+                        </div>
+                        <h4 style={{ margin: '0.4rem 0 0.3rem 0', fontSize: '0.85rem', color: '#64748b' }}>【登録血液検査データ確認】</h4>
+                        <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: patient.blood_test_data ? '#1e293b' : '#94a3b8' }}>
                             {patient.blood_test_data || '血液検査データは登録されていません。'}
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                        <button onClick={handleComplete} className="button button--primary">
-                            結果を送信（手技完了）
+                    <div style={{ display: 'flex', gap: '0.8rem' }}>
+                        <button
+                            type="button"
+                            onClick={handleStartLabExam}
+                            disabled={isSubmitting}
+                            className="button button--primary"
+                            style={{ flex: 1, padding: '0.8rem', fontSize: '1rem', fontWeight: 'bold' }}
+                        >
+                            {isSubmitting ? '処理中...' : currentExam && currentExam.minutes > 0
+                                ? `${currentExam.name}を開始（患者画面を${currentExam.minutes}分ロック）`
+                                : `${currentExam?.name}結果を送信（即時完了）`
+                            }
                         </button>
-                        <button onClick={() => setPatient(null)} className="button button--secondary">
+                        <button
+                            type="button"
+                            onClick={() => setPatient(null)}
+                            disabled={isSubmitting}
+                            className="button button--secondary"
+                            style={{ width: 'auto', padding: '0.8rem 1.2rem' }}
+                        >
                             キャンセル
                         </button>
                     </div>

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatient } from '../hooks/usePatient'
 import { activeSessionId, fetchTrainingSession } from '../lib/firestore'
 import LoadingScreen from '../components/LoadingScreen'
 import PatientPictogram from '../components/PatientPictogram'
 import VitalsCard from '../components/VitalsCard'
+import { useWakeLock } from '../hooks/useWakeLock'
+import { soundEngine } from '../lib/soundEngine'
 
 const STANDARD_TRIAGE_DURATION_SEC = 120 // 通常モード: 2分（120秒）
 const TEST_TRIAGE_DURATION_SEC = 5       // 検証・テストモード: 5秒
@@ -39,6 +41,9 @@ const TriagePatientPage: React.FC = () => {
     const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null)
     const [secondsRemaining, setSecondsRemaining] = useState<number>(durationSec)
     const [isCompleted, setIsCompleted] = useState(false)
+    const hasPlayedPhase2Beep = useRef(false)
+    // トリアージ評価中のスリープ防止
+    useWakeLock(timerStartedAt !== null && !isCompleted)
 
     // isTestMode が判明したときのタイマー初期値調整（未開始時）
     useEffect(() => {
@@ -75,8 +80,15 @@ const TriagePatientPage: React.FC = () => {
             const remaining = Math.max(0, durationSec - elapsed)
             setSecondsRemaining(remaining)
 
+            const pct = Math.floor((elapsed / durationSec) * 100)
+            if (pct >= 30 && !hasPlayedPhase2Beep.current) {
+                hasPlayedPhase2Beep.current = true
+                soundEngine.playVitalMonitorBeep()
+            }
+
             if (remaining === 0) {
                 setIsCompleted(true)
+                soundEngine.playTreatmentComplete()
                 clearInterval(interval)
             }
         }, 300)
@@ -87,6 +99,8 @@ const TriagePatientPage: React.FC = () => {
     const handleStartTriage = () => {
         if (!patientId) return
         const now = Date.now()
+        hasPlayedPhase2Beep.current = false
+        soundEngine.playClickBeep()
         setTimerStartedAt(now)
         setSecondsRemaining(durationSec)
         setIsCompleted(false)

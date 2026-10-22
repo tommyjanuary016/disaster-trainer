@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { useWakeLock } from '../../hooks/useWakeLock'
 
 interface BreathingAnimationProps {
     cpm: number // Cycles per minute
@@ -8,6 +9,7 @@ interface BreathingAnimationProps {
 const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose }) => {
     const audioCtxRef = useRef<AudioContext | null>(null)
     const intervalRef = useRef<number | null>(null)
+    useWakeLock(true)
 
     useEffect(() => {
         // AudioContextの初期化

@@ -4,6 +4,8 @@ import { usePatient } from '../hooks/usePatient'
 import { useDeterioration } from '../hooks/useDeterioration'
 import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
+import { useWakeLock } from '../hooks/useWakeLock'
+import { soundEngine } from '../lib/soundEngine'
 
 // 痛みの強度に応じた素人向け説明を生成する
 const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlockedReason: string): string[] => {
@@ -59,6 +61,8 @@ const PatientActorPage: React.FC = () => {
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
     const [activeAnimation, setActiveAnimation] = useState<'pulse' | 'breathing' | null>(null)
     const [activeTab, setActiveTab] = useState<'easy' | 'detail'>('easy')
+    // 模擬患者としてQRコードを提示して待機中、画面がスリープしないよう自動維持
+    useWakeLock(true)
 
     // リアルタイムアクションログ（演技者向け）
     const [actionLog, setActionLog] = useState<{ time: string; message: string; icon: string }[]>([])
@@ -75,21 +79,26 @@ const PatientActorPage: React.FC = () => {
             const d = new Date()
             return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
         }
-        const addLog = (message: string, icon: string) => {
+        const addLog = (message: string, icon: string, isCritical: boolean = false) => {
             setActionLog(prev => [{ time: now(), message, icon }, ...prev].slice(0, 15))
             setFlashNotice(message)
+            if (isCritical) {
+                soundEngine.playCriticalAlert()
+            } else {
+                soundEngine.playVitalMonitorBeep()
+            }
             setTimeout(() => setFlashNotice(null), 4000)
         }
 
         // ステータス変化の検知
         if (prevStatus.current !== null && prevStatus.current !== patient.status) {
-            const messages: Record<string, { msg: string; icon: string }> = {
+            const messages: Record<string, { msg: string; icon: string; critical?: boolean }> = {
                 '処置中': { msg: '処置が開始されました。演技を続けてください。', icon: '💉' },
-                '悪化': { msg: '悪化しています！バイタルが変化しています。', icon: '🚨' },
-                '急変': { msg: '急変です！不動の演技をしてください。', icon: '🚨' },
+                '悪化': { msg: '悪化しています！バイタルが変化しています。', icon: '🚨', critical: true },
+                '急変': { msg: '急変です！不動の演技をしてください。', icon: '🚨', critical: true },
             }
             const m = messages[patient.status]
-            if (m) addLog(m.msg, m.icon)
+            if (m) addLog(m.msg, m.icon, !!m.critical)
         }
         prevStatus.current = patient.status
 

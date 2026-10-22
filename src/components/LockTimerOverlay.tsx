@@ -1,6 +1,8 @@
 // LockTimerOverlay - 処置タイマー中に全画面をロックするオーバーレイ
-import React from 'react'
+import React, { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useWakeLock } from '../hooks/useWakeLock'
+import { soundEngine } from '../lib/soundEngine'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
@@ -16,10 +18,15 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
     patient,
 }) => {
     const navigate = useNavigate()
+    const hasPlayedCompleteRef = useRef(false)
+    // 処置ロックタイマー中は画面スリープを自動防止
+    useWakeLock(true)
 
     React.useEffect(() => {
-        // useTimer.ts の handleTimerEnd にて completeTreatment は実行されるため、
-        // ここでの重複呼び出しは削除し、UIのロック解除のみを待つ
+        if (remainingDisplay === '00:00' && !hasPlayedCompleteRef.current) {
+            hasPlayedCompleteRef.current = true
+            soundEngine.playTreatmentComplete()
+        }
     }, [remainingDisplay, patientId])
 
     // タイマー進行度（0% 〜 100%）の計算

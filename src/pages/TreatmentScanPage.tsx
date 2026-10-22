@@ -8,6 +8,7 @@ import QRConfirmModal from '../components/QRConfirmModal'
 import { useRole } from '../hooks/useRole'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
 import { CameraFallbackUI } from '../components/CameraFallbackUI'
+import { soundEngine } from '../lib/soundEngine'
 
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
@@ -318,6 +319,7 @@ const TreatmentScanPage: React.FC = () => {
             setRoleWarning(undefined)
         }
 
+        soundEngine.playScanSuccess()
         setError(null)
         setPendingProcedure(resolved)
         setPendingParsed(parsed)
@@ -356,6 +358,7 @@ const TreatmentScanPage: React.FC = () => {
             let latest: Patient | null = null
             if (timerMinutes === 0 || treatId === 'vitals' || treatId === 'triage') {
                 // 即時完了手技：バイタル測定等のみタイマーを作らず直接 completed_treatments に追加して即時反映する
+                soundEngine.playVitalMonitorBeep()
                 const currentCompleted = patient?.completed_treatments || []
                 const newCompleted = (treatId === 'vitals')
                     ? [...currentCompleted, treatId]

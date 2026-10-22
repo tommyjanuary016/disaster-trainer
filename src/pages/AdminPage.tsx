@@ -30,7 +30,7 @@ const AdminPage: React.FC = () => {
         useExactScenarioMatch: false,
     })
     const navigate = useNavigate()
-    const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>('patients')
+    const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>(() => activeSessionId ? 'dashboard' : 'patients')
     const [webhookUrl, setWebhookUrl] = useState(localStorage.getItem('gas_webhook_url') || '')
     const [isExporting, setIsExporting] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(activeSessionId)
@@ -312,6 +312,7 @@ const AdminPage: React.FC = () => {
             setSessionEnded(false)
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
+            setActiveTab('dashboard') // セッション開始直後に災害対策本部コマンドセンターを表示
             setShowShareModal(true) // セッション作成直後に自動で招待モーダルを開く
             alert('新しいセッションを作成しました。プレイヤーを招待できます。')
         }
@@ -922,7 +923,7 @@ const AdminPage: React.FC = () => {
                                 onClick={() => setActiveTab('dashboard')}
                                 style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'dashboard' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'dashboard' ? 'bold' : 'normal', color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--gray-600)' }}
                             >
-                                ダッシュボード
+                                🛰️ 災害対策本部 (Command Center)
                             </button>
                             <button
                                 onClick={() => setActiveTab('settings')}

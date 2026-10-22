@@ -7,6 +7,7 @@ import QRConfirmModal from '../components/QRConfirmModal'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
 import { CameraFallbackUI } from '../components/CameraFallbackUI'
 import { useRole } from '../hooks/useRole'
+import { soundEngine } from '../lib/soundEngine'
 
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
@@ -131,6 +132,7 @@ const QRScannerPage: React.FC = () => {
             return
         }
 
+        soundEngine.playScanSuccess()
         setPendingPatientId(String(patient.id))
         setPendingPatient(patient)
         setShowModal(true)

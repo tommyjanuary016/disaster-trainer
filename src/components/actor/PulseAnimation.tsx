@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react'
+import { soundEngine } from '../../lib/soundEngine'
+import { useWakeLock } from '../../hooks/useWakeLock'
 
 interface PulseAnimationProps {
     bpm: number
@@ -8,6 +10,8 @@ interface PulseAnimationProps {
 const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
     const audioCtxRef = useRef<AudioContext | null>(null)
     const intervalRef = useRef<number | null>(null)
+    // 脈拍表示中のスリープ自動防止
+    useWakeLock(true)
 
     useEffect(() => {
         // AudioContextの初期化
@@ -42,14 +46,16 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
             osc.stop(ctx.currentTime + 0.2)
         }
 
-        // 初回再生
+        // 初回再生 ＋ 心拍ハプティクス振動
         playPulseSound(false)
+        soundEngine.triggerHeartbeatHaptics()
         setTimeout(() => playPulseSound(true), 160)
 
         // BPMから間隔(ms)を計算してループ再生
         const intervalMs = (60 / bpm) * 1000
         intervalRef.current = window.setInterval(() => {
             playPulseSound(false)
+            soundEngine.triggerHeartbeatHaptics()
             // ドクン・ドクンの2音目を少し遅れて鳴らす
             setTimeout(() => playPulseSound(true), 160)
         }, intervalMs)
@@ -95,6 +101,9 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
                     style={{ animationDuration: `${durationSeconds}s` }}
                 ></div>
                 <div className="pulse-text">HR: {bpm} bpm</div>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.06em' }}>
+                    📳 心拍ハプティクス連動中（端末に触れて脈を感知）
+                </div>
             </div>
             <button
                 onClick={onClose}

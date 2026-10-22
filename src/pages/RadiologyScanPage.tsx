@@ -5,6 +5,7 @@ import { fetchPatientFlexible, updatePatientFlags, subscribeToAllPatients, start
 import { Patient } from '../types/patient'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
 import { CameraFallbackUI } from '../components/CameraFallbackUI'
+import { soundEngine } from '../lib/soundEngine'
 
 const RadiologyScanPage: React.FC = () => {
     const navigate = useNavigate()
@@ -53,6 +54,7 @@ const RadiologyScanPage: React.FC = () => {
         setError(null)
         const p = await fetchPatientFlexible(rawId)
         if (p) {
+            soundEngine.playScanSuccess()
             setPatient(p)
         } else {
             setError(`該当する患者が見つかりません (入力・読み取り値: ${rawId})`)

@@ -1,10 +1,11 @@
-import React from 'react'
-import { BrowserRouter as Router } from 'react-router-dom'
+import React, { useState } from 'react'
+import { BrowserRouter as Router, useLocation } from 'react-router-dom'
 import { TransitionRoutes } from './components/TransitionRoutes'
 import { GlobalNavigation } from './components/GlobalNavigation'
 import { NotificationProvider } from './components/NotificationProvider'
 import { setActiveSession } from './lib/firestore'
 import { APP_VERSION } from './version'
+import { soundEngine } from './lib/soundEngine'
 
 // URLのクエリパラメータからセッションIDを検出し、最優先で設定する
 const params = new URLSearchParams(window.location.search)
@@ -17,9 +18,16 @@ if (sessionIdParam) {
 
 /**
  * アプリのグローバルヘッダー。
- * ダーク・インパクト系デザイン。
+ * ダーク・インパクト系デザイン ＋ マルチモーダル音響ミュート切替スイッチ搭載。
  */
 const Header: React.FC = () => {
+    const [isMuted, setIsMuted] = useState<boolean>(() => soundEngine.isMuted())
+
+    const handleToggleSound = () => {
+        const nextMuted = soundEngine.toggleMute()
+        setIsMuted(nextMuted)
+    }
+
     return (
         <header className="app-header">
             {/* 左側：パルスインジケーター */}
@@ -38,9 +46,49 @@ const Header: React.FC = () => {
                 <h1 className="app-header__title">DISASTER LOGIC</h1>
             </div>
 
-            {/* 右側：システムバージョン */}
-            <div className="app-header__version">{APP_VERSION}</div>
+            {/* 右側：サウンドON/OFFスイッチ ＆ システムバージョン */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'absolute', right: '0.85rem' }}>
+                <button
+                    type="button"
+                    onClick={handleToggleSound}
+                    title={isMuted ? '効果音・振動をONにする' : '効果音・振動をミュートする'}
+                    style={{
+                        background: isMuted ? 'rgba(148, 163, 184, 0.15)' : 'rgba(37, 99, 235, 0.12)',
+                        border: `1px solid ${isMuted ? 'rgba(148, 163, 184, 0.35)' : 'rgba(37, 99, 235, 0.3)'}`,
+                        color: isMuted ? 'var(--gray-500)' : 'var(--accent)',
+                        borderRadius: '999px',
+                        padding: '0.2rem 0.55rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    <span>{isMuted ? '🔇' : '🔊'}</span>
+                    <span style={{ fontSize: '0.65rem', letterSpacing: '0.03em' }}>{isMuted ? 'MUTE' : 'SE/VIB'}</span>
+                </button>
+                <div className="app-header__version" style={{ position: 'static' }}>{APP_VERSION}</div>
+            </div>
         </header>
+    )
+}
+
+const AppLayout: React.FC = () => {
+    const location = useLocation()
+    // 管理画面（/admin）およびQR印刷（/qr-generator）はPC・大型モニターのワイド画面表示に対応する
+    const isWideMode = location.pathname.startsWith('/admin') || location.pathname.startsWith('/qr-generator')
+
+    return (
+        <div className={`app-container ${isWideMode ? 'app-container--wide' : ''}`}>
+            <Header />
+            <div className="app-main">
+                <TransitionRoutes />
+            </div>
+            <GlobalNavigation />
+        </div>
     )
 }
 
@@ -48,16 +96,11 @@ const App: React.FC = () => {
     return (
         <Router>
             <NotificationProvider>
-                <div className="app-container">
-                    <Header />
-                    <div className="app-main">
-                        <TransitionRoutes />
-                    </div>
-                    <GlobalNavigation />
-                </div>
+                <AppLayout />
             </NotificationProvider>
         </Router>
     )
 }
 
 export default App
+

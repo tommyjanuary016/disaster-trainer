@@ -217,7 +217,10 @@ const RadiologyScanPage: React.FC = () => {
                 {!isCameraActive ? (
                     <button
                         type="button"
-                        onClick={() => setIsCameraActive(true)}
+                        onClick={() => {
+                            soundEngine.playClickBeep()
+                            setIsCameraActive(true)
+                        }}
                         className="button button--primary"
                         style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                     >

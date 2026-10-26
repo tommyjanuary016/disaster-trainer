@@ -2789,30 +2789,33 @@ select.input {
 }
 
 /* ======================================================
-   アプリヘッダー（刷新版）
+   アプリヘッダー（刷新版・モバイル完全対応）
    ====================================================== */
 .app-header {
-  background: rgba(15, 23, 42, 0.92) !important;
+  background: rgba(15, 23, 42, 0.94) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: white !important;
-  padding: 0 1.25rem !important;
-  height: 56px !important;
+  padding: 0 0.75rem !important;
+  height: 54px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
+  gap: 0.4rem !important;
   position: sticky !important;
   top: 0 !important;
   z-index: 100 !important;
   box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.3) !important;
   animation: none !important;
+  box-sizing: border-box !important;
 }
 
 .app-header__status {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .app-header__status-dot {
@@ -2822,49 +2825,125 @@ select.input {
   background: #10b981;
   animation: liveDot 1.8s ease-in-out infinite;
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  flex-shrink: 0;
 }
 
 .app-header__status-text {
   font-size: 0.65rem;
   font-weight: 700;
   color: #10b981;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
 }
 
 .app-header__center {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .app-header__logo-icon {
   display: flex;
   align-items: center;
   color: #3b82f6;
+  flex-shrink: 0;
 }
 
 .app-header h1,
 .app-header__title {
-  font-size: 0.875rem !important;
+  font-size: 0.85rem !important;
   font-weight: 800 !important;
-  letter-spacing: 0.1em !important;
+  letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
   background: linear-gradient(135deg, #ffffff 0%, #93c5fd 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   background-clip: text !important;
   margin: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.app-header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.app-header__sound-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.24rem 0.52rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.app-header__sound-btn--active {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+.app-header__sound-btn--active:active {
+  transform: scale(0.94);
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.app-header__sound-btn--muted {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+}
+
+.app-header__sound-icon {
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.app-header__sound-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
 }
 
 .app-header__version {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.3);
-  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.04em;
   font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* スマホ小画面（400px以下）でも絶対に見切れない最適化 */
+@media (max-width: 400px) {
+  .app-header {
+    padding: 0 0.55rem !important;
+    gap: 0.25rem !important;
+  }
+  .app-header h1,
+  .app-header__title {
+    font-size: 0.76rem !important;
+    letter-spacing: 0.04em !important;
+  }
+  .app-header__sound-btn {
+    padding: 0.22rem 0.44rem;
+  }
+  .app-header__version {
+    font-size: 0.56rem;
+  }
 }
 
 /* ======================================================

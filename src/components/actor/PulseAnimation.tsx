@@ -14,36 +14,59 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
     useWakeLock(true)
 
     useEffect(() => {
-        // AudioContextの初期化
+        // AudioContextの初期化（マスターコンプレッサー付きでスマホでの音圧を増強）
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext
-        audioCtxRef.current = new AudioContext()
+        const ctx: AudioContext = new AudioContext()
+        audioCtxRef.current = ctx
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {})
+        }
+
+        const compressor = ctx.createDynamicsCompressor()
+        compressor.threshold.setValueAtTime(-20, ctx.currentTime)
+        compressor.knee.setValueAtTime(10, ctx.currentTime)
+        compressor.ratio.setValueAtTime(6, ctx.currentTime)
+        compressor.connect(ctx.destination)
 
         const playPulseSound = (isSecondBeat: boolean = false) => {
-            if (!audioCtxRef.current) return
-            
-            const ctx = audioCtxRef.current
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
+            if (!audioCtxRef.current || soundEngine.isMuted()) return
 
-            // スマホスピーカーでも明瞭に聞こえる周波数帯（第1音: 150Hz->90Hz, 第2音: 180Hz->120Hz）
-            osc.type = 'triangle' // サイン波より倍音を含み聞き取りやすい波形
-            const startFreq = isSecondBeat ? 180 : 150
-            const endFreq = isSecondBeat ? 120 : 90
-            const volume = isSecondBeat ? 1.2 : 1.5
+            const currentCtx = audioCtxRef.current
+            if (currentCtx.state === 'suspended') {
+                currentCtx.resume().catch(() => {})
+            }
 
-            osc.frequency.setValueAtTime(startFreq, ctx.currentTime)
-            osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + 0.12)
+            // 低域（ドクンという筐体共振）＋ 中域倍音（スピーカーで明瞭に聞こえる鼓動音）の2オシレーター合成
+            const oscLow = currentCtx.createOscillator()
+            const oscMid = currentCtx.createOscillator()
+            const gain = currentCtx.createGain()
+
+            oscLow.type = 'triangle'
+            oscMid.type = 'sine'
+
+            const startFreq = isSecondBeat ? 210 : 170
+            const endFreq = isSecondBeat ? 110 : 80
+            const volume = isSecondBeat ? 1.5 : 1.9
+
+            oscLow.frequency.setValueAtTime(startFreq, currentCtx.currentTime)
+            oscLow.frequency.exponentialRampToValueAtTime(endFreq, currentCtx.currentTime + 0.14)
+
+            oscMid.frequency.setValueAtTime(startFreq * 1.8, currentCtx.currentTime)
+            oscMid.frequency.exponentialRampToValueAtTime(endFreq * 1.5, currentCtx.currentTime + 0.12)
 
             // アタックとエンベロープ
-            gain.gain.setValueAtTime(0, ctx.currentTime)
-            gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.015)
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18)
+            gain.gain.setValueAtTime(0.0001, currentCtx.currentTime)
+            gain.gain.linearRampToValueAtTime(volume, currentCtx.currentTime + 0.012)
+            gain.gain.exponentialRampToValueAtTime(0.001, currentCtx.currentTime + 0.19)
 
-            osc.connect(gain)
-            gain.connect(ctx.destination)
+            oscLow.connect(gain)
+            oscMid.connect(gain)
+            gain.connect(compressor)
 
-            osc.start(ctx.currentTime)
-            osc.stop(ctx.currentTime + 0.2)
+            oscLow.start(currentCtx.currentTime)
+            oscMid.start(currentCtx.currentTime)
+            oscLow.stop(currentCtx.currentTime + 0.2)
+            oscMid.stop(currentCtx.currentTime + 0.2)
         }
 
         // 初回再生 ＋ 心拍ハプティクス振動

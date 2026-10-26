@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import { ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
 import { Patient } from '../types/patient'
+import { soundEngine } from '../lib/soundEngine'
 
 // 手技IDと表示名のマッピング
 const PROCEDURE_NAMES: Record<string, string> = {
@@ -37,6 +38,11 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
   onCancel,
   warningText,
 }) => {
+  // モーダルが開いた瞬間にスキャン成功音「ピピッ！」＋バイブレーションを確実に鳴らす
+  useEffect(() => {
+    soundEngine.playScanSuccess()
+  }, [])
+
   // QR種別に応じたラベルと詳細を生成
   const getLabel = (): { badge: string; badgeClass: string; title: string; detail: string } => {
     if (parsed.type === 'patient') {
@@ -107,7 +113,13 @@ const QRConfirmModal: React.FC<QRConfirmModalProps> = ({
           <button className="button button--secondary" onClick={onCancel}>
             キャンセル
           </button>
-          <button className="button button--primary" onClick={onConfirm}>
+          <button
+            className="button button--primary"
+            onClick={() => {
+              soundEngine.playClickBeep()
+              onConfirm()
+            }}
+          >
             OK　→
           </button>
         </div>

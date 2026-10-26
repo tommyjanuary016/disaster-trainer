@@ -19,6 +19,7 @@ if (sessionIdParam) {
 /**
  * アプリのグローバルヘッダー。
  * ダーク・インパクト系デザイン ＋ マルチモーダル音響ミュート切替スイッチ搭載。
+ * スマホ画面（320px〜）でも見切れ・重なりが起きない3分割Flexレイアウト。
  */
 const Header: React.FC = () => {
     const [isMuted, setIsMuted] = useState<boolean>(() => soundEngine.isMuted())
@@ -47,30 +48,17 @@ const Header: React.FC = () => {
             </div>
 
             {/* 右側：サウンドON/OFFスイッチ ＆ システムバージョン */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'absolute', right: '0.85rem' }}>
+            <div className="app-header__right">
                 <button
                     type="button"
                     onClick={handleToggleSound}
-                    title={isMuted ? '効果音・振動をONにする' : '効果音・振動をミュートする'}
-                    style={{
-                        background: isMuted ? 'rgba(148, 163, 184, 0.15)' : 'rgba(37, 99, 235, 0.12)',
-                        border: `1px solid ${isMuted ? 'rgba(148, 163, 184, 0.35)' : 'rgba(37, 99, 235, 0.3)'}`,
-                        color: isMuted ? 'var(--gray-500)' : 'var(--accent)',
-                        borderRadius: '999px',
-                        padding: '0.2rem 0.55rem',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease'
-                    }}
+                    className={`app-header__sound-btn ${isMuted ? 'app-header__sound-btn--muted' : 'app-header__sound-btn--active'}`}
+                    title={isMuted ? 'タップして効果音・バイブレーションをONにする' : '効果音・バイブレーション作動中（タップでOFF）'}
                 >
-                    <span>{isMuted ? '🔇' : '🔊'}</span>
-                    <span style={{ fontSize: '0.65rem', letterSpacing: '0.03em' }}>{isMuted ? 'MUTE' : 'SE/VIB'}</span>
+                    <span className="app-header__sound-icon">{isMuted ? '🔇' : '🔊'}</span>
+                    <span className="app-header__sound-label">{isMuted ? 'OFF' : '音・振動'}</span>
                 </button>
-                <div className="app-header__version" style={{ position: 'static' }}>{APP_VERSION}</div>
+                <div className="app-header__version">{APP_VERSION}</div>
             </div>
         </header>
     )

@@ -53,10 +53,10 @@ const Header: React.FC = () => {
                     type="button"
                     onClick={handleToggleSound}
                     className={`app-header__sound-btn ${isMuted ? 'app-header__sound-btn--muted' : 'app-header__sound-btn--active'}`}
-                    title={isMuted ? 'タップして効果音・バイブレーションをONにする' : '効果音・バイブレーション作動中（タップでOFF）'}
+                    title={isMuted ? 'タップして効果音をONにする' : '効果音ON（タップで消音）'}
                 >
                     <span className="app-header__sound-icon">{isMuted ? '🔇' : '🔊'}</span>
-                    <span className="app-header__sound-label">{isMuted ? 'OFF' : '音・振動'}</span>
+                    <span className="app-header__sound-label">{isMuted ? '消音' : '効果音'}</span>
                 </button>
                 <div className="app-header__version">{APP_VERSION}</div>
             </div>

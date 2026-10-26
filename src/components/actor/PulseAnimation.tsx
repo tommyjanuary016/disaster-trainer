@@ -125,7 +125,7 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
                 ></div>
                 <div className="pulse-text">HR: {bpm} bpm</div>
                 <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.06em' }}>
-                    📳 心拍ハプティクス連動中（端末に触れて脈を感知）
+                    🔊 心拍音と画面の脈動で脈拍（HR）を提示中
                 </div>
             </div>
             <button

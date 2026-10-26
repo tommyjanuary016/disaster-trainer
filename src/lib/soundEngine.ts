@@ -1,17 +1,21 @@
 // ======================================================
-// マルチモーダル音響（Web Audio SE）＆ ハプティクス（振動）エンジン v2
+// マルチモーダル音響（Web Audio SE）＆ ハプティクス（振動）エンジン v3
+// ・iOS 18+ Taptic Engine 物理駆動ハック（<input type="checkbox" switch> + <label> クリック）搭載
+// ・Android Web Vibration API（navigator.vibrate）の非同期ブロック回避＆高出力パルス駆動
 // ・モバイル端末（iOS Safari / Android Chrome）での自動AudioContextアンロック対応
 // ・スマホの小型スピーカーでも確実に響く「大音量＋ダイナミクスコンプレッサー＋低音レイヤー」合成
-// ・iOS等の navigator.vibrate 非対応端末でもスピーカーの超低周波パルスで指先に振動感を伝える疑似ハプティクス搭載
 // ======================================================
 
 const MUTE_STORAGE_KEY = 'disaster_logic_sound_muted'
+const IOS_HAPTIC_INPUT_ID = 'disaster-logic-ios-haptic-switch'
+const IOS_HAPTIC_LABEL_ID = 'disaster-logic-ios-haptic-label'
 
 class MultimodalEngine {
     private ctx: AudioContext | null = null
     private compressor: DynamicsCompressorNode | null = null
     private muted: boolean = false
     private unlocked: boolean = false
+    private iosHapticLabel: HTMLLabelElement | null = null
 
     constructor() {
         try {
@@ -20,6 +24,73 @@ class MultimodalEngine {
             this.muted = false
         }
         this.setupGlobalTouchUnlock()
+        this.setupIOSHapticSwitch()
+    }
+
+    /**
+     * iOS 18+ の Safari で本物の Taptic Engine（物理バイブレーション）を駆動するための隠し switch 要素を生成
+     * WebKit は `<input type="checkbox" switch>` に紐づく `<label>` が click() された際にネイティブの触覚フィードバックを発生させる
+     */
+    private setupIOSHapticSwitch(): void {
+        if (typeof document === 'undefined') return
+
+        const inject = () => {
+            if (this.iosHapticLabel && document.body.contains(this.iosHapticLabel)) return
+            const existingLabel = document.getElementById(IOS_HAPTIC_LABEL_ID) as HTMLLabelElement | null
+            if (existingLabel) {
+                this.iosHapticLabel = existingLabel
+                return
+            }
+            if (!document.body) return
+
+            const input = document.createElement('input')
+            input.type = 'checkbox'
+            input.setAttribute('switch', '')
+            input.id = IOS_HAPTIC_INPUT_ID
+            input.setAttribute('aria-hidden', 'true')
+            input.tabIndex = -1
+            input.style.cssText = 'position:fixed;top:-100px;left:-100px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;'
+
+            const label = document.createElement('label')
+            label.htmlFor = IOS_HAPTIC_INPUT_ID
+            label.id = IOS_HAPTIC_LABEL_ID
+            label.setAttribute('aria-hidden', 'true')
+            label.style.cssText = 'position:fixed;top:-100px;left:-100px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;'
+
+            document.body.appendChild(input)
+            document.body.appendChild(label)
+            this.iosHapticLabel = label
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', inject, { once: true })
+        } else {
+            inject()
+        }
+    }
+
+    /**
+     * iOS 18+ の Taptic Engine を1回または複数回パルス駆動する
+     */
+    private triggerIOSTaptic(pulses: number = 1, intervalMs: number = 90): void {
+        try {
+            this.setupIOSHapticSwitch()
+            const label = this.iosHapticLabel
+            if (!label) return
+
+            label.click()
+            for (let i = 1; i < pulses; i++) {
+                window.setTimeout(() => {
+                    try {
+                        label.click()
+                    } catch {
+                        // ignore
+                    }
+                }, i * intervalMs)
+            }
+        } catch {
+            // ignore
+        }
     }
 
     /**
@@ -110,20 +181,33 @@ class MultimodalEngine {
     }
 
     /**
-     * ハプティクス（バイブレーション）実行
-     * Android 等では navigator.vibrate を強く駆動し、
-     * iOS Safari 等でもスピーカーの低周波アタック（95Hz サブベースパルス）で本体筐体を微振動させる
+     * ハプティクス（物理バイブレーション）実行
+     * 1. Android 等: Web Vibration API (`navigator.vibrate`) を強力に駆動
+     * 2. iPhone (iOS 18+ Safari): `<input type="checkbox" switch>` の `<label>` クリックハックで本物の Taptic Engine を物理振動させる
+     * 3. 補助として重低音パルスも選択可能
      */
-    public vibrate(pattern: number | number[], withSubBassThump: boolean = true): void {
+    public vibrate(pattern: number | number[], withSubBassThump: boolean = false): void {
         if (this.muted) return
+
+        // パターンからパルス回数（奇数インデックスがON時間）を算出
+        const pulseCount = Array.isArray(pattern)
+            ? Math.max(1, Math.ceil(pattern.length / 2))
+            : 1
+
+        // 1. iOS 18+ Taptic Engine 物理ハプティクス駆動
+        this.triggerIOSTaptic(pulseCount, 110)
+
+        // 2. Android / 標準 Web Vibration API 駆動
         try {
             if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                navigator.vibrate(0) // 既存の振動キューをクリアして確実に新規駆動
                 navigator.vibrate(pattern)
             }
         } catch {
             // ignore
         }
 
+        // 3. 音響サブベース補助（必要な場合のみ）
         if (withSubBassThump) {
             const ctx = this.getContext()
             if (!ctx) return
@@ -133,7 +217,7 @@ class MultimodalEngine {
             osc.type = 'triangle'
             osc.frequency.setValueAtTime(115, now)
             osc.frequency.exponentialRampToValueAtTime(55, now + 0.055)
-            gain.gain.setValueAtTime(0.65, now)
+            gain.gain.setValueAtTime(0.45, now)
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06)
             osc.connect(gain)
             gain.connect(this.getDestination(ctx))
@@ -142,9 +226,9 @@ class MultimodalEngine {
         }
     }
 
-    /** 確認クリック音（ボタン操作時にもはっきり分かる医療タッチ音） */
+    /** 確認クリック音（ボタン操作時にもはっきり分かる医療タッチ音 ＋ 物理タプティック振動） */
     public playClickBeep(): void {
-        this.vibrate(60, true)
+        this.vibrate(80, false)
         const ctx = this.getContext()
         if (!ctx) return
         const now = ctx.currentTime
@@ -167,8 +251,8 @@ class MultimodalEngine {
      * ① QRコード読み取り成功音（誰でも一発で気づく「ピピッ！」高輝度バーコードスキャナー音 ＋ 2連強バイブ）
      */
     public playScanSuccess(): void {
-        // スマホで明確に感じる2連バイブレーション (100ms - 50ms休止 - 140ms)
-        this.vibrate([100, 50, 140], true)
+        // スマホで明確に感じる2連バイブレーション (180ms - 60ms休止 - 220ms)
+        this.vibrate([180, 60, 220], false)
         const ctx = this.getContext()
         if (!ctx) return
 
@@ -216,7 +300,7 @@ class MultimodalEngine {
      * ② バイタルサイン解禁・測定完了音（生体情報モニターの明瞭なパルスビープ2連音）
      */
     public playVitalMonitorBeep(): void {
-        this.vibrate([90, 40, 90], true)
+        this.vibrate([150, 60, 150], false)
         const ctx = this.getContext()
         if (!ctx) return
 
@@ -253,7 +337,7 @@ class MultimodalEngine {
      * ③ 処置・検査完了ファンファーレ（はっきり響く医療機器コンプリートチャイム ＋ 3連振動）
      */
     public playTreatmentComplete(): void {
-        this.vibrate([100, 50, 100, 50, 180], true)
+        this.vibrate([160, 60, 160, 60, 260], false)
         const ctx = this.getContext()
         if (!ctx) return
 
@@ -291,7 +375,7 @@ class MultimodalEngine {
      * ④ 患者急変・悪化アラーム音（ICU高優先度アラーム風 強力3連パルス＋長振動）
      */
     public playCriticalAlert(): void {
-        this.vibrate([200, 80, 200, 80, 320], true)
+        this.vibrate([260, 80, 260, 80, 400], false)
         const ctx = this.getContext()
         if (!ctx) return
 
@@ -330,8 +414,8 @@ class MultimodalEngine {
      * 画面に触れているスタッフにリアルな脈動を伝える
      */
     public triggerHeartbeatHaptics(): void {
-        // 第1音（収縮期: 90ms強振動）→ 110ms休止 → 第2音（拡張期: 65ms振動）
-        this.vibrate([90, 110, 65], true)
+        // 第1音（収縮期: 140ms強振動）→ 110ms休止 → 第2音（拡張期: 100ms振動）
+        this.vibrate([140, 110, 100], false)
     }
 }
 

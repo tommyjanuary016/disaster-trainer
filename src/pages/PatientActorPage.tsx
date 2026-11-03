@@ -53,6 +53,76 @@ const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlock
     return guides
 }
 
+const getAgeGroup = (age: number) => {
+    if (age < 6) return '乳幼児'
+    if (age < 15) return '小児'
+    return `${Math.floor(age / 10) * 10}代`
+}
+
+/**
+ * 外見上の明らかな異常所見（初見・視診所見）を簡潔な客観描写で抽出する
+ * ※体幹・四肢・触診所見（骨盤動揺、下肢短縮、腹部打撲等）は除外し身体診察手技での発見に委ねる
+ */
+const getVisibleFindings = (patient: any, rr: number, isSpeechBlocked: boolean): string[] => {
+    const findings: string[] = []
+
+    // ① 顔面・頭部の露出部外傷（首・気管偏位などの診察所見は除外）
+    const hText = patient?.findings?.head_and_neck || ''
+    if (hText && !hText.includes('明らかな外傷性変化なし') && !hText.includes('特記所見なし') && !hText.includes('特記事項なし')) {
+        const faceKeywords = ['顔面', '額', '鼻', '眼', '口', '頬', '頭部', '耳', '側頭部', '後頭部']
+        const lines = hText.split(/[、。\n・]/).map((s: string) => s.trim()).filter(Boolean)
+        const matched = lines.filter((line: string) => 
+            faceKeywords.some(kw => line.includes(kw)) && 
+            !line.includes('なし') &&
+            !line.includes('気管') &&
+            !line.includes('怒張')
+        )
+        if (matched.length > 0) {
+            matched.forEach((m: string) => findings.push(m))
+        } else if (faceKeywords.some(kw => hText.includes(kw))) {
+            const firstPart = hText.split(/[、。\n]/)[0].trim()
+            if (firstPart) findings.push(firstPart)
+        }
+    }
+
+    // ② 表情・意識の見た目
+    if (patient?.consciousness_level) {
+        const cl = String(patient.consciousness_level).toLowerCase()
+        if (cl.includes('300') || cl.includes('3桁') || cl.includes('深昏睡') || cl.includes('e1v1m1') || cl.includes('jcs 3')) {
+            findings.push('無反応')
+        } else if (cl.includes('100') || cl.includes('200') || cl.includes('2桁') || isSpeechBlocked) {
+            findings.push('うめき声のみ')
+        } else if (cl.includes('1桁') || cl.includes('清明')) {
+            if (patient?.triage_color === '赤' || patient?.triage_color === '黄' || rr >= 24) {
+                findings.push('苦悶表情')
+            }
+        }
+    } else if (isSpeechBlocked) {
+        findings.push('うめき声のみ')
+    } else if (patient?.triage_color === '赤' || patient?.triage_color === '黄' || rr >= 24) {
+        findings.push('苦悶表情')
+    }
+
+    // ③ 呼吸の見た目
+    if (rr === 0) {
+        findings.push('呼吸停止')
+    } else if (rr >= 30) {
+        findings.push('荒い呼吸')
+    } else if (rr >= 24) {
+        findings.push('浅く速い呼吸')
+    } else if (rr > 0 && rr <= 10) {
+        findings.push('微弱な呼吸')
+    }
+
+    // ④ 活動性外出血
+    const allText = `${hText} ${patient?.findings?.limbs || ''} ${patient?.findings?.chest || ''}`
+    if (allText.includes('大量出血') || allText.includes('噴出性出血')) {
+        findings.push('活動性外出血あり')
+    }
+
+    return Array.from(new Set(findings))
+}
+
 const PatientActorPage: React.FC = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
@@ -170,6 +240,7 @@ const PatientActorPage: React.FC = () => {
     }
 
     const laymanGuides = generateLaymanGuide(patient, isSpeechBlocked, speechBlockedReason)
+    const visibleFindings = getVisibleFindings(patient, rr, isSpeechBlocked)
 
     return (
         <div className="actor-page">
@@ -240,7 +311,7 @@ const PatientActorPage: React.FC = () => {
             <div className="actor-page__content">
                 <div className="actor-patient-info">
                     <div className="actor-patient-info__demo" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                        {patient.name} 様 <span style={{ fontSize: '0.9rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(ID: {patient.base_patient_id || patient.id})</span> | {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}
+                        推定 {getAgeGroup(patient.age)} {patient.gender === 'M' ? '男性' : '女性'} <span style={{ fontSize: '0.9rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(患者ID: {patient.base_patient_id || patient.id})</span>
                     </div>
                 </div>
 
@@ -273,6 +344,27 @@ const PatientActorPage: React.FC = () => {
                     <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '0.05em' }}>
                         ID: {patient.base_patient_id || patient.id}
                     </div>
+
+                    {/* 外見上の明らかな異常所見 */}
+                    {visibleFindings.length > 0 && (
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '0.75rem 1rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            textAlign: 'left'
+                        }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#334155', marginBottom: '0.35rem' }}>
+                                外見上の明らかな異常所見
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.6' }}>
+                                {visibleFindings.map((f, i) => (
+                                    <li key={i}>{f}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
 
                 {/* タブ切り替え */}
@@ -310,6 +402,21 @@ const PatientActorPage: React.FC = () => {
                 {/* かんたんガイドタブ */}
                 {activeTab === 'easy' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                        {/* 演技者用控え（氏名・実年齢） */}
+                        <div style={{
+                            backgroundColor: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.85rem',
+                            color: '#475569'
+                        }}>
+                            <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '0.2rem' }}>
+                                🎭 演技者控え情報
+                            </div>
+                            <div>患者氏名: <strong>{patient.name}</strong> 様（実年齢: {patient.age}歳）</div>
+                        </div>
+
                         {/* やること手順カード */}
                         <div style={{
                             backgroundColor: '#fff7ed',
@@ -405,6 +512,11 @@ const PatientActorPage: React.FC = () => {
                 {activeTab === 'detail' && (
                     <div className="actor-instruction">
                         <div className="instruction-card">
+                            <h4>患者氏名・実年齢（演技者控え）</h4>
+                            <p style={{ fontWeight: 'bold', fontSize: '0.95rem', margin: '0 0 1rem', color: '#1e293b' }}>
+                                {patient.name} 様（実年齢: {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}）
+                            </p>
+
                             <h4>状況・受傷機転</h4>
                             <p>{patient.findings.background || '特記事項なし'}</p>
 

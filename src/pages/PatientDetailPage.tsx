@@ -63,7 +63,7 @@ const PatientDetailPage: React.FC = () => {
             <p className="page-error__title">データ取得エラー</p>
             <p className="page-error__message">{error || '患者が見つかりません'}</p>
             <button className="button button--secondary" style={{ marginTop: '1.5rem', width: 'auto' }} onClick={() => navigate('/training')}>
-                訓練トップへ戻る
+                患者選択に戻る
             </button>
         </div>
     )
@@ -143,7 +143,7 @@ const PatientDetailPage: React.FC = () => {
                 <div>
                     <button onClick={() => navigate('/training')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                        患者スキャン
+                        患者選択に戻る
                     </button>
                 </div>
                 <div className="patient-header__identity">
@@ -331,7 +331,7 @@ const PatientDetailPage: React.FC = () => {
                         className="button button--secondary"
                         onClick={() => navigate('/training')}
                     >
-                        トップに戻る
+                        患者選択に戻る
                     </button>
                 </div>
             </main>

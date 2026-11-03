@@ -143,7 +143,7 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                         className="button button--secondary"
                         style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
                     >
-                        訓練トップへ戻る
+                        患者選択に戻る
                     </button>
                     {patientId && (
                         <button

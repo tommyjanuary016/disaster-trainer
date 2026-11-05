@@ -4,10 +4,12 @@ import { usePatient } from '../hooks/usePatient'
 import { useDeterioration } from '../hooks/useDeterioration'
 import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
+import { ActorQRModal } from '../components/actor/ActorQRModal'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
+import { generateInlineQrSvg } from '../lib/inlineQr'
 
-// 痛みの強度に応じた素人向け説明を生成する
+// 痛みの強度に応じた説明を生成する
 const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlockedReason: string): string[] => {
     const guides: string[] = []
     const findings = patient?.findings
@@ -26,24 +28,24 @@ const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlock
         guides.push(`🚌 【あなたの状況】${findings.background.slice(0, 80)}`)
     }
 
-    // 頭部所見 → 素人向け
+    // 頭部所見
     if (findings?.head_and_neck && !findings.head_and_neck.includes('明らかな外傷性変化なし')) {
-        guides.push('🤕 頭や顔が強く打たれています。顔をしかめて痛そうにしてください。頭や顔を触られたら「痛い！」と反応してください。')
+        guides.push('🤕 頭部や頸部（首・顔面）を強く打撲しています。顔をしかめて痛そうにし、頭や首を触られたら「痛い！」と反応してください。')
     }
 
     // 胸部所見
     if (findings?.chest && !findings.chest.includes('明らかな外傷性変化なし')) {
-        guides.push('😮‍💨 胸が痛くて息がしにくい状態です。呼吸のたびに顔をゆがめ、浅くゆっくり息をしてください。胸を触られたら「痛い！」と言ってください。')
+        guides.push('😮‍💨 胸部が痛くて呼吸が苦しい状態です。呼吸のたびに顔をゆがめ、浅く息をしてください。胸部を触られたら「痛い！」と言ってください。')
     }
 
     // 腹部・骨盤所見
     if (findings?.abdomen_and_pelvis && !findings.abdomen_and_pelvis.includes('明らかな外傷性変化なし')) {
-        guides.push('😣 お腹や腰の周りが痛い状態です。お腹を押されたら「痛い！」「そこが一番痛い！」と言ってください。できるだけ動きたくない様子を演じてください。')
+        guides.push('😣 腹部や骨盤周囲が激しく痛む状態です。腹部や骨盤を押されたら「痛い！」「そこが一番痛い！」と言ってください。できるだけ動きたくない様子を演じてください。')
     }
 
     // 四肢所見
     if (findings?.limbs && !findings.limbs.includes('明らかな外傷性変化なし')) {
-        guides.push('🦵 足（または手）が強く打たれています。その足（手）をできるだけ動かさないようにし、触られたら「痛い！」と言ってください。')
+        guides.push('🦵 四肢（腕や脚）を強く打撲・骨折しています。患部をできるだけ動かさないようにし、触られたら「痛い！」と言ってください。')
     }
 
     if (guides.length === 0 && !isSpeechBlocked) {
@@ -131,6 +133,7 @@ const PatientActorPage: React.FC = () => {
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
     const [activeAnimation, setActiveAnimation] = useState<'pulse' | 'breathing' | null>(null)
     const [activeTab, setActiveTab] = useState<'easy' | 'detail'>('easy')
+    const [showActorQRModal, setShowActorQRModal] = useState<boolean>(false)
     // 模擬患者としてQRコードを提示して待機中、画面がスリープしないよう自動維持
     useWakeLock(true)
 
@@ -255,14 +258,15 @@ const PatientActorPage: React.FC = () => {
                 <button
                     onClick={() => navigate('/qr-generator?tab=procedure')}
                     style={{
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: '1px solid #1d4ed8',
                         borderRadius: '6px',
-                        padding: '0.4rem 0.8rem',
-                        fontSize: '0.8rem',
+                        padding: '0.45rem 0.85rem',
+                        fontSize: '0.85rem',
                         fontWeight: 'bold',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                     }}
                 >
                     🖨️ 手技/バイタルQR
@@ -337,7 +341,7 @@ const PatientActorPage: React.FC = () => {
                         👩‍⚕️ 医療スタッフが「スキャンします」と言ったらこの画面を見せてください
                     </p>
                     <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`patient:${patient.id}`)}`}
+                        src={generateInlineQrSvg(`patient:${patient.id}`, 160)}
                         alt="患者QR"
                         style={{ width: '160px', height: '160px', margin: '0 auto', display: 'block' }}
                     />
@@ -546,31 +550,65 @@ const PatientActorPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* 脈・呼吸ボタン (常時表示) */}
-                <div className="actor-actions" style={{ marginTop: '1.5rem' }}>
-                    <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '0.5rem' }}>
-                        「脈をみます」「呼吸をみます」と言われたらタップ
+                {/* 処置・物品QR提示 ＆ 脈・呼吸ボタン (常時表示) */}
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* スマホ完結・処置QR提示ボタン */}
+                    <button
+                        onClick={() => setShowActorQRModal(true)}
+                        style={{
+                            width: '100%',
+                            padding: '1rem',
+                            backgroundColor: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            fontWeight: 'bold',
+                            fontSize: '1.05rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.6rem',
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        <span style={{ fontSize: '1.3rem' }}>📱</span>
+                        <span>処置・手技・物品のQRを提示する</span>
+                    </button>
+
+                    <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.25rem 0 0' }}>
+                        「脈をみます」「呼吸をみます」と言われたら以下をタップ
                     </p>
-                    <button
-                        className="actor-button actor-button--pulse"
-                        onClick={() => setActiveAnimation('pulse')}
-                    >
-                        <div className="button-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                        </div>
-                        <span>💓 脈（心拍）を見せる</span>
-                    </button>
-                    <button
-                        className="actor-button actor-button--breathing"
-                        onClick={() => setActiveAnimation('breathing')}
-                    >
-                        <div className="button-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
-                        </div>
-                        <span>🌬️ 呼吸を見せる</span>
-                    </button>
+                    <div className="actor-actions" style={{ marginTop: '0' }}>
+                        <button
+                            className="actor-button actor-button--pulse"
+                            onClick={() => setActiveAnimation('pulse')}
+                        >
+                            <div className="button-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            </div>
+                            <span>💓 脈（心拍）を見せる</span>
+                        </button>
+                        <button
+                            className="actor-button actor-button--breathing"
+                            onClick={() => setActiveAnimation('breathing')}
+                        >
+                            <div className="button-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                            </div>
+                            <span>🌬️ 呼吸を見せる</span>
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* 処置・物品QR個別提示モーダル */}
+            {showActorQRModal && (
+                <ActorQRModal
+                    onClose={() => setShowActorQRModal(false)}
+                    patientName={patient.name}
+                />
+            )}
 
             {/* アニメーション用オーバーレイ */}
             {activeAnimation === 'pulse' && (

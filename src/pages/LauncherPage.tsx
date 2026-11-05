@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchActiveSessions, setActiveSession } from '../lib/firestore'
+import { fetchActiveSessions, setActiveSession, activeSessionId } from '../lib/firestore'
 import { TrainingSession } from '../types/patient'
 import { APP_VERSION, APP_LAST_UPDATED } from '../version'
+import { generateInlineQrSvg } from '../lib/inlineQr'
 
 const LauncherPage: React.FC = () => {
     const navigate = useNavigate()
@@ -18,6 +19,10 @@ const LauncherPage: React.FC = () => {
 
     // 管理画面選択モーダル用ステート
     const [showAdminActionModal, setShowAdminActionModal] = useState(false)
+
+    // トップ画面の招待QRモーダル用ステート
+    const [showInviteQrModal, setShowInviteQrModal] = useState(false)
+    const [copySuccess, setCopySuccess] = useState(false)
 
     const handleAdminClick = () => {
         setPasswordInput('')
@@ -39,6 +44,12 @@ const LauncherPage: React.FC = () => {
             setIsLoadingSessions(false)
         }
     }
+
+    React.useEffect(() => {
+        if (new URLSearchParams(window.location.search).get('select_session') === '1') {
+            handleTrainingStartClick()
+        }
+    }, [])
 
     const handleSelectSession = (sessionId: string) => {
         setActiveSession(sessionId)
@@ -297,6 +308,32 @@ const LauncherPage: React.FC = () => {
                         <span className="launcher-btn__label">管理画面</span>
                         <span className="launcher-btn__arrow">→</span>
                     </button>
+
+                    {/* トップ画面から即座に参加QRを表示するボタン */}
+                    <button
+                        type="button"
+                        onClick={() => setShowInviteQrModal(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.6rem',
+                            width: '100%',
+                            padding: '0.85rem 1rem',
+                            backgroundColor: '#eff6ff',
+                            border: '1.5px solid #93c5fd',
+                            borderRadius: '12px',
+                            color: '#1d4ed8',
+                            fontWeight: 'bold',
+                            fontSize: '0.95rem',
+                            cursor: 'pointer',
+                            marginTop: '0.25rem',
+                            boxShadow: '0 2px 4px rgba(37,99,235,0.08)',
+                        }}
+                    >
+                        <span style={{ fontSize: '1.2rem' }}>📱</span>
+                        <span>訓練参加用QRコードを表示</span>
+                    </button>
                 </div>
 
                 <div style={{ marginTop: '2rem', textAlign: 'center' }}>
@@ -321,6 +358,80 @@ const LauncherPage: React.FC = () => {
                     </span>
                 </div>
             </div>
+
+            {/* トップ画面の訓練参加QRモーダル */}
+            {showInviteQrModal && (
+                <div
+                    className="launcher-modal-overlay"
+                    onClick={() => setShowInviteQrModal(false)}
+                    style={{ zIndex: 10000 }}
+                >
+                    <div
+                        className="launcher-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '420px', textAlign: 'center', padding: '1.75rem 1.25rem' }}
+                    >
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 0.5rem' }}>
+                            📱 訓練参加用QRコード
+                        </h2>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem' }}>
+                            参加者のスマホカメラでスキャンすると、この訓練システムに直接参加できます。
+                        </p>
+
+                        {/* QRコード画像（インラインSVG） */}
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#ffffff',
+                            border: '2px solid #2563eb',
+                            borderRadius: '16px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(37,99,235,0.12)',
+                            marginBottom: '1rem',
+                        }}>
+                            <img
+                                src={generateInlineQrSvg(
+                                    `${window.location.origin}/role-select${activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : ''}`,
+                                    220
+                                )}
+                                alt="Join QR Code"
+                                style={{ width: '220px', height: '220px', display: 'block' }}
+                            />
+                        </div>
+
+                        {activeSessionId && (
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
+                                現在のセッション: <strong>{activeSessionId}</strong>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                            <button
+                                type="button"
+                                className="button button--primary"
+                                onClick={() => {
+                                    const joinUrl = `${window.location.origin}/role-select${activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : ''}`
+                                    navigator.clipboard.writeText(joinUrl)
+                                    setCopySuccess(true)
+                                    setTimeout(() => setCopySuccess(false), 2000)
+                                }}
+                                style={{ padding: '0.6rem 1.2rem', fontSize: '0.9rem' }}
+                            >
+                                {copySuccess ? '✓ URLコピー完了' : '参加URLをコピー'}
+                            </button>
+                            <button
+                                type="button"
+                                className="button button--secondary"
+                                onClick={() => setShowInviteQrModal(false)}
+                                style={{ padding: '0.6rem 1.2rem', fontSize: '0.9rem' }}
+                            >
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

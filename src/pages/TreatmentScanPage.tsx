@@ -32,55 +32,56 @@ const DOCTOR_ONLY_PROCEDURES = [
     'pericardiocentesis',
 ]
 
-// 手技IDと表示名のマッピング（全臨床リスト）
+// 手技IDと表示名のマッピング（全臨床リスト・日本語・カタカナ統一）
 export const PROCEDURE_NAMES: Record<string, string> = {
-    vitals:             '診療エリアV/S測定',
-    triage:             'トリアージエリアV/S測定',
+    vitals:             '診療エリア詳細V/S測定',
+    triage:             'トリアージ迅速V/S測定',
     head_and_neck:      '頭頸部診察',
     chest:              '胸部診察',
     abdomen_and_pelvis: '腹部・骨盤診察',
     limbs:              '四肢診察',
-    fast:               'FAST',
-    ample:              'AMPLE',
-    background:         '背景聴取',
+    fast:               '超音波検査 (FAST)',
+    ample:              '問診 (AMPLE聴取)',
+    background:         '受傷機転・背景聴取',
     // 気道・呼吸
-    oxygen: '酸素投与',
-    hfnc: 'ハイフロー開始 (HFNC)',
+    oxygen: '酸素マスク投与',
+    hfnc: 'ハイフロー酸素吸入 (HFNC)',
     intubation: '気管挿管',
     surgical_airway: '外科的気道確保',
-    ventilator: '人工呼吸器開始',
+    ventilator: '人工呼吸器管理',
     needle_decompression: '胸腔穿刺 (緊急脱気)',
     chest_tube: '胸腔ドレーン挿入',
-    gauze_towel_fixation: 'ガーゼ固定、タオル固定',
+    gauze_towel_fixation: 'ガーゼ固定・タオル固定',
     three_sided_taping: '三辺テーピング',
     // 循環・輸液・輸血
-    iv_access: '静脈路確保(末梢)',
-    iv_access_2: '静脈路確保(2本目)',
-    cv_access: '中心静脈路確保',
+    iv_access: '末梢静脈路確保 (1本目)',
+    iv_access_2: '末梢静脈路確保 (2本目)',
+    cv_access: '中心静脈路確保 (CV)',
     quinton_catheter: '血管アクセスカテーテル挿入 (クイントン)',
-    iv_fluid: '外液急速投与',
+    iv_fluid: '外液急速輸液 (加圧投与)',
     blood_transfusion: '緊急輸血 (RBC/FFP/PC)',
+    tourniquet: '止血帯装着 (ターニケット)',
     // 薬剤投与
-    vasopressor: '昇圧剤投与',
-    antihypertensive: '降圧剤投与',
+    vasopressor: '昇圧剤投与 (ノルアドレナリン等)',
+    antihypertensive: '降圧剤投与 (ニカルジピン等)',
     antibiotics: '抗菌薬投与',
     sedation: '鎮静・鎮痛薬投与',
     // 蘇生・外科的介入・高度医療
-    pelvic_binder: 'サムスリング装着 (骨盤固定)',
+    pelvic_binder: '骨盤固定具装着 (サムスリング)',
     cpr: '胸骨圧迫 / ACLS',
     fasciotomy: '減張切開',
-    open_cardiac_massage: '開胸心マ',
+    open_cardiac_massage: '開胸心臓マッサージ',
     aortic_cross_clamping: '開胸大動脈クランプ',
-    exploratory_laparotomy: '試験開腹',
-    emergency_c_section: '緊急帝王切開',
-    iabo: 'IABO (大動脈内バルーン閉塞)',
-    iabp: 'IABP (大動脈内バルーンポンピング)',
-    pcps: 'PCPS (VA-ECMO)',
+    exploratory_laparotomy: '緊急開腹手術 (ダメージコントロール)',
+    emergency_c_section: '死戦期帝王切開 (PMCA)',
+    iabo: '大動脈バルーン遮断 (IABO/REBOA)',
+    iabp: '大動脈バルーンパンピング (IABP)',
+    pcps: '体外式膜型人工肺 (PCPS/VA-ECMO)',
     // 整形・その他
     pericardiocentesis: '心嚢穿刺ドレナージ',
-    splint: 'シーネ固定',
+    splint: 'シーネ固定 (副子固定)',
     traction: '直達牽引',
-    suture: '挫創処置 (洗浄縫合)',
+    suture: '創傷処置 (洗浄縫合)',
     // 放射線科検査
     xray: 'レントゲン検査',
     ct: 'CT検査',
@@ -531,14 +532,14 @@ const TreatmentScanPage: React.FC = () => {
                                         <option value="vitals">{PROCEDURE_NAMES.vitals}</option>
                                     </optgroup>
 
-                                    <optgroup label="診察手技">
+                                    <optgroup label="診察・評価">
                                         <option value="head_and_neck">頭頸部診察</option>
                                         <option value="chest">胸部診察</option>
                                         <option value="abdomen_and_pelvis">腹部・骨盤診察</option>
                                         <option value="limbs">四肢診察</option>
-                                        <option value="fast">FAST</option>
-                                        <option value="ample">AMPLE</option>
-                                        <option value="background">背景聴取</option>
+                                        <option value="fast">超音波検査 (FAST)</option>
+                                        <option value="ample">問診 (AMPLE聴取)</option>
+                                        <option value="background">受傷機転・背景聴取</option>
                                     </optgroup>
 
                                     <optgroup label="治療処置: 気道・呼吸" disabled={!hasVitalsOrExams}>

@@ -1,10 +1,12 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useExperienceMode } from '../hooks/useExperienceMode'
 
 export const GlobalNavigation: React.FC = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const path = location.pathname
+    const { isExperienceMode, toggleExperienceMode } = useExperienceMode()
 
     // ランチャー（/）
     const isLauncher = path === '/'
@@ -21,10 +23,41 @@ export const GlobalNavigation: React.FC = () => {
     const pathParts = path.split('/')
     const patientId = pathParts.length > 3 ? pathParts[3] : null
 
-    if (!showAppTop && !showRoleSelect && !isInsideTreatment) return null
-
     return (
         <div className="global-navigation">
+            {/* 操作体験モードバナー（ONの時、常にフッター上部に目立つ形で表示） */}
+            {isExperienceMode && (
+                <div style={{
+                    backgroundColor: '#fef3c7',
+                    borderTop: '2px solid #f59e0b',
+                    padding: '0.4rem 0.75rem',
+                    fontSize: '0.78rem',
+                    color: '#92400e',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                }}>
+                    <span style={{ fontWeight: 'bold' }}>
+                        🧪 操作体験中 (他スマホと連動しないモード)
+                    </span>
+                    <button
+                        onClick={toggleExperienceMode}
+                        style={{
+                            background: '#d97706',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0.2rem 0.5rem',
+                            fontSize: '0.72rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        連動モードに戻す
+                    </button>
+                </div>
+            )}
+
             <div className="global-navigation__nav-buttons">
                 {showAppTop && (
                     <button className="nav-button nav-button--home" onClick={() => navigate('/')}>
@@ -54,6 +87,28 @@ export const GlobalNavigation: React.FC = () => {
                         <span>患者ステータス</span>
                     </button>
                 )}
+
+                {/* 操作体験モード切り替えボタン */}
+                <button
+                    onClick={toggleExperienceMode}
+                    style={{
+                        marginLeft: 'auto',
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '6px',
+                        border: isExperienceMode ? '1.5px solid #d97706' : '1px solid #cbd5e1',
+                        backgroundColor: isExperienceMode ? '#fef3c7' : '#f8fafc',
+                        color: isExperienceMode ? '#b45309' : '#64748b',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        cursor: 'pointer',
+                    }}
+                    title="説明会などで他者の画面と干渉せずに一人で試せます"
+                >
+                    <span>{isExperienceMode ? '🧪 体験中' : '📱 体験モード'}</span>
+                </button>
             </div>
         </div>
     )

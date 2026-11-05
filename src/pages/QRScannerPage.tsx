@@ -12,7 +12,10 @@ import { soundEngine } from '../lib/soundEngine'
 const QRScannerPage: React.FC = () => {
     const navigate = useNavigate()
     const { role } = useRole()
-    const [activeTab, setActiveTab] = useState<'qr' | 'list'>('qr')
+    const [activeTab, setActiveTab] = useState<'qr' | 'list'>(() => {
+        const params = new URLSearchParams(window.location.search)
+        return params.get('tab') === 'list' ? 'list' : 'qr'
+    })
     const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [cameraError, setCameraError] = useState<any>(null)

@@ -5,62 +5,16 @@ import { MEDICAL_ITEMS, getItemCategories } from '../data/items'
 import { makePatientQR, makeProcedureQR, makeItemQR } from '../types/qr'
 import { createPatient } from '../lib/firestore'
 import { Patient } from '../types/patient'
+import { generateInlineQrSvg } from '../lib/inlineQr'
+
+import { PROCEDURES_MASTER } from '../data/procedures'
 
 // 手技一覧（QR生成用・全臨床対応）
-const PROCEDURES = [
-    { id: 'triage',             name: 'トリアージエリアV/S測定', category: 'バイタル' },
-    { id: 'vitals',             name: '診療エリアV/S測定',     category: 'バイタル' },
-    { id: 'head_and_neck',      name: '頭頸部診察',         category: '診察手技' },
-    { id: 'chest',              name: '胸部診察',           category: '診察手技' },
-    { id: 'abdomen_and_pelvis', name: '腹部・骨盤診察',     category: '診察手技' },
-    { id: 'limbs',              name: '四肢診察',           category: '診察手技' },
-    { id: 'fast',               name: 'FAST',               category: '診察手技' },
-    { id: 'ample',              name: 'AMPLE',              category: '診察手技' },
-    { id: 'background',         name: '背景聴取',           category: '診察手技' },
-    // 気道・呼吸
-    { id: 'oxygen',             name: '酸素投与',           category: '気道・呼吸' },
-    { id: 'hfnc',               name: 'ハイフロー開始 (HFNC)', category: '気道・呼吸' },
-    { id: 'intubation',         name: '気管挿管',           category: '気道・呼吸' },
-    { id: 'surgical_airway',    name: '外科的気道確保',     category: '気道・呼吸' },
-    { id: 'ventilator',         name: '人工呼吸器開始',     category: '気道・呼吸' },
-    { id: 'needle_decompression', name: '胸腔穿刺 (緊急脱気)', category: '気道・呼吸' },
-    { id: 'chest_tube',         name: '胸腔ドレーン挿入',   category: '気道・呼吸' },
-    { id: 'gauze_towel_fixation', name: 'ガーゼ・タオル固定', category: '気道・呼吸' },
-    { id: 'three_sided_taping', name: '三辺テーピング',     category: '気道・呼吸' },
-    // 循環・輸液・輸血
-    { id: 'iv_access',          name: '静脈路確保(末梢)',   category: '循環・輸液' },
-    { id: 'iv_access_2',        name: '静脈路確保(2本目)',  category: '循環・輸液' },
-    { id: 'cv_access',          name: '中心静脈路確保',     category: '循環・輸液' },
-    { id: 'quinton_catheter',   name: 'カテーテル(クイントン)', category: '循環・輸液' },
-    { id: 'iv_fluid',           name: '外液急速投与',       category: '循環・輸液' },
-    { id: 'blood_transfusion',  name: '緊急輸血',           category: '循環・輸液' },
-    { id: 'tourniquet',         name: '止血帯',             category: '循環・輸液' },
-    // 薬剤投与
-    { id: 'vasopressor',        name: '昇圧剤投与',         category: '薬剤投与' },
-    { id: 'antihypertensive',   name: '降圧剤投与',         category: '薬剤投与' },
-    { id: 'antibiotics',        name: '抗菌薬投与',         category: '薬剤投与' },
-    { id: 'sedation',           name: '鎮静・鎮痛薬投与',   category: '薬剤投与' },
-    // 蘇生・高度医療
-    { id: 'pelvic_binder',      name: 'サムスリング(骨盤固定)', category: '蘇生・高度医療' },
-    { id: 'cpr',                name: '胸骨圧迫 / ACLS',    category: '蘇生・高度医療' },
-    { id: 'fasciotomy',         name: '減張切開',           category: '蘇生・高度医療' },
-    { id: 'open_cardiac_massage', name: '開胸心マ',         category: '蘇生・高度医療' },
-    { id: 'aortic_cross_clamping', name: '開胸大動脈クランプ', category: '蘇生・高度医療' },
-    { id: 'exploratory_laparotomy', name: '試験開腹',       category: '蘇生・高度医療' },
-    { id: 'emergency_c_section', name: '緊急帝王切開',     category: '蘇生・高度医療' },
-    { id: 'iabo',               name: 'IABO',               category: '蘇生・高度医療' },
-    { id: 'iabp',               name: 'IABP',               category: '蘇生・高度医療' },
-    { id: 'pcps',               name: 'PCPS (VA-ECMO)',     category: '蘇生・高度医療' },
-    // 整形・その他
-    { id: 'pericardiocentesis', name: '心嚢穿刺ドレナージ', category: '整形・その他' },
-    { id: 'splint',             name: 'シーネ固定',         category: '整形・その他' },
-    { id: 'traction',           name: '直達牽引',           category: '整形・その他' },
-    { id: 'suture',             name: '挫創処置 (洗浄縫合)', category: '整形・その他' },
-]
+const PROCEDURES = PROCEDURES_MASTER
 
-/** フリーQR画像APIでQR画像URLを生成 */
+/** QR画像URLを生成（オフライン・ローカルでも確実に表示できるインラインSVG） */
 function qrImageUrl(data: string, size = 160): string {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`
+    return generateInlineQrSvg(data, size)
 }
 
 type Tab = 'patient' | 'procedure' | 'item' | 'import'

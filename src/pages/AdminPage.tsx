@@ -58,6 +58,19 @@ const AdminPage: React.FC = () => {
     }, [])
 
     useEffect(() => {
+        const queryParams = new URLSearchParams(location.search)
+        const tabParam = queryParams.get('tab')
+        if (tabParam === 'patients' || tabParam === 'dashboard' || tabParam === 'settings') {
+            setActiveTab(tabParam)
+        }
+        if (queryParams.get('new_session') === '1') {
+            setIsSessionModalOpen(true)
+        }
+        if (queryParams.get('auth') === '1' || sessionStorage.getItem('admin_authenticated') === 'true') {
+            sessionStorage.setItem('admin_authenticated', 'true')
+            setIsAuthenticated(true)
+        }
+
         if (location.state && (location.state as any).action) {
             const action = (location.state as any).action
             if (action === 'new_session') {
@@ -67,7 +80,7 @@ const AdminPage: React.FC = () => {
                 setDisplaySessionId(null)
             }
         }
-    }, [location.state])
+    }, [location.state, location.search])
 
     useEffect(() => {
         if (showMasterAll) {

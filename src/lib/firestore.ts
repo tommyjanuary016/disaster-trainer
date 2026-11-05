@@ -16,6 +16,33 @@ import {
 import { db, USE_MOCK } from './firebase'
 import { Patient, TrainingSession } from '../types/patient'
 import { mockPatients } from '../data/mockData'
+import { getIsExperienceMode } from '../hooks/useExperienceMode'
+
+// 操作体験モード (他スマホと連動しないモード) 用の端末ローカルストア
+const experienceStore: Map<number, Patient> = new Map()
+const experienceListeners: Map<number, Set<(patient: Patient) => void>> = new Map()
+
+function getOrInitExperiencePatient(patientId: number, basePatient?: Patient | null): Patient | null {
+    if (experienceStore.has(patientId)) {
+        return experienceStore.get(patientId)!
+    }
+    const source = basePatient || mockStore.get(patientId) || mockPatients.find(p => p.id === patientId)
+    if (source) {
+        const cloned: Patient = JSON.parse(JSON.stringify(source))
+        experienceStore.set(patientId, cloned)
+        return cloned
+    }
+    return null
+}
+
+function notifyExperienceListeners(patientId: number) {
+    const p = experienceStore.get(patientId)
+    if (!p) return
+    const listeners = experienceListeners.get(patientId)
+    if (listeners) {
+        listeners.forEach(fn => fn(JSON.parse(JSON.stringify(p))))
+    }
+}
 
 // モック用インメモリストア（モードの場合は変更をここで管理）
 const mockStore: Map<number, Patient> = new Map(
@@ -24,10 +51,50 @@ const mockStore: Map<number, Patient> = new Map(
 
 // セッション管理用（localStorageで永続化）
 const STORAGE_KEY_SESSION = 'disaster_active_session_id'
-export let activeSessionId: string | null = localStorage.getItem(STORAGE_KEY_SESSION)
+export let activeSessionId: string | null = localStorage.getItem(STORAGE_KEY_SESSION) || 'session-2026-demo'
 
 // モックセッションストア（モックモードでセッション情報を保持）
-const mockSessionStore: Map<string, any> = new Map()
+const DEFAULT_MOCK_SESSION: TrainingSession = {
+    id: 'session-2026-demo',
+    title: '2026年度 災害医療実地訓練（本番）',
+    createdAt: new Date().toISOString(),
+    date: new Date().toISOString(),
+    isActive: true,
+    examLockTimeMinutes: 5,
+    treatmentLockTimeMinutes: 5,
+    isTestMode: false,
+    config: {
+        examLockTimeMinutes: 5,
+        treatmentLockTimeMinutes: 5,
+        isTestMode: false,
+    },
+    totalPatients: mockPatients.length,
+    sessionStartMs: Date.now() - 1000 * 60 * 15,
+}
+const mockSessionStore: Map<string, any> = new Map([
+    [DEFAULT_MOCK_SESSION.id, DEFAULT_MOCK_SESSION],
+])
+
+// モック患者の初期状態（セッションIDを付与）
+mockStore.forEach((p, id) => {
+    p.session_id = DEFAULT_MOCK_SESSION.id
+    if (id === 1) {
+        p.status = '診察中'
+        p.assessment_completed = true
+    } else if (id === 2) {
+        p.status = '処置中'
+        p.applied_treatment_id = 'needle_decompression'
+        p.assessment_completed = true
+    } else if (id === 3) {
+        p.status = '処置完了'
+        p.assessment_completed = true
+        p.completed_treatments = ['iv_fluid']
+    } else if (id === 4) {
+        p.status = '待機中'
+    } else if (id === 5) {
+        p.status = '搬入済'
+    }
+})
 
 // モックのリスナー登録（疑似リアルタイム同期）
 const mockListeners: Map<number, Set<(patient: Patient) => void>> = new Map()
@@ -101,6 +168,22 @@ export function subscribeToPatient(
     patientId: number,
     callback: (patient: Patient | null) => void
 ): Unsubscribe {
+    // 操作体験モード (他スマホと連動しないモード)
+    if (getIsExperienceMode()) {
+        const p = getOrInitExperiencePatient(patientId)
+        callback(checkAutoTimerExpiration(p ? JSON.parse(JSON.stringify(p)) : null))
+
+        if (!experienceListeners.has(patientId)) {
+            experienceListeners.set(patientId, new Set())
+        }
+        const wrapped = (updated: Patient) => callback(checkAutoTimerExpiration(JSON.parse(JSON.stringify(updated))))
+        experienceListeners.get(patientId)!.add(wrapped)
+
+        return () => {
+            experienceListeners.get(patientId)?.delete(wrapped)
+        }
+    }
+
     if (USE_MOCK || !db) {
         // モックモード: 現在の値をすぐ返す
         const raw = mockStore.get(patientId)
@@ -136,6 +219,12 @@ export function subscribeToPatient(
 // 患者データを一度だけ取得する
 // ------------------------------------------------------------------
 export async function fetchPatient(patientId: number): Promise<Patient | null> {
+    // 操作体験モード (他スマホと連動しないモード)
+    if (getIsExperienceMode()) {
+        const p = getOrInitExperiencePatient(patientId)
+        return checkAutoTimerExpiration(p ? JSON.parse(JSON.stringify(p)) : null)
+    }
+
     if (USE_MOCK || !db) {
         const p = mockStore.get(patientId) ?? null
         return checkAutoTimerExpiration(p ? { ...p } : null)
@@ -350,6 +439,18 @@ export async function updateAssessmentCompleted(
     patientId: number,
     completed: boolean
 ): Promise<void> {
+    if (getIsExperienceMode()) {
+        const patient = getOrInitExperiencePatient(patientId)
+        if (patient) {
+            patient.assessment_completed = completed
+            if (completed && patient.status === '初期状態') {
+                patient.status = 'アセスメント完了'
+            }
+            notifyExperienceListeners(patientId)
+        }
+        return
+    }
+
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {
@@ -381,6 +482,15 @@ export async function updatePatientFlags(
     patientId: number,
     flags: Partial<Patient>
 ): Promise<void> {
+    if (getIsExperienceMode()) {
+        const patient = getOrInitExperiencePatient(patientId)
+        if (patient) {
+            Object.assign(patient, flags)
+            notifyExperienceListeners(patientId)
+        }
+        return
+    }
+
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {
@@ -400,6 +510,30 @@ export async function startTreatmentTimer(
 ): Promise<void> {
     const now = Date.now()
     const durationMs = durationMinutes * 60 * 1000
+
+    if (getIsExperienceMode()) {
+        const patient = getOrInitExperiencePatient(patientId)
+        if (patient) {
+            if (patient.timer_started_at != null) {
+                const duration = patient.timer_duration_ms ?? 0
+                const isExpired = now >= (patient.timer_started_at + duration)
+                if (!isExpired) {
+                    throw new Error('ALREADY_LOCKED')
+                }
+                const prevTreatment = patient.applied_treatment_id
+                if (prevTreatment) {
+                    patient.completed_treatments = patient.completed_treatments || []
+                    patient.completed_treatments.push(prevTreatment)
+                }
+            }
+            patient.timer_started_at = now
+            patient.timer_duration_ms = durationMs
+            patient.applied_treatment_id = treatmentId
+            patient.status = '処置中'
+            notifyExperienceListeners(patientId)
+        }
+        return
+    }
 
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
@@ -460,6 +594,35 @@ export async function completeTreatment(
     patientId: number,
     _success: boolean
 ): Promise<void> {
+    if (getIsExperienceMode()) {
+        const patient = getOrInitExperiencePatient(patientId)
+        if (patient) {
+            const addedId = patient.applied_treatment_id || 'unknown'
+            patient.completed_treatments = patient.completed_treatments || []
+            patient.completed_treatments.push(addedId)
+            patient.timer_started_at = null
+            patient.timer_duration_ms = null
+            patient.applied_treatment_id = null
+
+            // 必須処置がすべて完了したか判定
+            let isStabilized = patient.stabilization_completed || false
+            if (patient.required_treatments && patient.required_treatments.length > 0) {
+                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
+                const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
+                if (allRequiredMet) {
+                    isStabilized = true
+                    patient.stabilization_completed = true
+                    if (!patient.post_vs_time_ms) {
+                        patient.post_vs_time_ms = Date.now()
+                    }
+                }
+            }
+            patient.status = isStabilized ? '処置完了' : 'アセスメント完了'
+            notifyExperienceListeners(patientId)
+        }
+        return
+    }
+
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {

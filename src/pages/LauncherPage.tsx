@@ -23,39 +23,6 @@ const LauncherPage: React.FC = () => {
     // トップ画面の招待QRモーダル用ステート
     const [showInviteQrModal, setShowInviteQrModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
-    const [effectiveSessionId, setEffectiveSessionId] = useState<string | null>(activeSessionId)
-    const [effectiveSessionTitle, setEffectiveSessionTitle] = useState<string | null>(null)
-    const [isFetchingInvite, setIsFetchingInvite] = useState(false)
-
-    // 招待QRを開く際、Firestoreから現在アクティブなセッションを最新取得して自動選定する
-    const handleOpenInviteModal = async () => {
-        setIsFetchingInvite(true)
-        setShowInviteQrModal(true)
-        try {
-            const sessions = await fetchActiveSessions()
-            setActiveSessions(sessions)
-            // 1. ローカルの activeSessionId がアクティブ一覧にあればそれを優先
-            const matched = sessions.find(s => s.id === activeSessionId)
-            if (matched) {
-                setEffectiveSessionId(matched.id)
-                setEffectiveSessionTitle(matched.title || null)
-            } else if (sessions.length > 0) {
-                // 2. 最新のアクティブセッションを自動選定し、ローカルにも反映
-                const latest = sessions[0]
-                setEffectiveSessionId(latest.id)
-                setEffectiveSessionTitle(latest.title || null)
-                setActiveSession(latest.id)
-            } else {
-                setEffectiveSessionId(activeSessionId)
-                setEffectiveSessionTitle(null)
-            }
-        } catch (e) {
-            console.error('セッション取得失敗:', e)
-            setEffectiveSessionId(activeSessionId)
-        } finally {
-            setIsFetchingInvite(false)
-        }
-    }
 
     const handleAdminClick = () => {
         setPasswordInput('')
@@ -345,7 +312,7 @@ const LauncherPage: React.FC = () => {
                     {/* トップ画面から即座に参加QRを表示するボタン */}
                     <button
                         type="button"
-                        onClick={handleOpenInviteModal}
+                        onClick={() => setShowInviteQrModal(true)}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -365,7 +332,7 @@ const LauncherPage: React.FC = () => {
                         }}
                     >
                         <span style={{ fontSize: '1.2rem' }}>📱</span>
-                        <span>訓練参加用QRコードを表示</span>
+                        <span>アプリ参加用QRコードを表示</span>
                     </button>
                 </div>
 
@@ -392,7 +359,7 @@ const LauncherPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* トップ画面の訓練参加QRモーダル */}
+            {/* トップ画面のアプリ参加QRモーダル（セッションに依存せず、いつ誰が開いても常に同一のアプリトップURLを表示） */}
             {showInviteQrModal && (
                 <div
                     className="launcher-modal-overlay"
@@ -405,13 +372,14 @@ const LauncherPage: React.FC = () => {
                         style={{ maxWidth: '420px', textAlign: 'center', padding: '1.75rem 1.25rem' }}
                     >
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 0.5rem' }}>
-                            📱 訓練参加用QRコード
+                            📱 アプリ参加用QRコード
                         </h2>
-                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem' }}>
-                            参加者のスマホカメラでスキャンすると、この訓練システムに直接参加できます。
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem', lineHeight: '1.5' }}>
+                            参加者のスマホカメラでスキャンすると、アプリトップ画面を開きます。<br />
+                            いつ誰が使用しても同じQRコードでアクセスできます。
                         </p>
 
-                        {/* QRコード画像（インラインSVG） */}
+                        {/* QRコード画像（規格準拠インラインSVG・セッションを含まないアプリルートURL） */}
                         <div style={{
                             padding: '1rem',
                             backgroundColor: '#ffffff',
@@ -422,48 +390,34 @@ const LauncherPage: React.FC = () => {
                             justifyContent: 'center',
                             boxShadow: '0 4px 12px rgba(37,99,235,0.12)',
                             marginBottom: '1rem',
-                            minHeight: '220px',
                         }}>
-                            {isFetchingInvite ? (
-                                <div style={{ color: '#64748b', fontSize: '0.9rem' }}>セッション確認中...</div>
-                            ) : (
-                                <img
-                                    src={generateInlineQrSvg(
-                                        `${window.location.origin}/?session_id=${encodeURIComponent(effectiveSessionId || '')}`,
-                                        220
-                                    )}
-                                    alt="Join QR Code"
-                                    style={{ width: '220px', height: '220px', display: 'block' }}
-                                />
-                            )}
+                            <img
+                                src={generateInlineQrSvg(
+                                    `${window.location.origin}/`,
+                                    220
+                                )}
+                                alt="App Join QR Code"
+                                style={{ width: '220px', height: '220px', display: 'block' }}
+                            />
                         </div>
 
-                        {effectiveSessionId && (
-                            <div style={{ fontSize: '0.85rem', color: '#1e293b', marginBottom: '1rem', lineHeight: '1.4' }}>
-                                {effectiveSessionTitle && (
-                                    <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '0.2rem' }}>
-                                        {effectiveSessionTitle}
-                                    </div>
-                                )}
-                                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
-                                    ID: <strong>{effectiveSessionId}</strong>
-                                </span>
-                            </div>
-                        )}
+                        <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1.2rem', wordBreak: 'break-all' }}>
+                            URL: <strong style={{ color: '#1e293b' }}>{window.location.origin}/</strong>
+                        </div>
 
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                             <button
                                 type="button"
                                 className="button button--primary"
                                 onClick={() => {
-                                    const joinUrl = `${window.location.origin}/?session_id=${encodeURIComponent(effectiveSessionId || '')}`
+                                    const joinUrl = `${window.location.origin}/`
                                     navigator.clipboard.writeText(joinUrl)
                                     setCopySuccess(true)
                                     setTimeout(() => setCopySuccess(false), 2000)
                                 }}
                                 style={{ padding: '0.6rem 1.2rem', fontSize: '0.9rem' }}
                             >
-                                {copySuccess ? '✓ URLコピー完了' : '参加URLをコピー'}
+                                {copySuccess ? '✓ URLコピー完了' : 'トップURLをコピー'}
                             </button>
                             <button
                                 type="button"

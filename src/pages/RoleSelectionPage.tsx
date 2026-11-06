@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRole, Role } from '../hooks/useRole'
 import { activeSessionId } from '../lib/firestore'
+import { generateInlineQrSvg } from '../lib/inlineQr'
 
 // 各ロールの定義
 const ROLES = [
@@ -120,7 +121,7 @@ const RoleSelectionPage: React.FC = () => {
     }
 
     const shareUrl = `${window.location.origin}/?session_id=${activeSessionId}`
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}`
+    const qrUrl = generateInlineQrSvg(shareUrl, 240)
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(shareUrl).then(() => {

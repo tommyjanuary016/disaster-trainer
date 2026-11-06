@@ -23,6 +23,39 @@ const LauncherPage: React.FC = () => {
     // トップ画面の招待QRモーダル用ステート
     const [showInviteQrModal, setShowInviteQrModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
+    const [effectiveSessionId, setEffectiveSessionId] = useState<string | null>(activeSessionId)
+    const [effectiveSessionTitle, setEffectiveSessionTitle] = useState<string | null>(null)
+    const [isFetchingInvite, setIsFetchingInvite] = useState(false)
+
+    // 招待QRを開く際、Firestoreから現在アクティブなセッションを最新取得して自動選定する
+    const handleOpenInviteModal = async () => {
+        setIsFetchingInvite(true)
+        setShowInviteQrModal(true)
+        try {
+            const sessions = await fetchActiveSessions()
+            setActiveSessions(sessions)
+            // 1. ローカルの activeSessionId がアクティブ一覧にあればそれを優先
+            const matched = sessions.find(s => s.id === activeSessionId)
+            if (matched) {
+                setEffectiveSessionId(matched.id)
+                setEffectiveSessionTitle(matched.title || null)
+            } else if (sessions.length > 0) {
+                // 2. 最新のアクティブセッションを自動選定し、ローカルにも反映
+                const latest = sessions[0]
+                setEffectiveSessionId(latest.id)
+                setEffectiveSessionTitle(latest.title || null)
+                setActiveSession(latest.id)
+            } else {
+                setEffectiveSessionId(activeSessionId)
+                setEffectiveSessionTitle(null)
+            }
+        } catch (e) {
+            console.error('セッション取得失敗:', e)
+            setEffectiveSessionId(activeSessionId)
+        } finally {
+            setIsFetchingInvite(false)
+        }
+    }
 
     const handleAdminClick = () => {
         setPasswordInput('')
@@ -312,7 +345,7 @@ const LauncherPage: React.FC = () => {
                     {/* トップ画面から即座に参加QRを表示するボタン */}
                     <button
                         type="button"
-                        onClick={() => setShowInviteQrModal(true)}
+                        onClick={handleOpenInviteModal}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -389,20 +422,32 @@ const LauncherPage: React.FC = () => {
                             justifyContent: 'center',
                             boxShadow: '0 4px 12px rgba(37,99,235,0.12)',
                             marginBottom: '1rem',
+                            minHeight: '220px',
                         }}>
-                            <img
-                                src={generateInlineQrSvg(
-                                    `${window.location.origin}/role-select${activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : ''}`,
-                                    220
-                                )}
-                                alt="Join QR Code"
-                                style={{ width: '220px', height: '220px', display: 'block' }}
-                            />
+                            {isFetchingInvite ? (
+                                <div style={{ color: '#64748b', fontSize: '0.9rem' }}>セッション確認中...</div>
+                            ) : (
+                                <img
+                                    src={generateInlineQrSvg(
+                                        `${window.location.origin}/?session_id=${encodeURIComponent(effectiveSessionId || '')}`,
+                                        220
+                                    )}
+                                    alt="Join QR Code"
+                                    style={{ width: '220px', height: '220px', display: 'block' }}
+                                />
+                            )}
                         </div>
 
-                        {activeSessionId && (
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
-                                現在のセッション: <strong>{activeSessionId}</strong>
+                        {effectiveSessionId && (
+                            <div style={{ fontSize: '0.85rem', color: '#1e293b', marginBottom: '1rem', lineHeight: '1.4' }}>
+                                {effectiveSessionTitle && (
+                                    <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '0.2rem' }}>
+                                        {effectiveSessionTitle}
+                                    </div>
+                                )}
+                                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
+                                    ID: <strong>{effectiveSessionId}</strong>
+                                </span>
                             </div>
                         )}
 
@@ -411,7 +456,7 @@ const LauncherPage: React.FC = () => {
                                 type="button"
                                 className="button button--primary"
                                 onClick={() => {
-                                    const joinUrl = `${window.location.origin}/role-select${activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : ''}`
+                                    const joinUrl = `${window.location.origin}/?session_id=${encodeURIComponent(effectiveSessionId || '')}`
                                     navigator.clipboard.writeText(joinUrl)
                                     setCopySuccess(true)
                                     setTimeout(() => setCopySuccess(false), 2000)

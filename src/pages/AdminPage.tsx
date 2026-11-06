@@ -8,6 +8,7 @@ import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/c
 import DashboardTab from '../components/DashboardTab'
 import { exportToGoogleSheets } from '../lib/sheetsExport'
 import { PROCEDURE_NAMES } from './TreatmentScanPage'
+import { generateInlineQrSvg } from '../lib/inlineQr'
 
 const AdminPage: React.FC = () => {
     const [patients, setPatients] = useState<Patient[]>([])
@@ -114,7 +115,7 @@ const AdminPage: React.FC = () => {
     }, [displaySessionId])
 
     const shareUrl = currentSessionId ? `${window.location.origin}/?session_id=${currentSessionId}` : ''
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareUrl)}`
+    const qrUrl = shareUrl ? generateInlineQrSvg(shareUrl, 240) : ''
 
     const handleCopyLink = () => {
         if (!shareUrl) return

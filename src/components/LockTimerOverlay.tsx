@@ -3,6 +3,7 @@ import React, { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
+import { ClinicalKnowledgeBox } from './ClinicalKnowledgeBox'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
@@ -127,6 +128,9 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                         </p>
                     </div>
                 )}
+
+                {/* 待機中の臨床ナレッジ表示（Clinical Knowledge Feed） */}
+                <ClinicalKnowledgeBox />
 
                 <p className="lock-overlay__note">
                     対象の処置・観察が完了するまで<br />

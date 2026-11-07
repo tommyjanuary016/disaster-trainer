@@ -16,7 +16,6 @@ const QRScannerPage: React.FC = () => {
         const params = new URLSearchParams(window.location.search)
         return params.get('tab') === 'list' ? 'list' : 'qr'
     })
-    const [manualId, setManualId] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [cameraError, setCameraError] = useState<any>(null)
     // 確認モーダル用の状態
@@ -138,13 +137,6 @@ const QRScannerPage: React.FC = () => {
         setPendingPatientId(String(patient.id))
         setPendingPatient(patient)
         setShowModal(true)
-    }
-
-    const handleManualSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (manualId) {
-            handleScan(manualId.trim())
-        }
     }
 
     const addRecentPatient = (patient: Patient) => {
@@ -325,85 +317,68 @@ const QRScannerPage: React.FC = () => {
 
             {error && <div className="error-message" style={{ margin: '0 1.25rem 1.25rem' }}>{error}</div>}
 
-            <div className="divider">
-                <span>OR</span>
-            </div>
-
-            {isTestMode ? (
-                <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>
-                        ⚡ 検証用: 患者カード（直接アクセス）
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                        {isLoadingPatients ? (
-                            /* ローディング中: スケルトンカードを表示 */
-                            Array.from({ length: 6 }).map((_, i) => (
-                                <div
-                                    key={i}
-                                    style={{
-                                        padding: '0.6rem 0.5rem',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        gap: '0.35rem',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--gray-200)',
-                                        backgroundImage: 'linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%)',
-                                        backgroundSize: '200% 100%',
-                                        minHeight: '80px',
-                                        animation: 'shimmer 1.5s ease-in-out infinite'
-                                    }}
-                                >
-                                    <div style={{ width: '40px', height: '18px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
-                                    <div style={{ width: '80%', height: '14px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
-                                    <div style={{ width: '60%', height: '12px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
-                                </div>
-                            ))
-                        ) : sessionPatients.length === 0 ? (
-                            /* データ取得完了後も患者が0件の場合 */
-                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
-                                セッションに患者データがありません
-                            </div>
-                        ) : (
-                            /* 患者カードを表示 */
-                            sessionPatients.map((p) => {
-                                const ageGroup = `${Math.floor(p.age / 10) * 10}代`
-                                const genderStr = p.gender === 'M' ? '男性' : '女性'
-
-                                return (
-                                    <button
-                                        key={p.id}
-                                        className="button button--secondary"
-                                        style={{ padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', position: 'relative' }}
-                                        onClick={() => handleScan(String(p.id))}
-                                    >
-                                        <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--gray-900)' }}>
-                                            {ageGroup} {genderStr}
-                                        </span>
-                                    </button>
-                                )
-                            })
-                        )}
+            {isTestMode && (
+                <>
+                    <div className="divider">
+                        <span>OR</span>
                     </div>
-                </div>
-            ) : (
-                <div className="manual-entry">
-                    <form onSubmit={handleManualSubmit} className="manual-entry__form">
-                        <div className="form-group">
-                            <label>QR読み取りコード / 患者番号を入力</label>
-                            <input
-                                type="text"
-                                value={manualId}
-                                onChange={(e) => setManualId(e.target.value)}
-                                placeholder="例: 1 または QRコード文字列"
-                                className="input"
-                            />
+                    <div className="test-patients-grid" style={{ padding: '0 1.25rem 1rem' }}>
+                        <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-600)' }}>
+                            ⚡ 検証用: 患者カード（直接アクセス）
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                            {isLoadingPatients ? (
+                                /* ローディング中: スケルトンカードを表示 */
+                                Array.from({ length: 6 }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            padding: '0.6rem 0.5rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--gray-200)',
+                                            backgroundImage: 'linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%)',
+                                            backgroundSize: '200% 100%',
+                                            minHeight: '80px',
+                                            animation: 'shimmer 1.5s ease-in-out infinite'
+                                        }}
+                                    >
+                                        <div style={{ width: '40px', height: '18px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                        <div style={{ width: '80%', height: '14px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                        <div style={{ width: '60%', height: '12px', backgroundColor: 'var(--gray-300)', borderRadius: '4px' }} />
+                                    </div>
+                                ))
+                            ) : sessionPatients.length === 0 ? (
+                                /* データ取得完了後も患者が0件の場合 */
+                                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                                    セッションに患者データがありません
+                                </div>
+                            ) : (
+                                /* 患者カードを表示 */
+                                sessionPatients.map((p) => {
+                                    const ageGroup = `${Math.floor(p.age / 10) * 10}代`
+                                    const genderStr = p.gender === 'M' ? '男性' : '女性'
+
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            className="button button--secondary"
+                                            style={{ padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', position: 'relative' }}
+                                            onClick={() => handleScan(String(p.id))}
+                                        >
+                                            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--gray-900)' }}>
+                                                {ageGroup} {genderStr}
+                                            </span>
+                                        </button>
+                                    )
+                                })
+                            )}
                         </div>
-                        <button type="submit" className="button button--primary" disabled={!manualId.trim()}>
-                            患者を検索
-                        </button>
-                    </form>
-                </div>
+                    </div>
+                </>
             )}
 
             {/* 最近対応した患者履歴 */}

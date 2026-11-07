@@ -133,7 +133,10 @@ const PatientActorPage: React.FC = () => {
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
     const [activeAnimation, setActiveAnimation] = useState<'pulse' | 'breathing' | null>(null)
     const [activeTab, setActiveTab] = useState<'easy' | 'detail'>('easy')
-    const [showActorQRModal, setShowActorQRModal] = useState<boolean>(false)
+    const [showActorQRModal, setShowActorQRModal] = useState<boolean>(() => {
+        const params = new URLSearchParams(window.location.search)
+        return params.get('modal') === '1'
+    })
     // 模擬患者としてQRコードを提示して待機中、画面がスリープしないよう自動維持
     useWakeLock(true)
 

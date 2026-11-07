@@ -14,7 +14,23 @@ type TabMode = 'procedure' | 'item'
 export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName }) => {
   const [tabMode, setTabMode] = useState<TabMode>('procedure')
   const [selectedCategory, setSelectedCategory] = useState<string>('気道・呼吸')
-  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; qrData: string; category: string; desc?: string } | null>(null)
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; qrData: string; category: string; desc?: string } | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    const initialItem = params.get('item')
+    if (initialItem) {
+      const proc = PROCEDURES_MASTER.find(p => p.id === initialItem)
+      if (proc) {
+        return {
+          id: proc.id,
+          name: proc.name,
+          qrData: makeProcedureQR(proc.id),
+          category: proc.category,
+          desc: proc.description,
+        }
+      }
+    }
+    return null
+  })
 
   // 処置リストのフィルタ
   const currentProcedures = PROCEDURES_MASTER.filter(p => p.category === selectedCategory)

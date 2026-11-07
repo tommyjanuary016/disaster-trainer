@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: transparent;
+    width: 540px;
+    height: 1020px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  .phone-frame {
+    position: relative;
+    width: 480px;
+    height: 932px;
+    border-radius: 46px;
+    background: #000;
+    box-shadow: 
+      0 0 0 3px #334155,
+      0 0 0 9px #0f172a,
+      0 0 0 10px rgba(255, 255, 255, 0.2),
+      0 25px 60px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+  .screen-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    border-radius: 36px;
+  }
+  /* Home indicator */
+  .home-bar {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 3px;
+    z-index: 1000;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div class="phone-frame">
+    <img id="img" class="screen-img" src="" />
+    <div class="home-bar"></div>
+  </div>
+  <script>
+    const p = new URLSearchParams(window.location.search).get('src');
+    if (p) document.getElementById('img').src = p;
+  </script>
+</body>
+</html>

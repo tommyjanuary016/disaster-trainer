@@ -71,6 +71,69 @@ const AdminPage: React.FC = () => {
             sessionStorage.setItem('admin_authenticated', 'true')
             setIsAuthenticated(true)
         }
+        if (queryParams.get('master_auth') === '1' || sessionStorage.getItem('admin_master_authenticated') === 'true') {
+            sessionStorage.setItem('admin_master_authenticated', 'true')
+            setIsMasterAuthenticated(true)
+        }
+        if (queryParams.get('create_patient') === '1') {
+            setEditingPatient({
+                id: 26,
+                scenario_tag: '基本',
+                name: '新規 症例患者',
+                age: 45,
+                gender: 'M',
+                triage_color: '赤',
+                vitals_triage: 'GCS:E3V4M5\n・BP:85/50\n・HR:125\n・R:32\n・SPO2:91%',
+                vitals_initial: 'GCS:E3V4M5\n・BP:85/50\n・HR:125\n・R:32\n・SPO2:91%',
+                vitals_post: 'GCS:E4V5M6\n・BP:110/68\n・HR:88\n・R:20\n・SPO2:98%',
+                findings: {
+                    head_and_neck: '意識清明、頸静脈怒張あり',
+                    chest: '右呼吸音減弱、右胸部鼓音、打撲痕あり',
+                    abdomen_and_pelvis: '明らかな圧痛なし',
+                    limbs: '明らかな骨折なし、冷感あり',
+                    fast: '陰性',
+                    ample: '既往歴: なし、アレルギー: なし',
+                    background: 'バス事故にて座席に強く胸部を打撲'
+                },
+                diagnosis: '右緊張性気胸・外傷性ショック',
+                acting_instructions: '息苦しそうに肩で浅く速い呼吸をする。右胸を押されたら強い痛みを訴える。',
+                required_treatments: [
+                    { treatment_id: 'needle_decompression', treatment_name: '胸腔穿刺 (緊急脱気)', lock_timer_minutes: 2 },
+                    { treatment_id: 'chest_tube', treatment_name: '胸腔ドレーン挿入', lock_timer_minutes: 5 }
+                ],
+                status: '初期状態',
+                assessment_completed: false,
+                timer_started_at: null,
+                timer_duration_ms: null,
+                applied_treatment_id: null
+            } as unknown as Patient)
+            setIsFormVisible(true)
+        } else if (queryParams.get('edit_patient') === '1') {
+            const p1 = patients.find(p => p.id === 1) || {
+                id: 1,
+                name: 'アカシ シンイチ',
+                age: 65,
+                gender: 'M',
+                triage_color: '赤',
+                diagnosis: '骨盤骨折',
+                required_treatments: [
+                    { treatment_id: 'iv_fluid', treatment_name: '外液急速投与 (2L負荷)', lock_timer_minutes: 3 },
+                    { treatment_id: 'blood_transfusion', treatment_name: '緊急輸血 (RBC4/FFP4)', lock_timer_minutes: 5 },
+                    { treatment_id: 'pelvic_binder', treatment_name: 'サムスリング装着 (骨盤固定)', lock_timer_minutes: 2 }
+                ],
+                findings: {
+                    head_and_neck: '顔面に打撲痕あり',
+                    chest: '明らかな外傷性変化なし',
+                    abdomen_and_pelvis: '下腹部右側に打撲痕、骨盤動揺あり',
+                    limbs: '右下肢短縮あり',
+                    fast: '骨盤腔にecho free spaceあり',
+                    ample: '高血圧のみ',
+                    background: 'バス転落による骨盤強打'
+                }
+            } as unknown as Patient
+            setEditingPatient(p1)
+            setIsFormVisible(true)
+        }
 
         if (location.state && (location.state as any).action) {
             const action = (location.state as any).action

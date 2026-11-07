@@ -8,6 +8,8 @@ const EXPERIENCE_MODE_EVENT = 'experience_mode_change'
 
 export function getIsExperienceMode(): boolean {
   if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('exp') === '1') return true
   return localStorage.getItem(STORAGE_KEY_EXPERIENCE_MODE) === 'true'
 }
 

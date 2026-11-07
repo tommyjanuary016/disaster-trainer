@@ -46,8 +46,12 @@ const LauncherPage: React.FC = () => {
     }
 
     React.useEffect(() => {
-        if (new URLSearchParams(window.location.search).get('select_session') === '1') {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('select_session') === '1') {
             handleTrainingStartClick()
+        }
+        if (params.get('show_qr') === '1') {
+            setShowInviteQrModal(true)
         }
     }, [])
 

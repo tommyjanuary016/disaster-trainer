@@ -271,13 +271,13 @@ const RadiologyScanPage: React.FC = () => {
                     <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>参加患者データを読み込んでいます...</p>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.6rem' }}>
-                        {sessionPatients.map((p, idx) => (
+                        {sessionPatients.map((p) => (
                             <button
                                 key={p.id}
                                 type="button"
                                 className="button button--secondary"
                                 style={{
-                                    padding: '0.6rem 0.5rem',
+                                    padding: '0.75rem 0.5rem',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
@@ -289,14 +289,8 @@ const RadiologyScanPage: React.FC = () => {
                                 }}
                                 onClick={() => handleScan(`patient:${p.id}`)}
                             >
-                                <span className={`triage-badge triage-badge--sm triage-${p.triage_color === '赤' ? 'red' : p.triage_color === '黄' ? 'yellow' : p.triage_color === '緑' ? 'green' : 'black'}`}>
-                                    {p.triage_color || '未'}
-                                </span>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginTop: '0.3rem' }}>
-                                    No.{idx + 1} {p.name}
-                                </span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
-                                    (ID: {p.base_patient_id || p.id})
+                                <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                    {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
                                 </span>
                             </button>
                         ))}

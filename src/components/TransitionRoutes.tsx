@@ -12,6 +12,7 @@ import QRGeneratorPage from '../pages/QRGeneratorPage'
 import RadiologyScanPage from '../pages/RadiologyScanPage'
 import LabScanPage from '../pages/LabScanPage'
 import TriagePatientPage from '../pages/TriagePatientPage'
+import KnowledgeLibraryPage from '../pages/KnowledgeLibraryPage'
 
 // 画面遷移時に表示するメッセージをランダムで選択
 const TRANSITION_MESSAGES = [
@@ -23,7 +24,7 @@ const TRANSITION_MESSAGES = [
 ]
 
 // 起動画面（ランチャー）は遷移エフェクトを出さない
-const NO_TRANSITION_PATHS = ['/']
+const NO_TRANSITION_PATHS = ['/', '/knowledge']
 
 export const TransitionRoutes: React.FC = () => {
     const location = useLocation()
@@ -103,6 +104,7 @@ export const TransitionRoutes: React.FC = () => {
                 {/* 起動画面 */}
                 <Route path="/" element={<LauncherPage />} />
                 <Route path="/role-select" element={<RoleSelectionPage />} />
+                <Route path="/knowledge" element={<KnowledgeLibraryPage />} />
 
                 {/* 訓練系ルート（/training/ プレフィックス） */}
                 <Route path="/training" element={<QRScannerPage />} />

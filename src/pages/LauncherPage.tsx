@@ -338,6 +338,33 @@ const LauncherPage: React.FC = () => {
                         <span style={{ fontSize: '1.2rem' }}>📱</span>
                         <span>アプリ参加用QRコードを表示</span>
                     </button>
+
+                    {/* エクストラ：外傷・災害Tips＆知識集へのアクセスボタン */}
+                    <button
+                        type="button"
+                        onClick={() => navigate('/knowledge')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.6rem',
+                            width: '100%',
+                            padding: '0.85rem 1rem',
+                            backgroundColor: '#f8fafc',
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '12px',
+                            color: '#334155',
+                            fontWeight: '700',
+                            fontSize: '0.95rem',
+                            cursor: 'pointer',
+                            marginTop: '0.25rem',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <span style={{ fontSize: '1.2rem' }}>💡</span>
+                        <span>現場で役立つ！外傷・災害Tips＆知識集</span>
+                    </button>
                 </div>
 
                 <div style={{ marginTop: '2rem', textAlign: 'center' }}>

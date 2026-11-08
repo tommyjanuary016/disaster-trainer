@@ -114,6 +114,7 @@ const TreatmentScanPage: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>()
     const navigate = useNavigate()
     const { role } = useRole()
+    const [activeTab, setActiveTab] = useState<'qr' | 'list'>('qr')
     const [manualTreatmentId, setManualTreatmentId] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [patient, setPatient] = useState<Patient | null>(null)
@@ -449,66 +450,107 @@ const TreatmentScanPage: React.FC = () => {
                     </div>
                 )}
 
-                <>
-                    <p className="instruction-text">カメラ起動ボタンを押して手技QRまたは物品QRコードをスキャンしてください。</p>
+                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                    {activeTab === 'qr' ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                soundEngine.playClickBeep()
+                                setActiveTab('list')
+                            }}
+                            style={{ 
+                                background: 'none', border: 'none', color: 'var(--gray-500)', fontSize: '0.85rem', 
+                                textDecoration: 'underline', cursor: 'pointer', padding: '0.5rem' 
+                            }}
+                        >
+                            QRコードが読み取れない場合はこちら（手技一覧から選択）
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                soundEngine.playClickBeep()
+                                setActiveTab('qr')
+                            }}
+                            style={{ 
+                                background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.85rem', 
+                                textDecoration: 'underline', cursor: 'pointer', padding: '0.5rem', fontWeight: 'bold' 
+                            }}
+                        >
+                            ← QRスキャン画面に戻る
+                        </button>
+                    )}
+                </div>
 
-                    <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                        {!isCameraActive ? (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    soundEngine.playClickBeep()
-                                    setIsCameraActive(true)
-                                }}
-                                className="button button--primary"
-                                style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                            >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                                📷 カメラを起動する
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setIsCameraActive(false)}
-                                className="button button--secondary"
-                                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                            >
-                                ⏹️ カメラを停止する
-                            </button>
+                {activeTab === 'qr' ? (
+                    <>
+                        <p className="instruction-text">カメラ起動ボタンを押して手技QRまたは物品QRコードをスキャンしてください。</p>
+
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            {!isCameraActive ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        soundEngine.playClickBeep()
+                                        setIsCameraActive(true)
+                                    }}
+                                    className="button button--primary"
+                                    style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    📷 カメラを起動する
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCameraActive(false)}
+                                    className="button button--secondary"
+                                    style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                                >
+                                    ⏹️ カメラを停止する
+                                </button>
+                            )}
+                        </div>
+
+                        {isCameraActive && (
+                            <div className="qr-reader-wrapper">
+                                <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
+                            </div>
                         )}
-                    </div>
 
-                    {isCameraActive && (
-                        <div className="qr-reader-wrapper">
-                            <div id="treatment-reader" className="qr-reader custom-qr-scanner"></div>
-                        </div>
-                    )}
+                        {cameraError && (
+                            <div style={{ marginBottom: '1rem' }}>
+                                <CameraFallbackUI
+                                    error={cameraError}
+                                    onScanSuccess={(text) => handleScan(text)}
+                                    onRetry={() => {
+                                        setCameraError(null)
+                                        setIsCameraActive(false)
+                                        setTimeout(() => setIsCameraActive(true), 100)
+                                    }}
+                                />
+                            </div>
+                        )}
 
-                    {cameraError && (
-                        <div style={{ marginBottom: '1rem' }}>
-                            <CameraFallbackUI
-                                error={cameraError}
-                                onScanSuccess={(text) => handleScan(text)}
-                                onRetry={() => {
-                                    setCameraError(null)
-                                    setIsCameraActive(false)
-                                    setTimeout(() => setIsCameraActive(true), 100)
-                                }}
-                            />
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="divider">
-                        <span>OR</span>
-                    </div>
-
+                        {error && (
+                            <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
+                                {error}
+                            </div>
+                        )}
+                    </>
+                ) : (
                     <div className="manual-entry">
+                        <div style={{ marginBottom: '1rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--gray-800)', marginBottom: '0.3rem' }}>手技・処置の選択</h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>実施する手技または処置をリストから選択してください。</p>
+                        </div>
+
+                        {error && (
+                            <div className="error-message" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
+                                {error}
+                            </div>
+                        )}
+
                         <form onSubmit={handleManualSubmit} className="manual-entry__form">
                             <div className="form-group">
                                 <label>手技・処置選択</label>
@@ -612,6 +654,7 @@ const TreatmentScanPage: React.FC = () => {
                             </button>
                         </form>
                     </div>
+                )}
 
                     <div className="actions">
                         <button
@@ -621,7 +664,6 @@ const TreatmentScanPage: React.FC = () => {
                             キャンセル
                         </button>
                     </div>
-                </>
             </main>
         </div>
     )

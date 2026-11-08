@@ -12,6 +12,7 @@ const LabScanPage: React.FC = () => {
     const [patient, setPatient] = useState<Patient | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([]) // セッション患者一覧
+    const [showPatientList, setShowPatientList] = useState(false)
 
     const [isCameraActive, setIsCameraActive] = useState(false)
     const [cameraError, setCameraError] = useState<any>(null)
@@ -214,93 +215,113 @@ const LabScanPage: React.FC = () => {
             {/* タイトルバナー（放射線科と同じスタイルに統一） */}
             <div className="scanner-hero">
                 <h2 className="scanner-hero__title">患者スキャン（検査科）</h2>
-                <p className="scanner-hero__sub">カメラ起動ボタンを押すか、下部の患者選択から選択してください</p>
+                <p className="scanner-hero__sub">カメラ起動ボタンを押して病着QRを読み取ってください</p>
             </div>
 
-            <div style={{ textAlign: 'center', margin: '0.75rem 1.25rem' }}>
-                {!isCameraActive ? (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            soundEngine.playClickBeep()
-                            setIsCameraActive(true)
-                        }}
-                        className="button button--primary"
-                        style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                        📷 カメラを起動する
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setIsCameraActive(false)}
-                        className="button button--secondary"
-                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                    >
-                        ⏹️ カメラを停止する
-                    </button>
-                )}
+            <div style={{ textAlign: 'center', margin: '0.5rem 1.25rem 1rem' }}>
+                <button
+                    type="button"
+                    onClick={() => {
+                        soundEngine.playClickBeep()
+                        setShowPatientList(prev => !prev)
+                    }}
+                    style={{ 
+                        background: 'none', border: 'none', color: showPatientList ? 'var(--primary)' : 'var(--gray-500)', fontSize: '0.85rem', 
+                        textDecoration: 'underline', cursor: 'pointer', padding: '0.4rem', fontWeight: showPatientList ? 'bold' : 'normal' 
+                    }}
+                >
+                    {showPatientList ? '← QRスキャン画面に戻る' : 'QRコードが読み取れない場合はこちら（患者リストから選択）'}
+                </button>
             </div>
 
-            {/* QRスキャナー */}
-            {isCameraActive && (
-                <div className="qr-reader-wrapper">
-                    <div id="lab-reader" className="qr-reader custom-qr-scanner"></div>
-                </div>
-            )}
-
-            {cameraError && (
-                <div style={{ margin: '0 1.25rem 1rem' }}>
-                    <CameraFallbackUI
-                        error={cameraError}
-                        onScanSuccess={(text) => handleScan(text)}
-                        onRetry={() => {
-                            setCameraError(null)
-                            setIsCameraActive(false)
-                            setTimeout(() => setIsCameraActive(true), 100)
-                        }}
-                    />
-                </div>
-            )}
-
-            {error && <div className="error-message" style={{ margin: '0 1.25rem 1.25rem' }}>{error}</div>}
-
-            {/* QRコードが読み取れない場合の患者選択エリア */}
-            <div style={{ padding: '0 1.25rem 1.5rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-700)', marginBottom: '0.75rem' }}>
-                    📋 QRコードが読めない場合の患者選択
-                </h3>
-                {sessionPatients.length === 0 ? (
-                    <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>参加患者データを読み込んでいます...</p>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.6rem' }}>
-                        {sessionPatients.map((p) => (
+            {!showPatientList ? (
+                <>
+                    <div style={{ textAlign: 'center', margin: '0.75rem 1.25rem' }}>
+                        {!isCameraActive ? (
                             <button
-                                key={p.id}
                                 type="button"
-                                className="button button--secondary"
-                                style={{
-                                    padding: '0.75rem 0.5rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    height: '100%',
-                                    borderRadius: '10px',
-                                    border: '1px solid var(--gray-200)',
-                                    boxShadow: 'var(--shadow-sm)',
+                                onClick={() => {
+                                    soundEngine.playClickBeep()
+                                    setIsCameraActive(true)
                                 }}
-                                onClick={() => handleScan(`patient:${p.id}`)}
+                                className="button button--primary"
+                                style={{ width: '100%', padding: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                             >
-                                <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-                                    {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
-                                </span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                📷 カメラを起動する
                             </button>
-                        ))}
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setIsCameraActive(false)}
+                                className="button button--secondary"
+                                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                ⏹️ カメラを停止する
+                            </button>
+                        )}
                     </div>
-                )}
-            </div>
+
+                    {/* QRスキャナー */}
+                    {isCameraActive && (
+                        <div className="qr-reader-wrapper">
+                            <div id="lab-reader" className="qr-reader custom-qr-scanner"></div>
+                        </div>
+                    )}
+
+                    {cameraError && (
+                        <div style={{ margin: '0 1.25rem 1rem' }}>
+                            <CameraFallbackUI
+                                error={cameraError}
+                                onScanSuccess={(text) => handleScan(text)}
+                                onRetry={() => {
+                                    setCameraError(null)
+                                    setIsCameraActive(false)
+                                    setTimeout(() => setIsCameraActive(true), 100)
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {error && <div className="error-message" style={{ margin: '0 1.25rem 1.25rem' }}>{error}</div>}
+                </>
+            ) : (
+                /* QRコードが読み取れない場合の患者選択エリア */
+                <div style={{ padding: '0 1.25rem 1.5rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--gray-700)', marginBottom: '0.75rem' }}>
+                        📋 セッション参加患者一覧
+                    </h3>
+                    {sessionPatients.length === 0 ? (
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>参加患者データを読み込んでいます...</p>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.6rem' }}>
+                            {sessionPatients.map((p) => (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    className="button button--secondary"
+                                    style={{
+                                        padding: '0.75rem 0.5rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        height: '100%',
+                                        borderRadius: '10px',
+                                        border: '1px solid var(--gray-200)',
+                                        boxShadow: 'var(--shadow-sm)',
+                                    }}
+                                    onClick={() => handleScan(`patient:${p.id}`)}
+                                >
+                                    <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                        {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

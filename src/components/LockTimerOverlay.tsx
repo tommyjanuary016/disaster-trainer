@@ -129,8 +129,8 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                     </div>
                 )}
 
-                {/* 待機中の臨床ナレッジ表示（Clinical Knowledge Feed） */}
-                <ClinicalKnowledgeBox />
+                {/* 処置中のみ待機知識を表示（身体診察・観察中は診察実技に集中するため非表示） */}
+                {!isExam && <ClinicalKnowledgeBox />}
 
                 <p className="lock-overlay__note">
                     対象の処置・観察が完了するまで<br />

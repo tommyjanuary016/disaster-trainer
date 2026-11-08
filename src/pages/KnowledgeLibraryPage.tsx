@@ -142,7 +142,7 @@ export const KnowledgeLibraryPage: React.FC = () => {
                         margin: 0,
                         lineHeight: '1.5',
                     }}>
-                        訓練の手技待機時間だけでなく、自習や振り返りにも使える全100選のリファレンスです。
+                        訓練の手技待機時間だけでなく、自習や振り返りにも使える全{medicalKnowledgeList.length}選のリファレンスです。
                     </p>
                 </div>
 

@@ -261,24 +261,30 @@ const LauncherPage: React.FC = () => {
                     <div className="launcher-hero__icon-wrapper">
                         {/* グロー背景 */}
                         <div className="launcher-hero__icon-glow" />
-                        {/* SVGアイコン（画像不要・常に表示） */}
+                        {/* SVGアイコン（画像フォールバック用） */}
                         <div className="launcher-hero__icon-svg">
                             <svg width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                             </svg>
                         </div>
-                        {/* 画像がある場合は上に重ねる */}
+                        {/* 息子様作成の公式アイコン */}
                         <img
-                            src="/icon-192.png"
-                            alt="DISASTER LOGIC"
+                            src="/icon-512.png"
+                            alt="災害訓練 DISASTER LOGIC"
                             className="launcher-hero__icon"
                             onError={(e) => {
-                                e.currentTarget.style.display = 'none'
+                                // 512がない場合は192にフォールバック
+                                const target = e.currentTarget
+                                if (!target.src.endsWith('/icon-192.png')) {
+                                    target.src = '/icon-192.png'
+                                }
                             }}
                         />
                     </div>
-                    <h1 className="launcher-hero__title">DISASTER LOGIC</h1>
-                    <p className="launcher-hero__subtitle">災害医療訓練システム</p>
+                    <div className="launcher-hero__text-block">
+                        <h1 className="launcher-hero__title">DISASTER LOGIC</h1>
+                        <p className="launcher-hero__subtitle">災害医療訓練システム</p>
+                    </div>
                 </div>
 
                 {/* ボタンエリア */}
@@ -313,104 +319,45 @@ const LauncherPage: React.FC = () => {
                         <span className="launcher-btn__arrow">→</span>
                     </button>
 
-                    {/* トップ画面から即座に参加QRを表示するボタン */}
-                    <button
-                        type="button"
-                        onClick={() => setShowInviteQrModal(true)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.6rem',
-                            width: '100%',
-                            padding: '0.85rem 1rem',
-                            backgroundColor: '#eff6ff',
-                            border: '1.5px solid #93c5fd',
-                            borderRadius: '12px',
-                            color: '#1d4ed8',
-                            fontWeight: 'bold',
-                            fontSize: '0.95rem',
-                            cursor: 'pointer',
-                            marginTop: '0.25rem',
-                            boxShadow: '0 2px 4px rgba(37,99,235,0.08)',
-                        }}
-                    >
-                        <span style={{ fontSize: '1.2rem' }}>📱</span>
-                        <span>アプリ参加用QRコードを表示</span>
-                    </button>
+                    {/* サブ機能 3列グリッド */}
+                    <div className="launcher-sub-grid">
+                        <button
+                            type="button"
+                            className="launcher-sub-card"
+                            onClick={() => setShowInviteQrModal(true)}
+                            title="アプリ参加用QRコードを表示"
+                        >
+                            <span className="launcher-sub-card__icon">📱</span>
+                            <span className="launcher-sub-card__label">参加QR</span>
+                        </button>
 
-                    {/* エクストラ：外傷・災害Tips＆知識集へのアクセスボタン */}
-                    <button
-                        type="button"
-                        onClick={() => navigate('/knowledge')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.6rem',
-                            width: '100%',
-                            padding: '0.85rem 1rem',
-                            backgroundColor: '#f8fafc',
-                            border: '1.5px solid #cbd5e1',
-                            borderRadius: '12px',
-                            color: '#334155',
-                            fontWeight: '700',
-                            fontSize: '0.95rem',
-                            cursor: 'pointer',
-                            marginTop: '0.25rem',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                            transition: 'all 0.2s',
-                        }}
-                    >
-                        <span style={{ fontSize: '1.2rem' }}>💡</span>
-                        <span>現場で役立つ！外傷・災害Tips＆知識集</span>
-                    </button>
+                        <button
+                            type="button"
+                            className="launcher-sub-card"
+                            onClick={() => navigate('/guide')}
+                            title="初めての方へ：操作マニュアル"
+                        >
+                            <span className="launcher-sub-card__icon">📖</span>
+                            <span className="launcher-sub-card__label">マニュアル</span>
+                        </button>
 
-                    {/* 初めて使う人のための操作マニュアルへのアクセスボタン */}
-                    <button
-                        type="button"
-                        onClick={() => navigate('/guide')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.6rem',
-                            width: '100%',
-                            padding: '0.85rem 1rem',
-                            backgroundColor: '#eff6ff',
-                            border: '1.5px solid #93c5fd',
-                            borderRadius: '12px',
-                            color: '#1d4ed8',
-                            fontWeight: '700',
-                            fontSize: '0.95rem',
-                            cursor: 'pointer',
-                            marginTop: '0.25rem',
-                            boxShadow: '0 2px 4px rgba(37,99,235,0.06)',
-                            transition: 'all 0.2s',
-                        }}
-                    >
-                        <span style={{ fontSize: '1.2rem' }}>📖</span>
-                        <span>初めての方へ：操作マニュアル</span>
-                    </button>
+                        <button
+                            type="button"
+                            className="launcher-sub-card"
+                            onClick={() => navigate('/knowledge')}
+                            title="現場で役立つ！外傷・災害Tips＆知識集"
+                        >
+                            <span className="launcher-sub-card__icon">💡</span>
+                            <span className="launcher-sub-card__label">災害Tips</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-                    <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        padding: '0.4rem 1rem',
-                        borderRadius: '999px',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        border: '1px solid var(--gray-300)',
-                        boxShadow: 'var(--shadow-sm)',
-                        fontSize: '0.85rem',
-                        fontWeight: '600',
-                        color: 'var(--gray-700)'
-                    }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
-                        DISASTER LOGIC {APP_VERSION}
-                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>
+                <div style={{ textAlign: 'center', marginTop: '0.25rem' }}>
+                    <span className="launcher-version-badge">
+                        <span className="launcher-version-badge__dot" />
+                        <span>{APP_VERSION}</span>
+                        <span className="launcher-version-badge__date">
                             (最終更新: {APP_LAST_UPDATED})
                         </span>
                     </span>

@@ -2393,12 +2393,12 @@ select.input {
 
 .launcher-content {
   width: 100%;
-  max-width: 400px;
-  padding: 2rem 1.5rem;
+  max-width: 420px;
+  padding: 1.25rem 1.25rem 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2.5rem;
+  gap: 1.25rem;
   position: relative;
   z-index: 1;
   animation: slideUp 0.5s ease both;
@@ -2409,28 +2409,28 @@ select.input {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   text-align: center;
 }
 
 .launcher-hero__icon-wrapper {
-  width: 150px;
-  height: 150px;
-  border-radius: 32px;
+  width: 175px;
+  height: 175px;
+  border-radius: 36px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(37, 99, 235, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.25);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 8px 40px rgba(37,99,235,0.3);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 10px 40px rgba(0,0,0,0.4);
   overflow: visible;
 }
 
 .launcher-hero__icon-glow {
   position: absolute;
-  inset: -20px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, transparent 70%);
+  inset: -15px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, rgba(37, 99, 235, 0.2) 50%, transparent 70%);
   animation: glowPulse 3s ease-in-out infinite;
   pointer-events: none;
 }
@@ -2451,12 +2451,20 @@ select.input {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 32px;
+  border-radius: 36px;
   z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.launcher-hero__text-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
 }
 
 .launcher-hero__title {
-  font-size: 1.8rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   background: linear-gradient(135deg, #ffffff 0%, #93c5fd 60%, #c4b5fd 100%);
@@ -2464,13 +2472,16 @@ select.input {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: none;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .launcher-hero__subtitle {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.05em;
+  margin: 0;
 }
 
 /* ボタンエリア */
@@ -2478,7 +2489,7 @@ select.input {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: 0.75rem;
 }
 
 .launcher-btn {
@@ -2486,7 +2497,7 @@ select.input {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.1rem 1.25rem;
+  padding: 1rem 1.25rem;
   border-radius: 14px;
   border: none;
   cursor: pointer;
@@ -2518,15 +2529,17 @@ select.input {
 /* 管理画面ボタン（グレー系） */
 .launcher-btn--admin {
   background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.75);
-  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .launcher-btn--admin:hover {
-  background: rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.9);
-  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.14);
+  color: #ffffff;
+  border-color: rgba(255,255,255,0.25);
 }
 
 .launcher-btn__icon {
@@ -2543,6 +2556,86 @@ select.input {
 .launcher-btn__arrow {
   font-size: 1rem;
   opacity: 0.6;
+}
+
+/* サブアクション グリッド（3列配置） */
+.launcher-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.launcher-sub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.75rem 0.4rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: var(--font-sans);
+}
+
+.launcher-sub-card:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.launcher-sub-card:active {
+  transform: scale(0.96);
+}
+
+.launcher-sub-card__icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.launcher-sub-card__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* バージョンバッジ */
+.launcher-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.launcher-version-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+}
+
+.launcher-version-badge__date {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: normal;
 }
 
 /* バージョン表示 */

@@ -365,6 +365,33 @@ const LauncherPage: React.FC = () => {
                         <span style={{ fontSize: '1.2rem' }}>💡</span>
                         <span>現場で役立つ！外傷・災害Tips＆知識集</span>
                     </button>
+
+                    {/* 初めて使う人のための操作マニュアルへのアクセスボタン */}
+                    <button
+                        type="button"
+                        onClick={() => navigate('/guide')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.6rem',
+                            width: '100%',
+                            padding: '0.85rem 1rem',
+                            backgroundColor: '#eff6ff',
+                            border: '1.5px solid #93c5fd',
+                            borderRadius: '12px',
+                            color: '#1d4ed8',
+                            fontWeight: '700',
+                            fontSize: '0.95rem',
+                            cursor: 'pointer',
+                            marginTop: '0.25rem',
+                            boxShadow: '0 2px 4px rgba(37,99,235,0.06)',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <span style={{ fontSize: '1.2rem' }}>📖</span>
+                        <span>初めての方へ：操作マニュアル</span>
+                    </button>
                 </div>
 
                 <div style={{ marginTop: '2rem', textAlign: 'center' }}>

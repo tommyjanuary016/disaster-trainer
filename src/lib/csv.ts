@@ -470,7 +470,7 @@ export function exportCSV(patients: Patient[]): string {
         '診療開始時刻(病着)', 'トリアージ完了時刻', '初期V/S測定時刻', '処置・安定化完了時刻',
         'キー手技到達時間(病着から)', 'トリアージ所要時間', '初期評価所要時間',
         '状態改善・安定化達成', '急変・悪化の有無', 'トリアージ判定', '実施完了した手技・処置',
-        '搬出先(転帰)', '搬出完了時刻', '総滞留・搬出所要時間', '搬出時CPA状態', '搬出登録者'
+        '搬出先(転帰)', '搬出完了時刻', '総滞留・搬出所要時間', '搬出時CPA状態', '搬出前バイタル再検', '搬出登録者'
     ]
 
     const formatTime = (ms?: number | null) => {
@@ -545,6 +545,8 @@ export function exportCSV(patients: Patient[]): string {
             formatDurationMs(p.reception_time_ms, p.disposition?.completed_at_ms),
             // 搬出時CPA状態
             p.disposition?.is_cpa_at_disposition ? '🚨 CPA到達' : (p.disposition ? '生存' : '—'),
+            // 搬出前バイタル再検
+            Boolean(p.post_vs_time_ms || doneList.filter(id => id === 'vitals').length >= 2) ? '再検済' : (p.disposition && p.triage_color !== '緑' ? '⚠️ 未再検' : '—'),
             // 搬出登録者
             p.disposition?.disposition_by === 'actor' ? '模擬患者本人' : (p.disposition ? '医療スタッフ' : '—')
         ]

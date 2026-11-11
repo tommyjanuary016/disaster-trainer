@@ -600,42 +600,18 @@ const PatientActorPage: React.FC = () => {
                 ) : (
                     /* 処置・物品QR提示 ＆ 脈・呼吸ボタン ＆ 目的地到着ボタン (常時表示) */
                     <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {/* 搬出・目的地到着報告ボタン（最重要・終了地点でタップ） */}
-                        <button
-                            onClick={() => setShowDispositionModal(true)}
-                            style={{
-                                width: '100%',
-                                padding: '1rem',
-                                backgroundColor: '#10b981',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '12px',
-                                fontWeight: 'bold',
-                                fontSize: '1.05rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.6rem',
-                                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            <span style={{ fontSize: '1.4rem' }}>🏁</span>
-                            <span>目的地（病棟・手術室・退場口等）に到着した</span>
-                        </button>
-
                         {/* スマホ完結・処置QR提示ボタン */}
                         <button
                             onClick={() => setShowActorQRModal(true)}
                             style={{
                                 width: '100%',
-                                padding: '0.85rem',
+                                padding: '0.9rem',
                                 backgroundColor: '#2563eb',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '12px',
                                 fontWeight: 'bold',
-                                fontSize: '0.95rem',
+                                fontSize: '1rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -644,7 +620,7 @@ const PatientActorPage: React.FC = () => {
                                 cursor: 'pointer',
                             }}
                         >
-                            <span style={{ fontSize: '1.2rem' }}>📱</span>
+                            <span style={{ fontSize: '1.25rem' }}>📱</span>
                             <span>処置・手技・物品のQRを提示する</span>
                         </button>
 
@@ -669,6 +645,35 @@ const PatientActorPage: React.FC = () => {
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
                                 </div>
                                 <span>🌬️ 呼吸を見せる</span>
+                            </button>
+                        </div>
+
+                        {/* 最下部：目的地到着ボタン（移動・搬送完了時にタップ） */}
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px dashed var(--gray-300)' }}>
+                            <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', margin: '0 0 0.5rem' }}>
+                                ※案内された病棟・手術室・退場口等に到着したら以下をタップ
+                            </p>
+                            <button
+                                onClick={() => setShowDispositionModal(true)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.85rem',
+                                    backgroundColor: '#10b981',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.95rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <span style={{ fontSize: '1.2rem' }}>🏁</span>
+                                <span>目的地（病棟・手術室・退場口等）に到着した</span>
                             </button>
                         </div>
                     </div>

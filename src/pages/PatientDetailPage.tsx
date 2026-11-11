@@ -319,77 +319,54 @@ const PatientDetailPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* ===== 搬出・転帰ステータスバナー ===== */}
-                {patient.disposition ? (
+                {/* ===== 搬出・転帰ステータスバナー（搬出済時のみ控えめに表示） ===== */}
+                {patient.disposition && (
                     <div
                         style={{
-                            margin: '1.5rem 0',
-                            padding: '1.2rem',
-                            backgroundColor: '#eff6ff',
-                            border: '2px solid #3b82f6',
-                            borderRadius: '12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.4rem',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', fontSize: '1.05rem', color: '#1d4ed8' }}>
-                                <span>🚑</span>
-                                <span>搬出完了: {patient.disposition.destination_label}</span>
-                            </div>
-                            <button
-                                onClick={() => setShowDispositionModal(true)}
-                                style={{
-                                    fontSize: '0.75rem',
-                                    padding: '0.3rem 0.6rem',
-                                    backgroundColor: '#ffffff',
-                                    border: '1px solid #93c5fd',
-                                    borderRadius: '6px',
-                                    color: '#2563eb',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                行き先変更
-                            </button>
-                        </div>
-                        <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                            搬出時刻: {new Date(patient.disposition.completed_at_ms).toLocaleTimeString()}
-                            （登録者: {patient.disposition.disposition_by === 'actor' ? '模擬患者本人' : '医療スタッフ'}）
-                        </div>
-                        {patient.disposition.is_cpa_at_disposition && (
-                            <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 'bold' }}>
-                                🚨 搬出時判定: CPA（心肺停止状態）
-                            </div>
-                        )}
-                    </div>
-                ) : null}
-
-                <div className="actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {/* 搬出（行き先決定）ボタン */}
-                    <button
-                        className="button"
-                        style={{
-                            backgroundColor: patient.disposition ? '#64748b' : '#10b981',
-                            color: '#ffffff',
-                            padding: '0.9rem',
+                            margin: '1rem 0',
+                            padding: '0.75rem 1rem',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #cbd5e1',
                             borderRadius: '8px',
-                            fontWeight: 'bold',
-                            fontSize: '1rem',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            border: 'none',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
+                            justifyContent: 'space-between',
+                            fontSize: '0.82rem',
+                            color: '#334155',
                         }}
-                        onClick={() => setShowDispositionModal(true)}
                     >
-                        <span style={{ fontSize: '1.2rem' }}>🚑</span>
-                        <span>{patient.disposition ? '搬出先・終了情報を確認 / 変更' : '患者を搬出する（行き先決定・終了）'}</span>
-                    </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span>🏁</span>
+                            <span>
+                                搬出済: <strong>{patient.disposition.destination_label}</strong>
+                                <span style={{ color: '#64748b', marginLeft: '0.4rem', fontSize: '0.75rem' }}>
+                                    ({new Date(patient.disposition.completed_at_ms).toLocaleTimeString()})
+                                </span>
+                            </span>
+                            {patient.disposition.is_cpa_at_disposition && (
+                                <span style={{ color: '#dc2626', fontWeight: 'bold', marginLeft: '0.3rem' }}>
+                                    [搬出時CPA判定]
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setShowDispositionModal(true)}
+                            style={{
+                                fontSize: '0.72rem',
+                                padding: '0.2rem 0.5rem',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                color: '#475569',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            変更
+                        </button>
+                    </div>
+                )}
 
+                <div className="actions">
                     <button
                         className="button button--primary button--large"
                         onClick={() => navigate(`/training/treatment-scan/${patientId}`)}
@@ -406,6 +383,31 @@ const PatientDetailPage: React.FC = () => {
                         患者選択に戻る
                     </button>
                 </div>
+
+                {/* 医療スタッフ側予備操作：最下部の目立たない代理搬出ボタン */}
+                {!patient.disposition && (
+                    <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px dashed #e2e8f0', textAlign: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowDispositionModal(true)}
+                            style={{
+                                background: 'none',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                padding: '0.35rem 0.8rem',
+                                fontSize: '0.75rem',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                            }}
+                        >
+                            <span>🚑</span>
+                            <span>[予備操作] 人形等で模擬患者がいない場合の搬出登録</span>
+                        </button>
+                    </div>
+                )}
             </main>
 
             {/* 搬出・行き先決定モーダル */}

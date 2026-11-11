@@ -488,7 +488,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
         const reqList = p.required_treatments || []
         const doneList = p.completed_treatments || []
         const doneReqCount = reqList.filter(rt => doneList.includes(rt.treatment_id)).length
-        return { p, idx, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated, reqCount: reqList.length, doneReqCount }
+        const vitalsCount = doneList.filter(id => id === 'vitals').length
+        const hasFinalVs = Boolean(p.post_vs_time_ms || vitalsCount >= 2)
+        const isMissedPreTransferVs = Boolean(p.disposition && p.triage_color !== '緑' && !hasFinalVs)
+        return { p, idx, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated, hasFinalVs, isMissedPreTransferVs, reqCount: reqList.length, doneReqCount }
     })
 
     const pct = (n: number) => totalCount > 0 ? Math.round((n / totalCount) * 100) : 0
@@ -1111,6 +1114,47 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                             ))}
                         </div>
 
+                        {/* デブリーフィング着眼点：搬出前バイタル再検＆急変検証ボックス */}
+                        {(() => {
+                            const disposedNonGreen = summaryRows.filter(r => r.p.disposition && r.p.triage_color !== '緑')
+                            const missedVsList = disposedNonGreen.filter(r => r.isMissedPreTransferVs)
+                            const missedAndCpaList = missedVsList.filter(r => r.deteriorated || r.p.disposition?.is_cpa_at_disposition)
+
+                            return (
+                                <div
+                                    style={{
+                                        marginBottom: '1.25rem',
+                                        padding: '0.9rem 1.1rem',
+                                        borderRadius: '8px',
+                                        backgroundColor: missedAndCpaList.length > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(30, 41, 59, 0.7)',
+                                        border: `1px solid ${missedAndCpaList.length > 0 ? '#ef4444' : 'rgba(148, 163, 184, 0.25)'}`,
+                                        fontSize: '0.82rem',
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 'bold', color: missedAndCpaList.length > 0 ? '#f87171' : '#38bdf8', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span>🔍</span>
+                                        <span>デブリーフィング重要検証: 搬出前（退室時）バイタル再検状況</span>
+                                    </div>
+                                    <div style={{ color: '#cbd5e1', lineHeight: '1.5' }}>
+                                        中等症・重症（赤・黄）搬出患者 {disposedNonGreen.length} 名中、搬出前バイタルを再検したのは{' '}
+                                        <strong style={{ color: '#34d399' }}>{disposedNonGreen.length - missedVsList.length} 名</strong>、
+                                        未再検のまま搬出したのは{' '}
+                                        <strong style={{ color: missedVsList.length > 0 ? '#f59e0b' : '#34d399' }}>{missedVsList.length} 名</strong> です。
+                                    </div>
+                                    {missedAndCpaList.length > 0 && (
+                                        <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', backgroundColor: 'rgba(239, 68, 68, 0.2)', borderRadius: '4px', color: '#fca5a5' }}>
+                                            ⚠️ <strong>防ぎ得た災害死（PDD）検証:</strong>{' '}
+                                            以下の患者は<strong>「退室前バイタルを再検しないまま搬出され、到着時にCPA/悪化」</strong>と判定されました：{' '}
+                                            {missedAndCpaList.map(r => r.p.name || `ID:${r.p.id}`).join('、 ')}
+                                            <div style={{ fontSize: '0.74rem', marginTop: '0.2rem', color: '#f87171' }}>
+                                                ※初療室を出る直前にバイタルを再検していれば、急変に気付き蘇生や処置の追加が行えた可能性があります。
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })()}
+
                         {/* 患者別詳細テーブル */}
                         <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#e2e8f0' }}>患者別パフォーマンス（受付からの経過時間）</h3>
                         <div style={{ overflowX: 'auto', maxHeight: '340px' }}>
@@ -1121,12 +1165,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#c4b5fd' }}>T開始</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#93c5fd' }}>初期V/S</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#6ee7b7' }}>処置完了</th>
+                                        <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#fcd34d' }}>最終V/S再検</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#38bdf8' }}>搬出完了</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#fca5a5' }}>状態</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {summaryRows.map(({ p, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated }) => (
+                                    {summaryRows.map(({ p, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated, hasFinalVs, isMissedPreTransferVs }) => (
                                         <tr key={p.id} style={{ borderBottom: '1px solid #1e293b', background: deteriorated ? 'rgba(239, 68, 68, 0.12)' : 'transparent' }}>
                                             <td style={{ padding: '0.5rem 0.6rem', fontWeight: '500' }}>
                                                 {deteriorated && <span style={{ color: '#f87171', marginRight: '4px' }}>⚠</span>}
@@ -1145,6 +1190,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                             </td>
                                             <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#6ee7b7' }}>
                                                 {postDelta !== null ? msToMinSec(postDelta) : '—'}
+                                            </td>
+                                            <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
+                                                {hasFinalVs ? (
+                                                    <span style={{ color: '#34d399', fontWeight: 'bold' }}>測定済</span>
+                                                ) : isMissedPreTransferVs ? (
+                                                    <span style={{ color: '#f87171', fontWeight: 'bold', fontSize: '0.75rem' }}>未再検</span>
+                                                ) : (
+                                                    <span style={{ color: '#64748b' }}>—</span>
+                                                )}
                                             </td>
                                             <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#7dd3fc' }}>
                                                 {p.disposition ? (

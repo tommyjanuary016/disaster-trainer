@@ -154,6 +154,10 @@ export const GuidePage: React.FC = () => {
                                     アプリは患者状態の進行や時間管理を行うためのツールです。スタッフ間の情報伝達や本部への報告は、アプリ画面ではなく実際のカルテ記載や口頭伝達で行ってください。
                                 </li>
                                 <li style={{ marginBottom: '0.3rem' }}>
+                                    <strong>搬出前には必ずバイタルを再検する！</strong><br />
+                                    診療エリアから病棟や手術室へ患者を移動・搬送する際は、直前に必ずバイタルを再測定して容態の安定を確認してください。未確認のまま搬出すると移動中に急変する危険があります。
+                                </li>
+                                <li style={{ marginBottom: '0.3rem' }}>
                                     <strong>診察・バイタル測定手技は決して手を抜かない！</strong><br />
                                     トリアージや診療エリアでは診察に伴う拘束時間（数分間）があり、アプリ画面上に所見や結果が少しずつ表示されていきます。画面をただ待つのではなく、実際の身体診察・バイタル測定手技を現場でしっかりと行いながら進めてください。
                                 </li>
@@ -202,7 +206,7 @@ export const GuidePage: React.FC = () => {
                                 🎭 模擬患者役（傷病者役）の現場アクション
                             </h2>
                             <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: '1.65' }}>
-                                模擬患者役は、訓練のリアルな進行を左右する極めて重要な役割です。
+                                模擬患者役は、訓練のリアルな進行と終了判定を担う極めて重要な役割です。
                                 <ol style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                                     <li style={{ marginBottom: '0.4rem' }}>
                                         <strong>待機時</strong>：画面中央の<strong>「あなたの患者QRコード」</strong>を医療スタッフに見せてください。
@@ -210,8 +214,12 @@ export const GuidePage: React.FC = () => {
                                     <li style={{ marginBottom: '0.4rem' }}>
                                         <strong>バイタル測定時</strong>：「脈をみます」「呼吸をみます」と言われたら、画面下の専用ボタンを押して拍動や呼吸のアニメーションを相手に見せます。
                                     </li>
+                                    <li style={{ marginBottom: '0.4rem' }}>
+                                        <strong>処置・物品提示</strong>：医療スタッフが現場から<strong>実物物品を持参したことを目で確認（現物視認）したら</strong>、青い<strong>「📱 処置・手技・物品のQRを提示する」</strong>ボタンをタップ ➜ 該当する処置・物品を選び、大画面QRを相手のスマホでスキャンさせてください。
+                                    </li>
                                     <li>
-                                        <strong>処置・物品提示【超重要】</strong>：医療スタッフが現場から<strong>実物物品を持参したことを目で確認（現物視認）したら</strong>、青い<strong>「📱 処置・手技・物品のQRを提示する」</strong>ボタンをタップ ➜ 該当する処置・物品を選び、大画面QRを相手のスマホでスキャンさせてください。
+                                        <strong>🏁 目的地到着・訓練終了【超重要】</strong>：医療スタッフから搬送・案内指示を受け、<strong>案内先の病棟・手術室・集中治療室・退場口（帰宅）等に実際に到着したら</strong>、画面最下部の緑色ボタン<strong>「🏁 目的地（病棟・手術室・退場口等）に到着した」</strong>をタップ ➜ 該当する行き先を選んで確定してください。<br />
+                                        ※目的地に到着するまでの間も患者状態（悪化）は進行しています。到着を確定することでバイタルが安全に固定され、その患者の訓練シーケンスが正式に終了となります。
                                     </li>
                                 </ol>
                             </div>
@@ -246,7 +254,8 @@ export const GuidePage: React.FC = () => {
                                     1. ベッドサイドで模擬患者の「患者QR」をスキャンします。診察開始に伴う拘束時間（数分間）の間に、<strong>画面上にバイタルや系統的診察所見（頭部〜四肢・FAST・AMPLE）が少しずつ表示</strong>されていきます。この間、<strong>診察手技は決して手を抜かず、実際の身体診察やアセスメントを現場でしっかり実施</strong>してください。<br />
                                     2. 必要な医療機器・処置資材（輸液セット、固定具など）を<strong>病院内から実際に探してベッドサイドに持参</strong>する。<br />
                                     3. 模擬患者に実物を見せ、<strong>模擬患者のスマホに出してもらった処置QRをスキャン</strong>して処置タイマーを開始！<br />
-                                    4. タイマー終了後、安定化バイタルを確認します。
+                                    4. タイマー終了後、安定化バイタルを確認します。<br />
+                                    5. <strong>搬出前の最終確認【重要】</strong>：病棟・手術室・他院転送などへの搬出を決定したら、<strong>必ず搬出直前のバイタルを再検・確認した上で、模擬患者を目的地へ送り出します</strong>。到着完了の操作は模擬患者役が目的地の現場で行います。
                                 </div>
                             </div>
 
@@ -349,6 +358,9 @@ export const GuidePage: React.FC = () => {
                                     <strong>🎯 症例別ステータスボード</strong>：各患者の診察状況（初期状態／処置中／処置完了）や現在のバイタル推移を一覧監視。
                                 </div>
                                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <strong>🏁 搬出完了・行き先内訳KPI</strong>：各患者がどこへ搬出されたか（帰宅／病棟／手術室／ICU／カテ室／他院転送／霊安室）と到着完了数をリアルタイムに把握。
+                                </div>
+                                <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                     <strong>🚨 急変・悪化アラート</strong>：処置が遅れて悪化シナリオに到達した傷病者の発生をリアルタイムに把握。
                                 </div>
                                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -390,8 +402,9 @@ export const GuidePage: React.FC = () => {
                             </h2>
                             <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: '1.6' }}>
                                 1. 訓練終了時にダッシュボード右上の<strong>「訓練終了」</strong>を押して全記録を確定。<br />
-                                2. <strong>Googleスプレッドシート連携</strong>（設定タブ）：全患者のトリアージ時刻、処置実施時刻、確定診断ログがワンクリックで自動転記されます。<br />
-                                3. <strong>振り返りCSVダウンロード</strong>：Excel等で時系列タイム分析を行い、客観的なデータに基づいた講評が可能です。
+                                2. <strong>デブリーフィング（反省会サマリー）</strong>：搬出前バイタル未再検の件数や、未再検のまま移動中に急変・CPAに至った症例などを自動集計し、防ぎ得た災害死（Preventable Disaster Death）の観点から振り返りを行います。<br />
+                                3. <strong>Googleスプレッドシート連携</strong>（設定タブ）：全患者のトリアージ時刻、処置実施時刻、確定診断ログ、搬出先・完了時刻がワンクリックで自動転記されます。<br />
+                                4. <strong>振り返りCSVダウンロード</strong>：搬出前バイタル再検有無や到着時バイタルを含めた詳細ログをExcel等で時系列分析できます。
                             </div>
                         </div>
 

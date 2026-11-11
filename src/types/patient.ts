@@ -100,6 +100,30 @@ export interface Patient {
     // 新しいフラグ
     tests_completed?: boolean // 放射線・検査科での検査が完了したか
     stabilization_completed?: boolean // 安定化処置がすべて完了し、悪化が停止したか
+
+    // 搬出・転帰（Disposition / 終了ポイント）
+    disposition?: PatientDisposition
+}
+
+// 搬出先（行き先）の定義
+export type PatientDispositionDestination =
+    | 'ward'        // 一般病棟
+    | 'icu_hcu'     // 集中治療室 (ICU/HCU)
+    | 'or'          // 手術室
+    | 'angio'       // 血管造影室（カテ室）
+    | 'transfer'    // 他院転送
+    | 'discharge'   // 帰宅
+    | 'morgue'      // 霊安室（不処置・死亡）
+
+export interface PatientDisposition {
+    destination: PatientDispositionDestination
+    destination_label: string              // 表示名（例: "手術室搬入", "帰宅"）
+    completed_at_ms: number                // 搬出・終了確定時刻（UNIXタイムスタンプ ms）
+    final_vitals?: VitalSignStruct         // 確定時バイタル
+    final_vitals_text?: string             // 確定時バイタルテキスト
+    is_cpa_at_disposition: boolean         // 確定時点でCPAに至っていたか
+    is_stabilized: boolean                 // 安定化処置が完了していたか
+    disposition_by: 'staff' | 'actor'     // 医療スタッフ入力か、模擬患者本人入力か
 }
 
 // 訓練セッションの型定義

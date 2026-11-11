@@ -5,6 +5,7 @@ import { useDeterioration } from '../hooks/useDeterioration'
 import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
 import { ActorQRModal } from '../components/actor/ActorQRModal'
+import { DispositionModal } from '../components/DispositionModal'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
 import { generateInlineQrSvg } from '../lib/inlineQr'
@@ -137,6 +138,7 @@ const PatientActorPage: React.FC = () => {
         const params = new URLSearchParams(window.location.search)
         return params.get('modal') === '1'
     })
+    const [showDispositionModal, setShowDispositionModal] = useState(false)
     // 模擬患者としてQRコードを提示して待機中、画面がスリープしないよう自動維持
     useWakeLock(true)
 
@@ -553,57 +555,134 @@ const PatientActorPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* 処置・物品QR提示 ＆ 脈・呼吸ボタン (常時表示) */}
-                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {/* スマホ完結・処置QR提示ボタン */}
-                    <button
-                        onClick={() => setShowActorQRModal(true)}
+                {/* 搬出・目的地到着済みバナー or 到着報告ボタン */}
+                {patient.disposition ? (
+                    <div
                         style={{
-                            width: '100%',
-                            padding: '1rem',
-                            backgroundColor: '#2563eb',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontWeight: 'bold',
-                            fontSize: '1.05rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.6rem',
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                            cursor: 'pointer',
+                            marginTop: '1.5rem',
+                            padding: '1.25rem',
+                            backgroundColor: '#ecfdf5',
+                            border: '2px solid #10b981',
+                            borderRadius: '16px',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
                         }}
                     >
-                        <span style={{ fontSize: '1.3rem' }}>📱</span>
-                        <span>処置・手技・物品のQRを提示する</span>
-                    </button>
-
-                    <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.25rem 0 0' }}>
-                        「脈をみます」「呼吸をみます」と言われたら以下をタップ
-                    </p>
-                    <div className="actor-actions" style={{ marginTop: '0' }}>
-                        <button
-                            className="actor-button actor-button--pulse"
-                            onClick={() => setActiveAnimation('pulse')}
+                        <div style={{ fontSize: '2.2rem', marginBottom: '0.4rem' }}>🎉</div>
+                        <h3 style={{ margin: '0 0 0.4rem', color: '#065f46', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                            訓練終了（目的地到着完了）
+                        </h3>
+                        <p style={{ margin: '0 0 0.8rem', color: '#047857', fontSize: '0.9rem' }}>
+                            行き先: <strong>{patient.disposition.destination_label}</strong> に到着が記録されました。
+                        </p>
+                        <div
+                            style={{
+                                display: 'inline-block',
+                                padding: '0.4rem 0.8rem',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '8px',
+                                border: '1px solid #a7f3d0',
+                                fontSize: '0.8rem',
+                                color: '#065f46',
+                            }}
                         >
-                            <div className="button-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                            </div>
-                            <span>💓 脈（心拍）を見せる</span>
-                        </button>
-                        <button
-                            className="actor-button actor-button--breathing"
-                            onClick={() => setActiveAnimation('breathing')}
-                        >
-                            <div className="button-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
-                            </div>
-                            <span>🌬️ 呼吸を見せる</span>
-                        </button>
+                            到着時刻: {new Date(patient.disposition.completed_at_ms).toLocaleTimeString()}
+                            {patient.disposition.is_cpa_at_disposition && (
+                                <span style={{ color: '#dc2626', fontWeight: 'bold', marginLeft: '0.5rem' }}>
+                                    (※到着時CPA判定)
+                                </span>
+                            )}
+                        </div>
+                        <p style={{ margin: '0.8rem 0 0', fontSize: '0.8rem', color: '#6ee7b7' }}>
+                            指示に従って待機または退場口へ移動してください。お疲れ様でした！
+                        </p>
                     </div>
-                </div>
+                ) : (
+                    /* 処置・物品QR提示 ＆ 脈・呼吸ボタン ＆ 目的地到着ボタン (常時表示) */
+                    <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {/* 搬出・目的地到着報告ボタン（最重要・終了地点でタップ） */}
+                        <button
+                            onClick={() => setShowDispositionModal(true)}
+                            style={{
+                                width: '100%',
+                                padding: '1rem',
+                                backgroundColor: '#10b981',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontWeight: 'bold',
+                                fontSize: '1.05rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.6rem',
+                                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <span style={{ fontSize: '1.4rem' }}>🏁</span>
+                            <span>目的地（病棟・手術室・退場口等）に到着した</span>
+                        </button>
+
+                        {/* スマホ完結・処置QR提示ボタン */}
+                        <button
+                            onClick={() => setShowActorQRModal(true)}
+                            style={{
+                                width: '100%',
+                                padding: '0.85rem',
+                                backgroundColor: '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontWeight: 'bold',
+                                fontSize: '0.95rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.6rem',
+                                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <span style={{ fontSize: '1.2rem' }}>📱</span>
+                            <span>処置・手技・物品のQRを提示する</span>
+                        </button>
+
+                        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.25rem 0 0' }}>
+                            「脈をみます」「呼吸をみます」と言われたら以下をタップ
+                        </p>
+                        <div className="actor-actions" style={{ marginTop: '0' }}>
+                            <button
+                                className="actor-button actor-button--pulse"
+                                onClick={() => setActiveAnimation('pulse')}
+                            >
+                                <div className="button-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                                </div>
+                                <span>💓 脈（心拍）を見せる</span>
+                            </button>
+                            <button
+                                className="actor-button actor-button--breathing"
+                                onClick={() => setActiveAnimation('breathing')}
+                            >
+                                <div className="button-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                                </div>
+                                <span>🌬️ 呼吸を見せる</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* 目的地到着・転帰確定モーダル */}
+            {showDispositionModal && (
+                <DispositionModal
+                    patient={patient}
+                    mode="actor"
+                    onClose={() => setShowDispositionModal(false)}
+                />
+            )}
 
             {/* 処置・物品QR個別提示モーダル */}
             {showActorQRModal && (

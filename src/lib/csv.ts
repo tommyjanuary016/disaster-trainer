@@ -469,7 +469,8 @@ export function exportCSV(patients: Patient[]): string {
         '管理番号', '患者氏名', '年齢', '性別', '想定トリアージ', '現場トリアージ', '診断名', '最終ステータス',
         '診療開始時刻(病着)', 'トリアージ完了時刻', '初期V/S測定時刻', '処置・安定化完了時刻',
         'キー手技到達時間(病着から)', 'トリアージ所要時間', '初期評価所要時間',
-        '状態改善・安定化達成', '急変・悪化の有無', 'トリアージ判定', '実施完了した手技・処置'
+        '状態改善・安定化達成', '急変・悪化の有無', 'トリアージ判定', '実施完了した手技・処置',
+        '搬出先(転帰)', '搬出完了時刻', '総滞留・搬出所要時間', '搬出時CPA状態', '搬出登録者'
     ]
 
     const formatTime = (ms?: number | null) => {
@@ -535,7 +536,17 @@ export function exportCSV(patients: Patient[]): string {
             // トリアージ判定
             triageDiff(),
             // 実施完了処置
-            completedNames
+            completedNames,
+            // 搬出先(転帰)
+            p.disposition?.destination_label || '未搬出',
+            // 搬出完了時刻
+            formatTime(p.disposition?.completed_at_ms),
+            // 総滞留・搬出所要時間 (病着〜搬出完了)
+            formatDurationMs(p.reception_time_ms, p.disposition?.completed_at_ms),
+            // 搬出時CPA状態
+            p.disposition?.is_cpa_at_disposition ? '🚨 CPA到達' : (p.disposition ? '生存' : '—'),
+            // 搬出登録者
+            p.disposition?.disposition_by === 'actor' ? '模擬患者本人' : (p.disposition ? '医療スタッフ' : '—')
         ]
         return row.map(cell => escapeCSV(cell as string)).join(',')
     })

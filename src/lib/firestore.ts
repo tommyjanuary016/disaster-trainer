@@ -14,7 +14,7 @@ import {
     where,
 } from 'firebase/firestore'
 import { db, USE_MOCK } from './firebase'
-import { Patient, TrainingSession } from '../types/patient'
+import { Patient, TrainingSession, PatientDisposition } from '../types/patient'
 import { mockPatients } from '../data/mockData'
 import { getIsExperienceMode } from '../hooks/useExperienceMode'
 
@@ -501,6 +501,16 @@ export async function updatePatientFlags(
     }
     const docRef = doc(db, 'patients', String(patientId))
     await updateDoc(docRef, flags as Record<string, unknown>)
+}
+
+// ------------------------------------------------------------------
+// 患者の搬出・転帰（Disposition）を確定する
+// ------------------------------------------------------------------
+export async function updatePatientDisposition(
+    patientId: number,
+    disposition: PatientDisposition
+): Promise<void> {
+    await updatePatientFlags(patientId, { disposition })
 }
 // ------------------------------------------------------------------
 export async function startTreatmentTimer(

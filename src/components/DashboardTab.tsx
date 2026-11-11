@@ -74,6 +74,17 @@ function computePatientTTD(p: Patient, nowMs: number): {
     const doneList = p.completed_treatments || []
     const isStabilized = p.stabilization_completed || (reqList.length > 0 && reqList.every(rt => doneList.includes(rt.treatment_id)))
 
+    // 搬出・転帰が確定している患者はTTDを停止
+    if (p.disposition) {
+        return {
+            hasTTD: false,
+            remainingSec: 0,
+            progressPct: p.disposition.is_cpa_at_disposition ? 100 : 0,
+            isExpired: p.disposition.is_cpa_at_disposition,
+            isStabilized: p.disposition.is_stabilized,
+        }
+    }
+
     if (!p.deterioration_enabled || !p.deterioration_time_minutes) {
         return { hasTTD: false, remainingSec: 0, progressPct: 0, isExpired: false, isStabilized }
     }
@@ -417,6 +428,36 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
     }).length
     const deterioratedCount = patients.filter(p => p.status === '悪化').length
 
+    // 搬出完了（Disposition）集計
+    const disposedPatients = patients.filter(p => p.disposition)
+    const disposedCount = disposedPatients.length
+    const disposedCpaCount = disposedPatients.filter(p => p.disposition?.is_cpa_at_disposition).length
+
+    // 行き先別内訳
+    const destinationCounts = {
+        discharge: disposedPatients.filter(p => p.disposition?.destination === 'discharge').length,
+        ward:      disposedPatients.filter(p => p.disposition?.destination === 'ward').length,
+        or:        disposedPatients.filter(p => p.disposition?.destination === 'or').length,
+        icu_hcu:   disposedPatients.filter(p => p.disposition?.destination === 'icu_hcu').length,
+        angio:     disposedPatients.filter(p => p.disposition?.destination === 'angio').length,
+        transfer:  disposedPatients.filter(p => p.disposition?.destination === 'transfer').length,
+        morgue:    disposedPatients.filter(p => p.disposition?.destination === 'morgue').length,
+    }
+
+    // 搬出所要時間の平均（ms）
+    const dispositionDurations = disposedPatients
+        .map(p => {
+            const start = p.reception_time_ms || sessionStartMs
+            if (start && p.disposition?.completed_at_ms) {
+                return Math.max(0, p.disposition.completed_at_ms - start)
+            }
+            return null
+        })
+        .filter((d): d is number => d !== null)
+    const avgDispositionMs = dispositionDurations.length > 0
+        ? Math.round(dispositionDurations.reduce((a, b) => a + b, 0) / dispositionDurations.length)
+        : null
+
     // 救命スコア & チームランク計算 (S / A / B / C)
     const allRequiredCount = patients.reduce((acc, p) => acc + (p.required_treatments?.length || 0), 0)
     const allDoneRequiredCount = patients.reduce((acc, p) => {
@@ -442,11 +483,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
         const triageDelta  = p.triage_time_ms    ? Math.max(0, p.triage_time_ms    - base) : null
         const initialDelta = p.initial_vs_time_ms ? Math.max(0, p.initial_vs_time_ms - base) : null
         const postDelta    = p.post_vs_time_ms   ? Math.max(0, p.post_vs_time_ms   - base) : null
-        const deteriorated = p.status === '悪化'
+        const dispositionDelta = p.disposition?.completed_at_ms ? Math.max(0, p.disposition.completed_at_ms - base) : null
+        const deteriorated = p.status === '悪化' || Boolean(p.disposition?.is_cpa_at_disposition)
         const reqList = p.required_treatments || []
         const doneList = p.completed_treatments || []
         const doneReqCount = reqList.filter(rt => doneList.includes(rt.treatment_id)).length
-        return { p, idx, triageDelta, initialDelta, postDelta, deteriorated, reqCount: reqList.length, doneReqCount }
+        return { p, idx, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated, reqCount: reqList.length, doneReqCount }
     })
 
     const pct = (n: number) => totalCount > 0 ? Math.round((n / totalCount) * 100) : 0
@@ -562,6 +604,23 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                         <span className="hq-kpi-chip__label" style={{ color: '#fca5a5' }}>急変・悪化</span>
                         <span className="hq-kpi-chip__val" style={{ color: '#f87171' }}>{deterioratedCount}<small>名</small></span>
                     </div>
+                    <div className="hq-kpi-chip" style={{ borderColor: 'rgba(56, 189, 248, 0.4)' }}>
+                        <span className="hq-kpi-chip__label" style={{ color: '#38bdf8' }}>搬出完了 (転帰)</span>
+                        <span className="hq-kpi-chip__val" style={{ color: '#7dd3fc' }}>
+                            {disposedCount}<small>/{totalCount}</small>
+                        </span>
+                        {avgDispositionMs !== null && (
+                            <span style={{ fontSize: '0.65rem', color: '#94a3b8', display: 'block', marginTop: '-2px' }}>
+                                平均 {msToMinSec(avgDispositionMs)}
+                            </span>
+                        )}
+                    </div>
+                    {disposedCpaCount > 0 && (
+                        <div className="hq-kpi-chip" style={{ borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' }}>
+                            <span className="hq-kpi-chip__label" style={{ color: '#fca5a5' }}>搬出時CPA</span>
+                            <span className="hq-kpi-chip__val" style={{ color: '#ef4444' }}>{disposedCpaCount}<small>名</small></span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 表示モード切替スイッチ */}
@@ -581,6 +640,53 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                         📊 一覧テーブル表示
                     </button>
                 </div>
+            </div>
+
+            {/* ───────── 行き先別搬出サマリー（Disposition Breakdown Bar） ───────── */}
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    flexWrap: 'wrap',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(148, 163, 184, 0.15)',
+                    fontSize: '0.78rem',
+                    color: '#e2e8f0',
+                }}
+            >
+                <span style={{ fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span>🏁</span>
+                    <span>搬出先内訳:</span>
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#6ee7b7' }}>
+                    🏠 帰宅: {destinationCounts.discharge}名
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', color: '#93c5fd' }}>
+                    🛏️ 一般病棟: {destinationCounts.ward}名
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(249, 115, 22, 0.15)', border: '1px solid #f97316', color: '#fdba74' }}>
+                    🏥 手術室: {destinationCounts.or}名
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c4b5fd' }}>
+                    🩺 ICU/HCU: {destinationCounts.icu_hcu}名
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(236, 72, 153, 0.15)', border: '1px solid #ec4899', color: '#f472b6' }}>
+                    🔬 カテ室: {destinationCounts.angio}名
+                </span>
+                <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(6, 182, 212, 0.15)', border: '1px solid #06b6d4', color: '#67e8f9' }}>
+                    🚑 他院転送: {destinationCounts.transfer}名
+                </span>
+                {destinationCounts.morgue > 0 && (
+                    <span style={{ padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(148, 163, 184, 0.15)', border: '1px solid #64748b', color: '#cbd5e1' }}>
+                        🕊️ 霊安室: {destinationCounts.morgue}名
+                    </span>
+                )}
+                <span style={{ marginLeft: 'auto', color: '#94a3b8', fontSize: '0.72rem' }}>
+                    滞留未搬出: <strong style={{ color: totalCount - disposedCount > 0 ? '#f59e0b' : '#34d399' }}>{totalCount - disposedCount}</strong>名
+                </span>
             </div>
 
             {/* ───────── メインビュー：4エリア戦術カンバン OR 一覧テーブル ───────── */}
@@ -679,6 +785,29 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                                                 }}
                                                             />
                                                         </div>
+
+                                                        {/* 搬出完了バッジ */}
+                                                        {p.disposition && (
+                                                            <div
+                                                                style={{
+                                                                    marginTop: '0.4rem',
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                                                    border: '1px solid #10b981',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '0.72rem',
+                                                                    color: '#6ee7b7',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                }}
+                                                            >
+                                                                <span>🏁 搬出済: <strong>{p.disposition.destination_label}</strong></span>
+                                                                {p.disposition.is_cpa_at_disposition && (
+                                                                    <span style={{ color: '#f87171', fontWeight: 'bold' }}>🚨 到着時CPA</span>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* 右側：急変設定がある場合は円形TTDカウントダウンゲージを表示 */}
@@ -723,6 +852,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                     <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: '#94a3b8', textAlign: 'center', whiteSpace: 'nowrap' }}>T完了</th>
                                     <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: '#94a3b8', textAlign: 'center', whiteSpace: 'nowrap' }}>初期V/S</th>
                                     <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: '#94a3b8', textAlign: 'center', whiteSpace: 'nowrap' }}>処置完了</th>
+                                    <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: '#38bdf8', whiteSpace: 'nowrap' }}>搬出先 (転帰)</th>
                                     <th style={{ padding: isCompactView ? '0.4rem 0.5rem' : '0.6rem 0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>現在のステータス</th>
                                 </tr>
                             </thead>
@@ -790,6 +920,29 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                             <td style={{ padding: pad, textAlign: 'center' }}>{p.triage_time_ms || doneTreatments.includes('triage') ? '✅' : '—'}</td>
                                             <td style={{ padding: pad, textAlign: 'center' }}>{p.initial_vs_time_ms || doneTreatments.includes('vitals') ? '✅' : '—'}</td>
                                             <td style={{ padding: pad, textAlign: 'center' }}>{p.post_vs_time_ms || doneReqCount === reqCount && reqCount > 0 ? '✅' : '—'}</td>
+                                            <td style={{ padding: pad }}>
+                                                {p.disposition ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                        <span style={{
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 'bold',
+                                                            padding: '0.12rem 0.45rem',
+                                                            borderRadius: '4px',
+                                                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                                                            color: '#38bdf8',
+                                                        }}>
+                                                            🏁 {p.disposition.destination_label}
+                                                        </span>
+                                                        {p.disposition.is_cpa_at_disposition && (
+                                                            <span style={{ fontSize: '0.68rem', color: '#f87171', fontWeight: 'bold' }}>
+                                                                (CPA)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>未搬出</span>
+                                                )}
+                                            </td>
                                             <td style={{ padding: pad }}>
                                                 <span style={{
                                                     display: 'inline-block', padding: '0.12rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
@@ -943,11 +1096,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                         </div>
 
                         {/* 概況バー */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
                             {[
                                 { label: 'トリアージ完了', v: triageCount, color: '#a78bfa' },
                                 { label: '初期V/S済', v: initialVsCount, color: '#60a5fa' },
                                 { label: '処置完了', v: postVsCount, color: '#34d399' },
+                                { label: '搬出完了(転帰)', v: disposedCount, color: '#38bdf8' },
                                 { label: '急変・悪化', v: deterioratedCount, color: '#f87171' },
                             ].map(({ label, v, color }) => (
                                 <div key={label} style={{ textAlign: 'center', padding: '0.75rem', background: '#1e293b', borderRadius: '8px', border: `1px solid ${color}44` }}>
@@ -967,11 +1121,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#c4b5fd' }}>T開始</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#93c5fd' }}>初期V/S</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#6ee7b7' }}>処置完了</th>
+                                        <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#38bdf8' }}>搬出完了</th>
                                         <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#fca5a5' }}>状態</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {summaryRows.map(({ p, triageDelta, initialDelta, postDelta, deteriorated }) => (
+                                    {summaryRows.map(({ p, triageDelta, initialDelta, postDelta, dispositionDelta, deteriorated }) => (
                                         <tr key={p.id} style={{ borderBottom: '1px solid #1e293b', background: deteriorated ? 'rgba(239, 68, 68, 0.12)' : 'transparent' }}>
                                             <td style={{ padding: '0.5rem 0.6rem', fontWeight: '500' }}>
                                                 {deteriorated && <span style={{ color: '#f87171', marginRight: '4px' }}>⚠</span>}
@@ -991,10 +1146,26 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                             <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#6ee7b7' }}>
                                                 {postDelta !== null ? msToMinSec(postDelta) : '—'}
                                             </td>
+                                            <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', color: '#7dd3fc' }}>
+                                                {p.disposition ? (
+                                                    <span>
+                                                        {p.disposition.destination_label}
+                                                        {dispositionDelta !== null && ` (${msToMinSec(dispositionDelta)})`}
+                                                    </span>
+                                                ) : (
+                                                    '未搬出'
+                                                )}
+                                            </td>
                                             <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
-                                                {deteriorated
-                                                    ? <span style={{ color: '#f87171', fontWeight: 'bold' }}>悪化</span>
-                                                    : <span style={{ color: '#64748b' }}>—</span>}
+                                                {p.disposition?.is_cpa_at_disposition ? (
+                                                    <span style={{ color: '#f87171', fontWeight: 'bold' }}>搬出時CPA</span>
+                                                ) : deteriorated ? (
+                                                    <span style={{ color: '#f87171', fontWeight: 'bold' }}>悪化</span>
+                                                ) : p.disposition ? (
+                                                    <span style={{ color: '#34d399', fontWeight: '600' }}>完了</span>
+                                                ) : (
+                                                    <span style={{ color: '#64748b' }}>対応中</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

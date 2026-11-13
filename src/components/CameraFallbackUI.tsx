@@ -134,6 +134,22 @@ export const CameraFallbackUI: React.FC<CameraFallbackUIProps> = ({ error, onSca
                     </button>
                 )}
             </div>
+
+            {errorString && (
+                <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    color: '#6b7280',
+                    wordBreak: 'break-all',
+                    fontFamily: 'monospace'
+                }}>
+                    詳細: {error?.name ? `[${error.name}] ` : ''}{errorString}
+                </div>
+            )}
         </div>
     )
 }

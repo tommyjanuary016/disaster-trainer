@@ -134,11 +134,13 @@ export function startRobustQRScanner(
     // 段階的カメラ起動
     const attemptStart = async () => {
         if (!html5Qrcode || isStopped) return
+        let firstError: any = null
 
         // 第1優先: { facingMode: "environment" } (iOS Safari / iPadOS / Android 共通標準背面カメラ)
         try {
             if (await tryStart({ facingMode: "environment" })) return
         } catch (e1) {
+            firstError = e1
             console.warn('[QRScanner] Standard facingMode environment failed:', e1)
         }
 
@@ -186,7 +188,7 @@ export function startRobustQRScanner(
         } catch (e5) {
             console.error('[QRScanner] All camera start attempts failed:', e5)
             videoObserver.disconnect()
-            if (onError) onError(e5)
+            if (onError) onError(firstError || e5)
         }
     }
 

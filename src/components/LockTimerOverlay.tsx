@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
 import { ClinicalKnowledgeBox } from './ClinicalKnowledgeBox'
+import { TEAM_REQUIRED_PROCEDURES } from '../pages/TreatmentScanPage'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
@@ -126,6 +127,28 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                         <p style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: '1.6', whiteSpace: 'pre-wrap', margin: 0 }}>
                             {getRevealedText()}
                         </p>
+                    </div>
+                )}
+
+                {/* 2人以上必須処置の場合は人員確認・拘束表示 */}
+                {patient?.applied_treatment_id && TEAM_REQUIRED_PROCEDURES.includes(patient.applied_treatment_id) && (
+                    <div style={{
+                        margin: '0.75rem 0',
+                        padding: '0.85rem 1rem',
+                        backgroundColor: 'rgba(234, 179, 8, 0.18)',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(250, 204, 21, 0.5)',
+                        textAlign: 'left',
+                        color: '#fef08a',
+                        fontSize: '0.9rem',
+                        lineHeight: '1.5',
+                    }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                            👥 最低医師1名を含む2人以上が揃っているか確認してください
+                        </div>
+                        <div>
+                            ⏱️ 2人ともタイマー終了までこの場に拘束されます
+                        </div>
                     </div>
                 )}
 

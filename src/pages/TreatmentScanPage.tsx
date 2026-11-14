@@ -13,6 +13,38 @@ import { soundEngine } from '../lib/soundEngine'
 // 診察手技のIDリスト
 const EXAM_IDS = ['head_and_neck', 'chest', 'abdomen_and_pelvis', 'limbs', 'fast', 'ample', 'background']
 
+// 医師1名を含む2名以上が必須となる処置のIDリスト（一律5分）
+export const TEAM_REQUIRED_PROCEDURES = [
+    'needle_decompression',
+    'pelvic_binder',
+    'blood_transfusion',
+    'intubation',
+    'ventilator',
+    'surgical_airway',
+    'chest_tube',
+    'traction',
+    'cv_access',
+    'quinton_catheter',
+    'pericardiocentesis',
+    'fasciotomy',
+    'cpr',
+    'iabo',
+    'iabp',
+    'pcps',
+    'open_cardiac_massage',
+    'aortic_cross_clamping',
+    'exploratory_laparotomy',
+    'emergency_c_section',
+]
+
+// 治療処置・検査のデフォルト拘束時間（分）を返す
+export const getDefaultTreatmentMinutes = (treatmentId: string, fallbackMinutes = 2): number => {
+    if (treatmentId === 'oxygen' || treatmentId === 'ecg') return 1
+    if (treatmentId === 'ct' || treatmentId === 'contrast_ct' || treatmentId === 'mri') return 5
+    if (TEAM_REQUIRED_PROCEDURES.includes(treatmentId)) return 5
+    return fallbackMinutes
+}
+
 // 医師専用処置のリスト（看護師などが選択した際に警告を出す用）
 const DOCTOR_ONLY_PROCEDURES = [
     'intubation',
@@ -238,7 +270,7 @@ const TreatmentScanPage: React.FC = () => {
         } else if (EXAM_IDS.includes(treatmentId)) {
             initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.examLockTimeMinutes ?? 3)
         } else if (isTreatmentOption(treatmentId)) {
-            initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.treatmentLockTimeMinutes ?? 5)
+            initialMinutes = isTestMode ? TEST_LOCK_MIN : getDefaultTreatmentMinutes(treatmentId, sessionMeta?.treatmentLockTimeMinutes ?? 2)
         }
 
         if (patient) {
@@ -414,7 +446,12 @@ const TreatmentScanPage: React.FC = () => {
                     parsed={pendingParsed}
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
-                    warningText={roleWarning}
+                    warningText={[
+                        roleWarning,
+                        TEAM_REQUIRED_PROCEDURES.includes(pendingProcedure.treatment_id)
+                            ? `👥 必要人数: 最低医師1名を含む2名以上が揃っているか確認してください。\n⏱️ 2名とも所定の時間（${pendingProcedure.defaultMinutes}分）この場に拘束されます。`
+                            : undefined
+                    ].filter(Boolean).join('\n\n') || undefined}
                 />
             )}
 

@@ -29,6 +29,24 @@ function getOrInitExperiencePatient(patientId: number, basePatient?: Patient | n
     const source = basePatient || mockStore.get(patientId) || mockPatients.find(p => p.id === patientId)
     if (source) {
         const cloned: Patient = JSON.parse(JSON.stringify(source))
+        // 体験モードでは常に真っさらな初期状態から開始する
+        cloned.status = '未トリアージ'
+        cloned.triage_color = null
+        cloned.triage_completed_at = undefined
+        cloned.assessment_completed = false
+        cloned.tests_completed = false
+        cloned.treatment_completed = false
+        cloned.applied_treatment_id = undefined
+        cloned.applied_treatments = []
+        cloned.completed_exams = []
+        cloned.lock_timer_end = undefined
+        cloned.lock_timer_minutes = undefined
+        cloned.current_treatment_id = undefined
+        cloned.disposition = undefined
+        cloned.disposition_time = undefined
+        cloned.is_deteriorating = false
+        cloned.vital_history = []
+        cloned.action_logs = []
         experienceStore.set(patientId, cloned)
         return cloned
     }
@@ -936,6 +954,74 @@ export async function endTrainingSession(sessionId: string): Promise<void> {
         activeSessionId = null
         localStorage.removeItem(STORAGE_KEY_SESSION)
     }
+}
+
+// ------------------------------------------------------------------
+// 指定セッションと紐づく患者データを一括削除する（マスター患者は保護）
+// ------------------------------------------------------------------
+export async function deleteSessionWithPatients(sessionId: string): Promise<{ deletedPatients: number }> {
+    if (USE_MOCK || !db) {
+        let deletedPatients = 0
+        mockStore.forEach((p, id) => {
+            if (p.session_id === sessionId) {
+                mockStore.delete(id)
+                deletedPatients++
+            }
+        })
+        mockSessionStore.delete(sessionId)
+        if (activeSessionId === sessionId) {
+            activeSessionId = null
+            localStorage.removeItem(STORAGE_KEY_SESSION)
+        }
+        return { deletedPatients }
+    }
+
+    const q = query(collection(db, 'patients'), where('session_id', '==', sessionId))
+    const snap = await getDocs(q)
+    const docs = snap.docs
+    // FirestoreのwriteBatchは最大500件まで
+    for (let i = 0; i < docs.length; i += 450) {
+        const batch = writeBatch(db)
+        docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref))
+        await batch.commit()
+    }
+    await deleteDoc(doc(db, 'sessions', sessionId))
+    if (activeSessionId === sessionId) {
+        activeSessionId = null
+        localStorage.removeItem(STORAGE_KEY_SESSION)
+    }
+    return { deletedPatients: docs.length }
+}
+
+// ------------------------------------------------------------------
+// 紐づけ先セッションが存在しない古い患者データ（孤立データ）を削除する
+// ------------------------------------------------------------------
+export async function deleteOrphanedSessionPatients(validSessionIds: Set<string>): Promise<number> {
+    if (USE_MOCK || !db) {
+        let count = 0
+        mockStore.forEach((p, id) => {
+            if (p.session_id && !validSessionIds.has(p.session_id)) {
+                mockStore.delete(id)
+                count++
+            }
+        })
+        return count
+    }
+
+    const snap = await getDocs(collection(db, 'patients'))
+    const orphanRefs = snap.docs
+        .filter((d) => {
+            const data = d.data() as Patient
+            return Boolean(data.session_id) && !validSessionIds.has(data.session_id!)
+        })
+        .map((d) => d.ref)
+
+    for (let i = 0; i < orphanRefs.length; i += 450) {
+        const batch = writeBatch(db)
+        orphanRefs.slice(i, i + 450).forEach((ref) => batch.delete(ref))
+        await batch.commit()
+    }
+    return orphanRefs.length
 }
 
 // モックかどうかを外部に公開

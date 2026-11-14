@@ -66,9 +66,9 @@ export const PROCEDURES_MASTER: ProcedureDefinition[] = [
 ]
 
 export const PROCEDURE_CATEGORIES = [
+  '診察・評価',
   '気道・呼吸',
   '循環・輸液',
-  '診察・評価',
   '固定・止血',
   '薬剤投与',
   '蘇生・高度救急',

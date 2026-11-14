@@ -66,10 +66,10 @@ const RadiologyScanPage: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const RADIOLOGY_EXAMS = [
-        { id: 'xray', name: 'レントゲン', minutes: 3 },
+        { id: 'xray', name: 'レントゲン', minutes: 2 },
         { id: 'ct', name: 'CT', minutes: 5 },
-        { id: 'mri', name: 'MRI', minutes: 10 },
-        { id: 'contrast_ct', name: '造影CT', minutes: 10 },
+        { id: 'mri', name: 'MRI', minutes: 5 },
+        { id: 'contrast_ct', name: '造影CT', minutes: 5 },
     ]
 
     const handleStartExam = async () => {
@@ -310,7 +310,10 @@ const RadiologyScanPage: React.FC = () => {
                                     onClick={() => handleScan(`patient:${p.id}`)}
                                 >
                                     <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-                                        {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
+                                        {p.name}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>
+                                        ({p.age}歳・{p.gender === 'M' ? '男性' : '女性'})
                                     </span>
                                 </button>
                             ))}

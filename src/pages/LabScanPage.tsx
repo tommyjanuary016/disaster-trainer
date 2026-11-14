@@ -68,9 +68,9 @@ const LabScanPage: React.FC = () => {
     const LAB_EXAMS = [
         { id: 'blood_test', name: '血液検査', minutes: 0 },
         { id: 'blood_gas', name: '血液ガス分析', minutes: 0 },
-        { id: 'ecg', name: '心電図', minutes: 3 },
-        { id: 'echocardiography', name: '心エコー', minutes: 5 },
-        { id: 'other_echo', name: 'その他エコー', minutes: 10 },
+        { id: 'ecg', name: '心電図', minutes: 1 },
+        { id: 'echocardiography', name: '心エコー', minutes: 2 },
+        { id: 'other_echo', name: 'その他エコー', minutes: 2 },
     ]
 
     const handleStartLabExam = async () => {
@@ -314,7 +314,10 @@ const LabScanPage: React.FC = () => {
                                     onClick={() => handleScan(`patient:${p.id}`)}
                                 >
                                     <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-                                        {Math.floor(p.age / 10) * 10}代 {p.gender === 'M' ? '男性' : '女性'}
+                                        {p.name}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>
+                                        ({p.age}歳・{p.gender === 'M' ? '男性' : '女性'})
                                     </span>
                                 </button>
                             ))}

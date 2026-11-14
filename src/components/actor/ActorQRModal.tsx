@@ -13,7 +13,7 @@ type TabMode = 'procedure' | 'item'
 
 export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName }) => {
   const [tabMode, setTabMode] = useState<TabMode>('procedure')
-  const [selectedCategory, setSelectedCategory] = useState<string>('気道・呼吸')
+  const [selectedCategory, setSelectedCategory] = useState<string>('診察・評価')
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; qrData: string; category: string; desc?: string } | null>(() => {
     const params = new URLSearchParams(window.location.search)
     const initialItem = params.get('item')
@@ -240,50 +240,26 @@ export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName
         ) : (
           /* 選択ステップ画面 */
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            {/* モード切替タブ */}
+            {/* モード切替タブ（診察・処置手技のみ） */}
             <div style={{
               display: 'flex',
               borderBottom: '1px solid #e2e8f0',
               backgroundColor: '#f8fafc',
             }}>
-              <button
-                onClick={() => {
-                  setTabMode('procedure')
-                  setSelectedCategory('気道・呼吸')
-                }}
+              <div
                 style={{
                   flex: 1,
                   padding: '0.75rem',
-                  border: 'none',
-                  borderBottom: tabMode === 'procedure' ? '3px solid #2563eb' : '3px solid transparent',
-                  backgroundColor: tabMode === 'procedure' ? '#ffffff' : 'transparent',
-                  fontWeight: tabMode === 'procedure' ? 'bold' : 'normal',
-                  color: tabMode === 'procedure' ? '#2563eb' : '#64748b',
+                  borderBottom: '3px solid #2563eb',
+                  backgroundColor: '#ffffff',
+                  fontWeight: 'bold',
+                  color: '#2563eb',
                   fontSize: '0.95rem',
-                  cursor: 'pointer',
+                  textAlign: 'center',
                 }}
               >
                 🩺 診察・処置手技
-              </button>
-              <button
-                onClick={() => {
-                  setTabMode('item')
-                  setSelectedCategory('輸液・ルート')
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  border: 'none',
-                  borderBottom: tabMode === 'item' ? '3px solid #2563eb' : '3px solid transparent',
-                  backgroundColor: tabMode === 'item' ? '#ffffff' : 'transparent',
-                  fontWeight: tabMode === 'item' ? 'bold' : 'normal',
-                  color: tabMode === 'item' ? '#2563eb' : '#64748b',
-                  fontSize: '0.95rem',
-                  cursor: 'pointer',
-                }}
-              >
-                📦 物品・オーダー票
-              </button>
+              </div>
             </div>
 
             {/* カテゴリ選択（横スクロールチップ） */}
@@ -303,6 +279,7 @@ export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     style={{
+                      flexShrink: 0,
                       whiteSpace: 'nowrap',
                       padding: '0.35rem 0.75rem',
                       borderRadius: '9999px',

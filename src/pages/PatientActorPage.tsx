@@ -260,22 +260,7 @@ const PatientActorPage: React.FC = () => {
                     模擬患者選択
                 </button>
                 <h2>模擬患者モード</h2>
-                <button
-                    onClick={() => navigate('/qr-generator?tab=procedure')}
-                    style={{
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        border: '1px solid #1d4ed8',
-                        borderRadius: '6px',
-                        padding: '0.45rem 0.85rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                >
-                    🖨️ 手技/バイタルQR
-                </button>
+                <div style={{ width: '80px' }} />
             </header>
 
             {/* 会話不能状態の強調バナー */}
@@ -438,7 +423,7 @@ const PatientActorPage: React.FC = () => {
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 {[
-                                    { step: '1', text: '病着（ゼッケン）を着て、このアプリを開いた状態で待機してください' },
+                                    { step: '1', text: 'このアプリを開いた状態で待機してください' },
                                     { step: '2', text: isSpeechBlocked ? `【注意】現在は「${speechBlockedReason}」です。医療スタッフに声をかけられても喋らず無反応・うめき声のみの演技をしてください。` : '医療スタッフが近づいてきたら「どこが痛いですか？」などと聞かれます。あなたの役の状況に合わせて答えてください（下の「演技のポイント」を参考に）' },
                                     { step: '3', text: '「スキャンします」と言われたら、このQRコード画面をかざしてください' },
                                     { step: '4', text: '「脈をみます」「呼吸をみます」と言われたら下のボタンを押してスタッフに端末を見せてください' },

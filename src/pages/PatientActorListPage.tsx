@@ -54,26 +54,6 @@ const PatientActorListPage: React.FC = () => {
                 <div style={{ fontWeight: 'bold', marginBottom: '0.4rem' }}>📋 模擬患者役の方へ案内</div>
                 スタッフから指示された<strong>患者番号（例: 1番, 2番...）</strong>をタップして演技内容を確認してください。<br />
                 ※診察役（医師・看護師）から処置や物品を求められた際は、<strong>各患者画面の中にある「処置・物品QR提示」ボタンからスマホ上で直接1つずつQRコードを表示して読み取らせることができます</strong>（印刷不要です）。
-                <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => navigate('/qr-generator?tab=procedure')}
-                        style={{
-                            background: '#475569',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.4rem'
-                        }}
-                    >
-                        🖨️ 手技・物品QRの一括確認・印刷用画面
-                    </button>
-                </div>
             </div>
 
             <div className="page__content" style={{ padding: '0 1rem' }}>

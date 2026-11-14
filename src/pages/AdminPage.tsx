@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom'
-import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, fetchActiveSessions, deleteAllCustomPatients } from '../lib/firestore'
+import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, fetchActiveSessions, deleteAllCustomPatients, deleteSessionWithPatients, deleteOrphanedSessionPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import PatientForm from '../components/PatientForm'
+import { DataCleanupModal } from '../components/DataCleanupModal'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/csv'
 import DashboardTab from '../components/DashboardTab'
@@ -43,6 +44,9 @@ const AdminPage: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false)
     const [showMasterAll, setShowMasterAll] = useState(false)
     const [activeSessionsList, setActiveSessionsList] = useState<TrainingSession[]>([])
+    const [adminView, setAdminView] = useState<'home' | 'master' | 'session'>(() => activeSessionId ? 'session' : 'home')
+    const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false)
+    const [allPatientsForCleanup, setAllPatientsForCleanup] = useState<Patient[]>([])
     const location = useLocation()
 
     const loadActiveSessions = async () => {
@@ -409,11 +413,21 @@ const AdminPage: React.FC = () => {
     }
 
     const handleReturnToMaster = () => {
-        // 全マスターデータ表示に戻る（完全にセッションをリセット）
+        // 管理画面トップに戻る
+        setAdminView('home')
         setDisplaySessionId(null)
         setCurrentSessionId(null)
         setSessionEnded(false)
         setCurrentSessionTitle(null)
+    }
+
+    const handleOpenCleanupModal = () => {
+        // 全患者を一時取得してモーダルを開く
+        const unsub = subscribeToAllPatients((all) => {
+            setAllPatientsForCleanup(all)
+            setIsCleanupModalOpen(true)
+            unsub()
+        }, true)
     }
 
     const handleExportCSV = () => {
@@ -577,7 +591,7 @@ const AdminPage: React.FC = () => {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                         アプリトップ
                     </button>
-                    {(displaySessionId || activeTab !== 'patients') && (
+                    {adminView !== 'home' && (
                         <button
                             onClick={() => {
                                 handleReturnToMaster()
@@ -589,6 +603,13 @@ const AdminPage: React.FC = () => {
                             🏠 管理画面トップに戻る
                         </button>
                     )}
+                    <button
+                        onClick={() => navigate('/qr-generator?tab=procedure')}
+                        className="button button--secondary"
+                        style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}
+                    >
+                        🖨️ 手技・物品QR印刷
+                    </button>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'}}>
                     <div>
@@ -987,6 +1008,127 @@ const AdminPage: React.FC = () => {
                         onSubmit={handleFormSubmit}
                         onCancel={handleFormCancel}
                     />
+                ) : adminView === 'home' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                        {activeSessionsList.filter(s => s.isActive).length > 0 && (
+                            <div style={{
+                                padding: '1.25rem',
+                                borderRadius: '12px',
+                                border: '2px solid #10b981',
+                                backgroundColor: '#ecfdf5',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#065f46' }}>🟢 進行中の訓練セッション</div>
+                                    <h3 style={{ margin: '0.25rem 0', fontSize: '1.1rem', color: '#064e3b' }}>
+                                        {activeSessionsList.find(s => s.isActive)?.title || '進行中のセッション'}
+                                    </h3>
+                                </div>
+                                <button
+                                    className="button button--primary"
+                                    style={{ backgroundColor: '#059669' }}
+                                    onClick={() => {
+                                        const active = activeSessionsList.find(s => s.isActive)
+                                        if (active) {
+                                            setActiveSession(active.id)
+                                            setCurrentSessionId(active.id)
+                                            setDisplaySessionId(active.id)
+                                            setCurrentSessionTitle(active.title)
+                                            setSessionEnded(false)
+                                            setAdminView('session')
+                                            setActiveTab('dashboard')
+                                        }
+                                    }}
+                                >
+                                    セッション運用画面を開く →
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{
+                            padding: '1.25rem',
+                            borderRadius: '12px',
+                            border: '1px solid var(--gray-200)',
+                            backgroundColor: '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                        }}>
+                            <div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb' }}>🚀 新規訓練</div>
+                                <h3 style={{ margin: '0.25rem 0', fontSize: '1.05rem' }}>新しい訓練セッションを開始</h3>
+                                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--gray-600)' }}>
+                                    患者数・トリアージ比率・拘束時間を設定して新しい訓練を開始します。
+                                </p>
+                            </div>
+                            <button
+                                className="button button--primary"
+                                onClick={() => setIsSessionModalOpen(true)}
+                            >
+                                ＋ 新規訓練を開始する
+                            </button>
+                        </div>
+
+                        <div style={{
+                            padding: '1.25rem',
+                            borderRadius: '12px',
+                            border: '1px solid var(--gray-200)',
+                            backgroundColor: '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                        }}>
+                            <div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#7c3aed' }}>📋 患者マスター</div>
+                                <h3 style={{ margin: '0.25rem 0', fontSize: '1.05rem' }}>患者マスターを管理する</h3>
+                                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--gray-600)' }}>
+                                    シナリオ別の患者テンプレート登録・編集・CSV入出力を行います。
+                                </p>
+                            </div>
+                            <button
+                                className="button button--secondary"
+                                onClick={() => {
+                                    setDisplaySessionId(null)
+                                    setCurrentSessionId(null)
+                                    setAdminView('master')
+                                    setActiveTab('patients')
+                                }}
+                            >
+                                患者マスターを開く →
+                            </button>
+                        </div>
+
+                        <div style={{
+                            padding: '1.25rem',
+                            borderRadius: '12px',
+                            border: '1px solid var(--gray-200)',
+                            backgroundColor: '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                        }}>
+                            <div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#dc2626' }}>🧹 データ整理</div>
+                                <h3 style={{ margin: '0.25rem 0', fontSize: '1.05rem' }}>過去データの整理（アーカイブ削除）</h3>
+                                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--gray-600)' }}>
+                                    終了済みの古いセッションや孤立した患者データをまとめて削除します。
+                                </p>
+                            </div>
+                            <button
+                                className="button button--secondary"
+                                style={{ color: '#dc2626', borderColor: '#fecaca', backgroundColor: '#fef2f2' }}
+                                onClick={handleOpenCleanupModal}
+                            >
+                                過去データを整理する
+                            </button>
+                        </div>
+                    </div>
                 ) : (
                     <>
                         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)' }}>
@@ -1430,6 +1572,35 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>,
                 document.body
+            )}
+            {isCleanupModalOpen && (
+                <DataCleanupModal
+                    sessions={activeSessionsList}
+                    allPatients={allPatientsForCleanup}
+                    onClose={() => setIsCleanupModalOpen(false)}
+                    onDeleteSessions={async (ids) => {
+                        for (const id of ids) {
+                            await deleteSessionWithPatients(id)
+                        }
+                        await loadActiveSessions()
+                        setAllPatientsForCleanup(prev => prev.filter(p => !p.session_id || !ids.includes(p.session_id)))
+                        alert(`${ids.length} 件のセッションと紐づく患者データを削除しました。`)
+                    }}
+                    onDeleteOrphans={async () => {
+                        const validIds = new Set(activeSessionsList.map(s => s.id))
+                        const deletedCount = await deleteOrphanedSessionPatients(validIds)
+                        setAllPatientsForCleanup(prev => prev.filter(p => !p.session_id || validIds.has(p.session_id)))
+                        alert(`${deletedCount} 件の孤立患者データを削除しました。`)
+                    }}
+                    onExportSessionsCSV={(ids) => {
+                        const targetPatients = allPatientsForCleanup.filter(p => p.session_id && ids.includes(p.session_id))
+                        if (targetPatients.length === 0) {
+                            alert('選択されたセッションに紐づく患者データがありません。')
+                            return
+                        }
+                        exportCSV(targetPatients)
+                    }}
+                />
             )}
         </div>
     )

@@ -44,7 +44,7 @@ const AdminPage: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false)
     const [showMasterAll, setShowMasterAll] = useState(false)
     const [activeSessionsList, setActiveSessionsList] = useState<TrainingSession[]>([])
-    const [adminView, setAdminView] = useState<'home' | 'master' | 'session'>(() => activeSessionId ? 'session' : 'home')
+    const [adminView, setAdminView] = useState<'home' | 'master' | 'session'>('home')
     const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false)
     const [allPatientsForCleanup, setAllPatientsForCleanup] = useState<Patient[]>([])
     const location = useLocation()
@@ -1290,7 +1290,7 @@ const AdminPage: React.FC = () => {
                                                 className="input"
                                                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                                             >
-                                                <option value="ALL">すべてのシナリオ ({patients.length}件)</option>
+                                                <option value="ALL">すべてのシナリオ (患者 {patients.length}名)</option>
                                                 {availableScenarios.map(scen => (
                                                     <option key={scen} value={scen}>
                                                         {scen} ({patients.filter(p => (p.scenario_tag || '基本') === scen).length}件)

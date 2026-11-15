@@ -1010,43 +1010,43 @@ const AdminPage: React.FC = () => {
                     />
                 ) : adminView === 'home' ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
-                        {activeSessionsList.filter(s => s.isActive).length > 0 && (
-                            <div style={{
-                                padding: '1.25rem',
-                                borderRadius: '12px',
-                                border: '2px solid #10b981',
-                                backgroundColor: '#ecfdf5',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                gap: '0.75rem',
-                            }}>
+                        {activeSessionsList.filter(s => s.isActive).map(active => (
+                            <div
+                                key={active.id}
+                                style={{
+                                    padding: '1.25rem',
+                                    borderRadius: '12px',
+                                    border: '2px solid #10b981',
+                                    backgroundColor: '#ecfdf5',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    gap: '0.75rem',
+                                }}
+                            >
                                 <div>
                                     <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#065f46' }}>🟢 進行中の訓練セッション</div>
                                     <h3 style={{ margin: '0.25rem 0', fontSize: '1.1rem', color: '#064e3b' }}>
-                                        {activeSessionsList.find(s => s.isActive)?.title || '進行中のセッション'}
+                                        {active.title || '進行中のセッション'}
                                     </h3>
                                 </div>
                                 <button
                                     className="button button--primary"
                                     style={{ backgroundColor: '#059669' }}
                                     onClick={() => {
-                                        const active = activeSessionsList.find(s => s.isActive)
-                                        if (active) {
-                                            setActiveSession(active.id)
-                                            setCurrentSessionId(active.id)
-                                            setDisplaySessionId(active.id)
-                                            setCurrentSessionTitle(active.title)
-                                            setSessionEnded(false)
-                                            setAdminView('session')
-                                            setActiveTab('dashboard')
-                                        }
+                                        setActiveSession(active.id)
+                                        setCurrentSessionId(active.id)
+                                        setDisplaySessionId(active.id)
+                                        setCurrentSessionTitle(active.title)
+                                        setSessionEnded(false)
+                                        setAdminView('session')
+                                        setActiveTab('dashboard')
                                     }}
                                 >
                                     セッション運用画面を開く →
                                 </button>
                             </div>
-                        )}
+                        ))}
 
                         <div style={{
                             padding: '1.25rem',

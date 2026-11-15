@@ -265,6 +265,8 @@ export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName
             {/* カテゴリ選択（横スクロールチップ） */}
             <div style={{
               display: 'flex',
+              alignItems: 'center',
+              flexShrink: 0,
               gap: '0.4rem',
               overflowX: 'auto',
               padding: '0.6rem 0.8rem',
@@ -279,9 +281,12 @@ export const ActorQRModal: React.FC<ActorQRModalProps> = ({ onClose, patientName
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
                       flexShrink: 0,
                       whiteSpace: 'nowrap',
-                      padding: '0.35rem 0.75rem',
+                      lineHeight: 1.2,
+                      padding: '0.4rem 0.8rem',
                       borderRadius: '9999px',
                       fontSize: '0.85rem',
                       fontWeight: isActive ? 'bold' : 'normal',

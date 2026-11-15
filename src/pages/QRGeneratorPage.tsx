@@ -87,7 +87,7 @@ const QRGeneratorPage: React.FC = () => {
                 {([
                     { key: 'patient',   label: '患者QR' },
                     { key: 'procedure', label: '手技QR' },
-                    { key: 'item',      label: '物品QR' },
+
                     { key: 'import',    label: 'データ取込' },
                 ] as { key: Tab; label: string }[]).map(tab => (
                     <button

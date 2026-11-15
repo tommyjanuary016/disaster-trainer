@@ -68,7 +68,7 @@ const LauncherPage: React.FC = () => {
             setShowPasswordModal(false)
             // パスワード成功後、管理メニューモーダルを表示
             setIsLoadingSessions(true)
-            setShowAdminActionModal(true)
+            navigate('/admin')
             try {
                 const sessions = await fetchActiveSessions()
                 setActiveSessions(sessions)
@@ -198,61 +198,7 @@ const LauncherPage: React.FC = () => {
                 </div>
             )}
 
-            {/* 管理メニュー選択モーダル */}
-            {showAdminActionModal && (
-                <div className="launcher-modal-overlay" onClick={() => setShowAdminActionModal(false)}>
-                    <div className="launcher-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-                        <h2 className="launcher-modal__title" style={{ marginBottom: '1.5rem' }}>管理メニュー選択</h2>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                            <button 
-                                onClick={() => { setActiveSession(null); navigate('/admin', { state: { action: 'new_session' }}) }}
-                                className="button button--primary"
-                                style={{ width: '100%', padding: '0.75rem' }}
-                            >
-                                新規セッション開始
-                            </button>
-                            <button 
-                                onClick={() => { setActiveSession(null); navigate('/admin', { state: { action: 'master' }}) }}
-                                className="button button--secondary"
-                                style={{ width: '100%', padding: '0.75rem', borderColor: '#8b5cf6', color: '#6d28d9' }}
-                            >
-                                患者CSV一括インポート／マスター編集
-                            </button>
-                        </div>
 
-                        {isLoadingSessions ? (
-                            <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--gray-500)' }}>読み込み中...</div>
-                        ) : activeSessions.length > 0 ? (
-                            <>
-                                <h4 style={{ fontSize: '0.9rem', color: 'var(--gray-600)', marginBottom: '0.5rem' }}>アクティブなセッションを管理</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto', marginBottom: '1.5rem' }}>
-                                    {activeSessions.map(session => (
-                                        <button 
-                                            key={session.id} 
-                                            onClick={() => { setActiveSession(session.id); navigate('/admin', { state: { action: 'manage' }}) }}
-                                            className="button button--secondary"
-                                            style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', width: '100%', padding: '0.5rem 1rem' }}
-                                        >
-                                            <span style={{ fontWeight: 'bold' }}>{session.title || '無題のセッション'}</span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>ID: {session.id}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        ) : null}
-
-                        <button
-                            type="button"
-                            className="launcher-modal__btn launcher-modal__btn--secondary"
-                            onClick={() => setShowAdminActionModal(false)}
-                            style={{ marginTop: 'auto' }}
-                        >
-                            キャンセル
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* メインコンテンツ */}
             <div className="launcher-content">

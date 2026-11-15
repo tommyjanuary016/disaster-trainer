@@ -288,25 +288,11 @@ const PatientDetailPage: React.FC = () => {
                 <FindingsCard findings={patient.findings} completedTreatments={uniqueCompleted} consciousnessLevel={patient.consciousness_level} patient={patient} />
 
                 {/* ===== 特別検査結果 ===== */}
-                {((patient.tests_completed && patient.image_urls && patient.image_urls.length > 0) || 
-                  (patient.tests_completed && patient.blood_test_data)) && (
+                {(patient.tests_completed && patient.blood_test_data) && (
                     <div className="test-results-section" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '0.8rem', color: 'var(--gray-900)', borderBottom: '1px solid var(--gray-200)', paddingBottom: '0.5rem' }}>
                             専門検査結果
                         </h3>
-                        
-                        {patient.tests_completed && patient.image_urls && patient.image_urls.length > 0 && (
-                            <div className="card" style={{ marginBottom: '0.8rem', borderLeft: '4px solid #3b82f6' }}>
-                                <h4 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem 0', color: '#1d4ed8' }}>画像検査結果</h4>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    {patient.image_urls.map((url, i) => (
-                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="button button--secondary" style={{ width: 'auto', fontSize: '0.8rem', padding: '0.4rem 0.8rem', margin: 0 }}>
-                                            画像 {i + 1} を確認する
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {patient.tests_completed && patient.blood_test_data && (
                             <div className="card" style={{ marginBottom: '0.8rem', borderLeft: '4px solid #8b5cf6' }}>

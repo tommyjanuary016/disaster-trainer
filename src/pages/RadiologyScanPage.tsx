@@ -155,22 +155,10 @@ const RadiologyScanPage: React.FC = () => {
                     </div>
 
                     <div style={{ backgroundColor: '#f8fafc', padding: '0.8rem 1rem', borderRadius: '8px', marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#475569' }}>選択中: {currentExam?.name}</span>
                             <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 'bold' }}>患者画面拘束時間: {currentExam?.minutes}分</span>
                         </div>
-                        <h4 style={{ margin: '0.4rem 0 0.3rem 0', fontSize: '0.85rem', color: '#64748b' }}>【登録画像URL確認】</h4>
-                        {patient.image_urls && patient.image_urls.length > 0 ? (
-                            <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
-                                {patient.image_urls.map((url, i) => (
-                                    <li key={i}>
-                                        <a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{url}</a>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>登録画像なし（結果テキストまたは事前URLなし）</p>
-                        )}
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.8rem' }}>

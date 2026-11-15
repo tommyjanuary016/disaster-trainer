@@ -1056,23 +1056,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                             <strong>{pct(triageCount)}% ({triageCount}/{totalCount})</strong>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const csv = exportCSV(patients)
-                            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                            const url = URL.createObjectURL(blob)
-                            const a = document.createElement('a')
-                            a.href = url
-                            a.download = `訓練ログ_${new Date().toISOString().slice(0, 10)}.csv`
-                            a.click()
-                            URL.revokeObjectURL(url)
-                        }}
-                        className="hq-btn hq-btn--outline"
-                        style={{ width: '100%', marginTop: '0.75rem' }}
-                    >
-                        ↓ 訓練ログCSV出力
-                    </button>
                 </div>
             </div>
 
@@ -1228,21 +1211,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                         </div>
 
                         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            <button
-                                onClick={() => {
-                                    const csv = exportCSV(patients)
-                                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                                    const url = URL.createObjectURL(blob)
-                                    const a = document.createElement('a')
-                                    a.href = url
-                                    a.download = `訓練ログ_${new Date().toISOString().slice(0,10)}.csv`
-                                    a.click()
-                                    URL.revokeObjectURL(url)
-                                }}
-                                className="hq-btn hq-btn--primary"
-                            >
-                                ↓ 訓練ログCSV出力
-                            </button>
                             <button onClick={() => setShowSummary(false)} className="hq-btn hq-btn--secondary">
                                 閉じる
                             </button>

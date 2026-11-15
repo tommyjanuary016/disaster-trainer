@@ -736,13 +736,6 @@ const AdminPage: React.FC = () => {
                     {currentSessionId ? (
                         <>
                             <button
-                                onClick={handleExportCSV}
-                                className="button button--secondary"
-                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#3b82f6', color: '#1d4ed8' }}
-                            >
-                                ↓ ダウンロード (振り返り用CSV)
-                            </button>
-                            <button
                                 onClick={handleClearSession}
                                 className="button button--secondary"
                                 style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#ef4444', color: '#b91c1c' }}
@@ -753,13 +746,6 @@ const AdminPage: React.FC = () => {
                     ) : sessionEnded && displaySessionId ? (
                         <>
                             <button
-                                onClick={handleExportCSV}
-                                className="button button--secondary"
-                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#3b82f6', color: '#1d4ed8' }}
-                            >
-                                ↓ ダウンロード (振り返り用CSV)
-                            </button>
-                            <button
                                 onClick={handleReturnToMaster}
                                 className="button button--secondary"
                                 style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
@@ -767,19 +753,7 @@ const AdminPage: React.FC = () => {
                                 全マスターデータに戻る
                             </button>
                         </>
-                    ) : (
-                        <button
-                            onClick={handleExportMasterCSV}
-                            className="button button--secondary"
-                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#8b5cf6', color: '#6d28d9' }}
-                        >
-                            ↓ 患者CSVを一括作成するためのマスターCSV出力
-                        </button>
-                    )}
-                    <label className="button button--secondary" style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center' }}>
-                        患者CSV一括インポート
-                        <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVUpload} />
-                    </label>
+                    ) : null}
                     {!currentSessionId && (
                         <button
                             onClick={handleDeleteAllCustom}
@@ -1143,12 +1117,6 @@ const AdminPage: React.FC = () => {
                                 style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'dashboard' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'dashboard' ? 'bold' : 'normal', color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--gray-600)' }}
                             >
                                 🛰️ 災害対策本部 (Command Center)
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('settings')}
-                                style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'settings' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'settings' ? 'bold' : 'normal', color: activeTab === 'settings' ? 'var(--primary)' : 'var(--gray-600)' }}
-                            >
-                                設定
                             </button>
                         </div>
 

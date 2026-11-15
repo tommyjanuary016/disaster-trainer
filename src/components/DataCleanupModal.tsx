@@ -288,19 +288,11 @@ export const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
                     borderTop: '1px solid var(--gray-200)',
                     backgroundColor: '#f8fafc',
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justifyContent: 'flex-end',
                     alignItems: 'center',
                     gap: '0.75rem',
                     flexWrap: 'wrap',
                 }}>
-                    <button
-                        onClick={() => onExportSessionsCSV(Array.from(selectedIds))}
-                        disabled={selectedIds.size === 0 || isDeleting}
-                        className="button button--secondary"
-                        style={{ width: 'auto', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-                    >
-                        💾 削除前にCSV保存
-                    </button>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                             onClick={onClose}

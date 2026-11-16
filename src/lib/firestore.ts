@@ -5,6 +5,7 @@ import {
     onSnapshot,
     updateDoc,
     setDoc,
+    deleteDoc,
     runTransaction,
     Unsubscribe,
     collection,
@@ -14,7 +15,8 @@ import {
     where,
 } from 'firebase/firestore'
 import { db, USE_MOCK } from './firebase'
-import { Patient, TrainingSession, PatientDisposition } from '../types/patient'
+import { Patient, TrainingSession, PatientDisposition, ActiveTreatment } from '../types/patient'
+export type { Patient, TrainingSession, PatientDisposition, ActiveTreatment } from '../types/patient'
 import { mockPatients } from '../data/mockData'
 import { getIsExperienceMode } from '../hooks/useExperienceMode'
 
@@ -78,11 +80,12 @@ const DEFAULT_MOCK_SESSION: TrainingSession = {
     createdAt: new Date().toISOString(),
     date: new Date().toISOString(),
     isActive: true,
-    examLockTimeMinutes: 5,
+    status: 'active',
+    examLockTimeMinutes: 1,
     treatmentLockTimeMinutes: 5,
     isTestMode: false,
     config: {
-        examLockTimeMinutes: 5,
+        examLockTimeMinutes: 1,
         treatmentLockTimeMinutes: 5,
         isTestMode: false,
     },
@@ -92,6 +95,15 @@ const DEFAULT_MOCK_SESSION: TrainingSession = {
 const mockSessionStore: Map<string, any> = new Map([
     [DEFAULT_MOCK_SESSION.id, DEFAULT_MOCK_SESSION],
 ])
+const mockSessionListeners: Map<string, Set<(session: TrainingSession | null) => void>> = new Map()
+
+function notifyMockSessionListeners(sessionId: string) {
+    const meta = mockSessionStore.get(sessionId) || null
+    const listeners = mockSessionListeners.get(sessionId)
+    if (listeners) {
+        listeners.forEach(fn => fn(meta ? { ...meta } : null))
+    }
+}
 
 // モック患者の初期状態（セッションIDを付与）
 mockStore.forEach((p, id) => {
@@ -126,6 +138,177 @@ function notifyMockListeners(patientId: number) {
     }
 }
 
+// ------------------------------------------------------------------
+// 端末ごとの「自分が開始した進行中アクション」管理（同時アクション時の自端末のみロック用）
+// ------------------------------------------------------------------
+const STORAGE_KEY_MY_ACTIONS = 'disaster_my_active_actions'
+
+export function getMyActiveAction(patientId: number): ActiveTreatment | null {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_MY_ACTIONS)
+        if (!raw) return null
+        const map = JSON.parse(raw) as Record<string, ActiveTreatment>
+        return map[String(patientId)] || null
+    } catch {
+        return null
+    }
+}
+
+export function setMyActiveAction(patientId: number, action: ActiveTreatment): void {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_MY_ACTIONS)
+        const map: Record<string, ActiveTreatment> = raw ? JSON.parse(raw) : {}
+        map[String(patientId)] = action
+        localStorage.setItem(STORAGE_KEY_MY_ACTIONS, JSON.stringify(map))
+    } catch (e) {
+        console.error('Failed to save my active action:', e)
+    }
+}
+
+export function clearMyActiveAction(patientId: number, actionId?: string): void {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_MY_ACTIONS)
+        if (!raw) return
+        const map = JSON.parse(raw) as Record<string, ActiveTreatment>
+        const current = map[String(patientId)]
+        if (!current) return
+        if (!actionId || current.action_id === actionId) {
+            delete map[String(patientId)]
+            localStorage.setItem(STORAGE_KEY_MY_ACTIONS, JSON.stringify(map))
+        }
+    } catch (e) {
+        console.error('Failed to clear my active action:', e)
+    }
+}
+
+// セッション状態のインメモリキャッシュ（一時停止中の自動完了抑制用）
+const sessionStatusCache: Map<string, TrainingSession> = new Map()
+const pendingAutoCompletions = new Set<string>()
+
+function updateSessionCache(session: TrainingSession | null) {
+    if (session?.id) {
+        sessionStatusCache.set(session.id, session)
+    }
+}
+
+/** 患者から現在の有効な進行中アクション一覧を取得（レガシー単一タイマー互換） */
+function getNormalizedActiveTreatments(patient: Patient): ActiveTreatment[] {
+    if (patient.active_treatments && patient.active_treatments.length > 0) {
+        return patient.active_treatments
+    }
+    if (
+        patient.status === '処置中' &&
+        patient.timer_started_at != null &&
+        patient.timer_duration_ms != null &&
+        patient.applied_treatment_id
+    ) {
+        return [{
+            action_id: `legacy_${patient.timer_started_at}`,
+            treatment_id: patient.applied_treatment_id,
+            started_at: patient.timer_started_at,
+            duration_ms: patient.timer_duration_ms,
+        }]
+    }
+    return []
+}
+
+/** 処置・診察開始時の患者ステータス算出ヘルパー */
+function applyStartTreatmentToPatient(data: Patient, newAction: ActiveTreatment, now: number) {
+    const existingActive = getNormalizedActiveTreatments(data)
+    const expired = existingActive.filter(at => now >= at.started_at + at.duration_ms)
+    const stillRunning = existingActive.filter(at => now < at.started_at + at.duration_ms)
+
+    const completed = [...(data.completed_treatments || [])]
+    for (const exp of expired) {
+        if (!completed.includes(exp.treatment_id)) {
+            completed.push(exp.treatment_id)
+        }
+    }
+    const nextActive = [...stillRunning, newAction]
+
+    return {
+        active_treatments: nextActive,
+        completed_treatments: completed,
+        timer_started_at: newAction.started_at,
+        timer_duration_ms: newAction.duration_ms,
+        applied_treatment_id: newAction.treatment_id,
+        status: '処置中' as Patient['status'],
+    }
+}
+
+/** 処置・診察完了時の患者ステータス算出ヘルパー */
+function applyCompleteTreatmentToPatient(data: Patient, targetActionIds?: string[] | string, now: number = Date.now()) {
+    const existingActive = getNormalizedActiveTreatments(data)
+    let toComplete: ActiveTreatment[] = []
+    let remaining: ActiveTreatment[] = []
+
+    if (targetActionIds !== undefined) {
+        const idSet = new Set(Array.isArray(targetActionIds) ? targetActionIds : [targetActionIds])
+        toComplete = existingActive.filter(at => idSet.has(at.action_id))
+        remaining = existingActive.filter(at => !idSet.has(at.action_id))
+    } else {
+        const expired = existingActive.filter(at => now >= at.started_at + at.duration_ms)
+        if (expired.length > 0) {
+            toComplete = expired
+            remaining = existingActive.filter(at => now < at.started_at + at.duration_ms)
+        } else if (existingActive.length > 0) {
+            // 手動強制完了など: 先頭または最後のアクションを完了
+            toComplete = [existingActive[existingActive.length - 1]]
+            remaining = existingActive.slice(0, -1)
+        }
+    }
+
+    const currentCompleted = data.completed_treatments || []
+    const newCompleted = [...currentCompleted]
+    if (toComplete.length > 0) {
+        for (const item of toComplete) {
+            if (item.treatment_id && !newCompleted.includes(item.treatment_id)) {
+                newCompleted.push(item.treatment_id)
+            }
+        }
+    } else if (targetActionIds === undefined && data.applied_treatment_id && !newCompleted.includes(data.applied_treatment_id)) {
+        // active_treatments も仮想タイマーも無いが applied_treatment_id だけ残っていた場合のフォールバック
+        newCompleted.push(data.applied_treatment_id)
+    }
+
+    // 必須処置がすべて完了したか判定
+    let isStabilized = data.stabilization_completed || false
+    let postVsTimeMs = data.post_vs_time_ms
+    if (data.required_treatments && data.required_treatments.length > 0) {
+        const requiredIds = data.required_treatments.map(rt => rt.treatment_id)
+        const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
+        if (allRequiredMet) {
+            isStabilized = true
+            if (!postVsTimeMs) postVsTimeMs = now
+        }
+    }
+
+    if (remaining.length > 0) {
+        const latest = remaining[remaining.length - 1]
+        return {
+            active_treatments: remaining,
+            completed_treatments: newCompleted,
+            stabilization_completed: isStabilized,
+            post_vs_time_ms: postVsTimeMs ?? null,
+            status: '処置中' as Patient['status'],
+            timer_started_at: latest.started_at,
+            timer_duration_ms: latest.duration_ms,
+            applied_treatment_id: latest.treatment_id,
+        }
+    }
+
+    return {
+        active_treatments: [] as ActiveTreatment[],
+        completed_treatments: newCompleted,
+        stabilization_completed: isStabilized,
+        post_vs_time_ms: postVsTimeMs ?? null,
+        status: (isStabilized ? '処置完了' : 'アセスメント完了') as Patient['status'],
+        timer_started_at: null,
+        timer_duration_ms: null,
+        applied_treatment_id: null,
+    }
+}
+
 /**
  * 患者の処置タイマーが満了（期限切れ）している場合、
  * 即座に「完了状態に変換した患者データ」を同期的に返却しつつ、
@@ -133,48 +316,45 @@ function notifyMockListeners(patientId: number) {
  */
 export function checkAutoTimerExpiration(patient: Patient | null): Patient | null {
     if (!patient) return null
-    if (
-        patient.status === '処置中' &&
-        patient.timer_started_at != null &&
-        patient.timer_duration_ms != null
-    ) {
-        const now = Date.now()
-        if (now >= (patient.timer_started_at + patient.timer_duration_ms)) {
-            // タイマーが満了しているため、非同期で completeTreatment を実行して永続化する
-            const isCorrect = (patient.required_treatments ?? []).some(
-                rt => rt.treatment_id === patient.applied_treatment_id
-            )
-            completeTreatment(patient.id, isCorrect).catch(e => console.error('Auto check complete error:', e))
 
-            // 同期的に即座に反映されたPatientオブジェクトを作成して返す（1周遅れ解消）
-            const addedId = patient.applied_treatment_id || 'unknown'
-            const currentCompleted = patient.completed_treatments || []
-            const newCompleted = currentCompleted.includes(addedId) ? currentCompleted : [...currentCompleted, addedId]
-
-            let isStabilized = patient.stabilization_completed || false
-            let postVsTimeMs = patient.post_vs_time_ms
-            if (patient.required_treatments && patient.required_treatments.length > 0) {
-                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
-                const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
-                if (allRequiredMet) {
-                    isStabilized = true
-                    if (!postVsTimeMs) postVsTimeMs = now
-                }
-            }
-
-            return {
-                ...patient,
-                status: isStabilized ? '処置完了' : 'アセスメント完了',
-                timer_started_at: null,
-                timer_duration_ms: null,
-                applied_treatment_id: null,
-                completed_treatments: newCompleted,
-                stabilization_completed: isStabilized,
-                post_vs_time_ms: postVsTimeMs,
-            }
+    // セッションが一時停止中または準備中の場合は自動完了を実行しない
+    if (patient.session_id) {
+        const cached = sessionStatusCache.get(patient.session_id) || mockSessionStore.get(patient.session_id)
+        if (cached?.status === 'paused' || cached?.status === 'preparing') {
+            return patient
         }
     }
-    return patient
+
+    const activeList = getNormalizedActiveTreatments(patient)
+    if (activeList.length === 0) return patient
+
+    const now = Date.now()
+    const expired = activeList.filter(at => now >= at.started_at + at.duration_ms)
+    if (expired.length === 0) return patient
+
+    const expiredIds = expired.map(at => at.action_id)
+    const lockKey = `${patient.id}:${expiredIds.join(',')}`
+    if (!pendingAutoCompletions.has(lockKey)) {
+        pendingAutoCompletions.add(lockKey)
+        completeTreatment(patient.id, true, expiredIds)
+            .catch(e => console.error('Auto check complete error:', e))
+            .finally(() => {
+                setTimeout(() => pendingAutoCompletions.delete(lockKey), 3000)
+            })
+    }
+
+    // 自端末のアクションが満了していたらローカル保存も掃除
+    const myAction = getMyActiveAction(patient.id)
+    if (myAction && expiredIds.includes(myAction.action_id)) {
+        clearMyActiveAction(patient.id, myAction.action_id)
+    }
+
+    const nextFields = applyCompleteTreatmentToPatient(patient, expiredIds, now)
+    return {
+        ...patient,
+        ...nextFields,
+        post_vs_time_ms: nextFields.post_vs_time_ms ?? patient.post_vs_time_ms,
+    }
 }
 
 // ------------------------------------------------------------------
@@ -531,61 +711,42 @@ export async function updatePatientDisposition(
     await updatePatientFlags(patientId, { disposition })
 }
 // ------------------------------------------------------------------
+// 処置・診察タイマーを開始する（診療エリアでは複数人同時アクション可）
+// ------------------------------------------------------------------
 export async function startTreatmentTimer(
     patientId: number,
     treatmentId: string,
     durationMinutes: number
-): Promise<void> {
+): Promise<ActiveTreatment> {
     const now = Date.now()
     const durationMs = durationMinutes * 60 * 1000
+    const actionId = `${treatmentId}_${now}_${Math.random().toString(36).slice(2, 6)}`
+    const newAction: ActiveTreatment = {
+        action_id: actionId,
+        treatment_id: treatmentId,
+        started_at: now,
+        duration_ms: durationMs,
+    }
+
+    // この端末自身が開始したアクションとして保存（自端末のみロック表示するため）
+    setMyActiveAction(patientId, newAction)
 
     if (getIsExperienceMode()) {
         const patient = getOrInitExperiencePatient(patientId)
         if (patient) {
-            if (patient.timer_started_at != null) {
-                const duration = patient.timer_duration_ms ?? 0
-                const isExpired = now >= (patient.timer_started_at + duration)
-                if (!isExpired) {
-                    throw new Error('ALREADY_LOCKED')
-                }
-                const prevTreatment = patient.applied_treatment_id
-                if (prevTreatment) {
-                    patient.completed_treatments = patient.completed_treatments || []
-                    patient.completed_treatments.push(prevTreatment)
-                }
-            }
-            patient.timer_started_at = now
-            patient.timer_duration_ms = durationMs
-            patient.applied_treatment_id = treatmentId
-            patient.status = '処置中'
+            Object.assign(patient, applyStartTreatmentToPatient(patient, newAction, now))
             notifyExperienceListeners(patientId)
         }
-        return
+        return newAction
     }
 
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {
-            if (patient.timer_started_at != null) {
-                const duration = patient.timer_duration_ms ?? 0
-                const isExpired = now >= (patient.timer_started_at + duration)
-                if (!isExpired) {
-                    throw new Error('ALREADY_LOCKED')
-                }
-                // 期限切れの場合は前の処置を自動完了として登録
-                const prevTreatment = patient.applied_treatment_id
-                if (prevTreatment) {
-                    patient.completed_treatments = patient.completed_treatments || []
-                    patient.completed_treatments.push(prevTreatment)
-                }
-            }
-            patient.timer_started_at = now
-            patient.timer_duration_ms = durationMs
-            patient.applied_treatment_id = treatmentId
-            patient.status = '処置中'
+            Object.assign(patient, applyStartTreatmentToPatient(patient, newAction, now))
             notifyMockListeners(patientId)
         }
-        return
+        return newAction
     }
 
     const docRef = doc(db, 'patients', String(patientId))
@@ -595,57 +756,27 @@ export async function startTreatmentTimer(
             throw new Error('Patient does not exist')
         }
         const data = docSnap.data() as Patient
-        let newCompleted = data.completed_treatments || []
-
-        if (data.timer_started_at != null) {
-            const duration = data.timer_duration_ms ?? 0
-            const isExpired = now >= (data.timer_started_at + duration)
-            if (!isExpired) {
-                throw new Error('ALREADY_LOCKED')
-            }
-            // 期限切れの場合は前の処置を自動完了として登録
-            if (data.applied_treatment_id) {
-                newCompleted = [...newCompleted, data.applied_treatment_id]
-            }
-        }
-        transaction.update(docRef, {
-            timer_started_at: now,
-            timer_duration_ms: durationMs,
-            applied_treatment_id: treatmentId,
-            completed_treatments: newCompleted,
-            status: '処置中',
-        })
+        const updates = applyStartTreatmentToPatient(data, newAction, now)
+        transaction.update(docRef, updates as Record<string, unknown>)
     })
+    return newAction
 }
 
 export async function completeTreatment(
     patientId: number,
-    _success: boolean
+    _success: boolean,
+    targetActionIds?: string[] | string
 ): Promise<void> {
+    const now = Date.now()
+
     if (getIsExperienceMode()) {
         const patient = getOrInitExperiencePatient(patientId)
         if (patient) {
-            const addedId = patient.applied_treatment_id || 'unknown'
-            patient.completed_treatments = patient.completed_treatments || []
-            patient.completed_treatments.push(addedId)
-            patient.timer_started_at = null
-            patient.timer_duration_ms = null
-            patient.applied_treatment_id = null
-
-            // 必須処置がすべて完了したか判定
-            let isStabilized = patient.stabilization_completed || false
-            if (patient.required_treatments && patient.required_treatments.length > 0) {
-                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
-                const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
-                if (allRequiredMet) {
-                    isStabilized = true
-                    patient.stabilization_completed = true
-                    if (!patient.post_vs_time_ms) {
-                        patient.post_vs_time_ms = Date.now()
-                    }
-                }
-            }
-            patient.status = isStabilized ? '処置完了' : 'アセスメント完了'
+            const updates = applyCompleteTreatmentToPatient(patient, targetActionIds, now)
+            Object.assign(patient, {
+                ...updates,
+                post_vs_time_ms: updates.post_vs_time_ms ?? patient.post_vs_time_ms,
+            })
             notifyExperienceListeners(patientId)
         }
         return
@@ -654,62 +785,36 @@ export async function completeTreatment(
     if (USE_MOCK || !db) {
         const patient = mockStore.get(patientId)
         if (patient) {
-            const addedId = patient.applied_treatment_id || 'unknown'
-            patient.completed_treatments = patient.completed_treatments || []
-            patient.completed_treatments.push(addedId)
-            patient.timer_started_at = null
-            patient.timer_duration_ms = null
-            patient.applied_treatment_id = null
-
-            // 必須処置がすべて完了したか判定
-            let isStabilized = patient.stabilization_completed || false
-            if (patient.required_treatments && patient.required_treatments.length > 0) {
-                const requiredIds = patient.required_treatments.map(rt => rt.treatment_id)
-                const allRequiredMet = requiredIds.every(id => patient.completed_treatments!.includes(id))
-                if (allRequiredMet) {
-                    isStabilized = true
-                    patient.stabilization_completed = true
-                    if (!patient.post_vs_time_ms) patient.post_vs_time_ms = Date.now()
-                }
-            }
-            
-            patient.status = isStabilized ? '処置完了' : 'アセスメント完了' // 継続して処置可能にする
-
+            const updates = applyCompleteTreatmentToPatient(patient, targetActionIds, now)
+            Object.assign(patient, {
+                ...updates,
+                post_vs_time_ms: updates.post_vs_time_ms ?? patient.post_vs_time_ms,
+            })
             notifyMockListeners(patientId)
         }
         return
     }
 
     const docRef = doc(db, 'patients', String(patientId))
-    const snap = await getDoc(docRef)
-    if (snap.exists()) {
+    await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(docRef)
+        if (!snap.exists()) return
         const p = snap.data() as Patient
-        const addedId = p.applied_treatment_id || 'unknown'
-        const currentCompleted = p.completed_treatments || []
-        const newCompleted = [...currentCompleted, addedId]
-
-        // 必須処置がすべて完了したか判定
-        let isStabilized = p.stabilization_completed || false
-        let postVsTimeMs = p.post_vs_time_ms
-        if (p.required_treatments && p.required_treatments.length > 0) {
-            const requiredIds = p.required_treatments.map(rt => rt.treatment_id)
-            const allRequiredMet = requiredIds.every(id => newCompleted.includes(id))
-            if (allRequiredMet) {
-                isStabilized = true
-                if (!postVsTimeMs) postVsTimeMs = Date.now()
-            }
+        const updates = applyCompleteTreatmentToPatient(p, targetActionIds, now)
+        const payload: Record<string, unknown> = {
+            active_treatments: updates.active_treatments,
+            completed_treatments: updates.completed_treatments,
+            stabilization_completed: updates.stabilization_completed,
+            status: updates.status,
+            timer_started_at: updates.timer_started_at,
+            timer_duration_ms: updates.timer_duration_ms,
+            applied_treatment_id: updates.applied_treatment_id,
         }
-
-        await updateDoc(docRef, {
-            status: isStabilized ? '処置完了' : 'アセスメント完了',
-            timer_started_at: null,
-            timer_duration_ms: null,
-            applied_treatment_id: null,
-            completed_treatments: newCompleted,
-            stabilization_completed: isStabilized,
-            post_vs_time_ms: postVsTimeMs,
-        })
-    }
+        if (updates.post_vs_time_ms != null) {
+            payload.post_vs_time_ms = updates.post_vs_time_ms
+        }
+        transaction.update(docRef, payload)
+    })
 }
 
 // ------------------------------------------------------------------
@@ -741,16 +846,19 @@ export interface SessionConfig {
     blackRatio: number
     sortBySeverity: boolean      // トリアージ順搬入
     useBasePatients: boolean     // 基礎25名（アプリ内蔵）を使用するか
-    examLockTimeMinutes: number  // 検査（画像・採血など）のデフォルト拘束時間
+    examLockTimeMinutes: number  // 身体診察・評価のデフォルト拘束時間
     treatmentLockTimeMinutes: number // 手技（点滴・外科処置など）のデフォルト拘束時間
     customProcedureLockTimes?: Record<string, number> // 手技別個別拘束時間設定 (分)
     isTestMode?: boolean         // 動作確認モード：全拘束時間を5秒に短縮
     selectedScenarios?: string[] // 使用するシナリオタグのリスト（空なら全対象）
     useExactScenarioMatch?: boolean // 指定したシナリオの患者を「そのまま全員」使用する（割合抽出を無視）
+    selectedPatientIds?: number[] // 個別選択モードで選ばれた患者ID一覧
+    startImmediately?: boolean    // true: 作成後すぐに訓練開始 / false: 事前準備（preparing）として作成
 }
 
 export async function createTrainingSession(config: SessionConfig): Promise<string> {
-    const sessionId = 'session_' + Date.now()
+    const now = Date.now()
+    const sessionId = 'session_' + now
     
     // Fisher-Yates shuffle
     const shuffle = (array: any[]) => {
@@ -783,61 +891,70 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
     const merged = [...allPool, ...firestorePool.filter(p => !idSet.has(p.id))]
     let pool = merged
 
-    // シナリオタグでフィルタリング
-    if (config.selectedScenarios && config.selectedScenarios.length > 0) {
-        pool = pool.filter(p => config.selectedScenarios!.includes(p.scenario_tag || '基本'))
-    }
-
+    // 個別選択された患者IDがある場合は最優先でその患者を抽出
     let selected: Patient[] = []
-
-    if (config.useExactScenarioMatch) {
-        // 割合指定を無視し、プールにある患者をそのまま全員使用する
-        selected = [...pool]
+    if (config.selectedPatientIds && config.selectedPatientIds.length > 0) {
+        const selectedIdSet = new Set(config.selectedPatientIds)
+        selected = pool.filter(p => selectedIdSet.has(p.id))
     } else {
-        // 重症度ごとに分類してランダム抽出
-        const reds = pool.filter(p => p.triage_color === '赤')
-        const yellows = pool.filter(p => p.triage_color === '黄')
-        const greens = pool.filter(p => p.triage_color === '緑')
-        const blacks = pool.filter(p => p.triage_color === '黒')
+        // シナリオタグでフィルタリング
+        if (config.selectedScenarios && config.selectedScenarios.length > 0) {
+            pool = pool.filter(p => config.selectedScenarios!.includes(p.scenario_tag || '基本'))
+        }
 
-        const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
-        const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
-        const targetGreen = Math.floor(config.totalPatients * (config.greenRatio / 100))
-        let targetBlack = config.totalPatients - (targetRed + targetYellow + targetGreen)
-        if (targetBlack < 0) targetBlack = 0
+        if (config.useExactScenarioMatch) {
+            // 割合指定を無視し、プールにある患者をそのまま全員使用する
+            selected = [...pool]
+        } else {
+            // 重症度ごとに分類してランダム抽出
+            const reds = pool.filter(p => p.triage_color === '赤')
+            const yellows = pool.filter(p => p.triage_color === '黄')
+            const greens = pool.filter(p => p.triage_color === '緑')
+            const blacks = pool.filter(p => p.triage_color === '黒')
 
-        selected = [
-            ...shuffle(reds).slice(0, targetRed),
-            ...shuffle(yellows).slice(0, targetYellow),
-            ...shuffle(greens).slice(0, targetGreen),
-            ...shuffle(blacks).slice(0, targetBlack)
-        ]
+            const targetRed = Math.floor(config.totalPatients * (config.redRatio / 100))
+            const targetYellow = Math.floor(config.totalPatients * (config.yellowRatio / 100))
+            const targetGreen = Math.floor(config.totalPatients * (config.greenRatio / 100))
+            let targetBlack = config.totalPatients - (targetRed + targetYellow + targetGreen)
+            if (targetBlack < 0) targetBlack = 0
 
-        // 人数が足りない場合は全カテゴリーからランダムに追加
-        if (selected.length < config.totalPatients) {
-            const remainingPool = shuffle(pool.filter(p => !selected.includes(p)))
-            selected.push(...remainingPool.slice(0, config.totalPatients - selected.length))
+            selected = [
+                ...shuffle(reds).slice(0, targetRed),
+                ...shuffle(yellows).slice(0, targetYellow),
+                ...shuffle(greens).slice(0, targetGreen),
+                ...shuffle(blacks).slice(0, targetBlack)
+            ]
+
+            // 人数が足りない場合は全カテゴリーからランダムに追加
+            if (selected.length < config.totalPatients) {
+                const remainingPool = shuffle(pool.filter(p => !selected.includes(p)))
+                selected.push(...remainingPool.slice(0, config.totalPatients - selected.length))
+            }
         }
     }
 
     // 順序の決定
     if (config.sortBySeverity) {
         const order: Record<string, number> = { '赤': 1, '黄': 2, '緑': 3, '黒': 4 }
-        selected.sort((a, b) => order[a.triage_color] - order[b.triage_color])
+        selected.sort((a, b) => (order[a.triage_color] || 9) - (order[b.triage_color] || 9))
     } else {
-        shuffle(selected)
+        selected = shuffle(selected)
     }
 
     // セッションに登録（新しいIDを付与して複製）
     // 動作確認モードの場合、全拘束時間を5秒に短縮する
     const TEST_MODE_LOCK_MINUTES = 5 / 60 // 5秒 = 0.0833...分
-    activeSessionId = sessionId
-    localStorage.setItem(STORAGE_KEY_SESSION, sessionId) // localStorage にも保存
+    const isStartingNow = config.startImmediately !== false
+    const sessionStartMs = isStartingNow ? now : 0
 
-    const sessionStartMs = Date.now()
+    if (isStartingNow) {
+        activeSessionId = sessionId
+        localStorage.setItem(STORAGE_KEY_SESSION, sessionId) // localStorage にも保存
+    }
+
     const sessionPatients = selected.map((p, index) => ({
         ...p,
-        id: sessionStartMs + index, // 新規一意ID
+        id: now + index, // 新規一意ID
         base_patient_id: p.id,
         session_id: sessionId,
         status: '初期状態' as any,
@@ -847,6 +964,7 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
         timer_duration_ms: null,
         applied_treatment_id: null,
         completed_treatments: [],
+        active_treatments: [],
         // 動作確認モード時は拘束時間を一律5秒に強制上書き、または個別カスタム時間が設定されていればそれを適用
         required_treatments: p.required_treatments?.map(rt => {
             if (config.isTestMode) {
@@ -859,22 +977,28 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
         }) || []
     }))
 
-    // セッションメタデータを作成
-    const sessionMeta = {
+    // セッションメタデータを作成（Firestore互換のため undefined を除去）
+    const sanitizedConfig = JSON.parse(JSON.stringify(config))
+    const sessionMeta: TrainingSession = {
         id: sessionId,
         title: config.title || `訓練セッション ${new Date().toLocaleString('ja-JP')}`,
+        createdAt: new Date().toISOString(),
         date: new Date().toISOString(),
-        isActive: true,
+        isActive: isStartingNow,
+        status: isStartingNow ? 'active' : 'preparing',
+        pausedAtMs: null,
+        totalPausedDurationMs: 0,
         examLockTimeMinutes: config.examLockTimeMinutes,
         treatmentLockTimeMinutes: config.treatmentLockTimeMinutes,
         isTestMode: config.isTestMode || false,
-        config,
+        config: sanitizedConfig,
         totalPatients: sessionPatients.length,
         sessionStartMs,
     }
 
-    // モックストアにも保存（モックモードで fetchActiveSessions が返せるように）
+    // モックストア・キャッシュにも保存
     mockSessionStore.set(sessionId, sessionMeta)
+    updateSessionCache(sessionMeta)
 
     for (const p of sessionPatients) {
         await createPatient(p)
@@ -882,7 +1006,6 @@ export async function createTrainingSession(config: SessionConfig): Promise<stri
 
     // Firestoreにセッションメタデータを保存
     if (!USE_MOCK && db) {
-        // sessions コレクションにセッションメタデータを保存
         const sessionRef = doc(db, 'sessions', sessionId)
         await setDoc(sessionRef, sessionMeta as any)
     }
@@ -900,20 +1023,47 @@ export function setActiveSession(sessionId: string | null) {
 }
 
 // ------------------------------------------------------------------
-// アクティブな訓練セッション一覧を取得する
+// アクティブな訓練セッション一覧を取得する（プレイヤー参加可能：訓練中のみ）
 // ------------------------------------------------------------------
 export async function fetchActiveSessions(): Promise<TrainingSession[]> {
+    const isJoinable = (s: TrainingSession) => {
+        const st = s.status || (s.isActive ? 'active' : 'ended')
+        return st === 'active'
+    }
+
     if (USE_MOCK || !db) {
-        // モックストアからアクティブなセッションを返す
         const sessions: TrainingSession[] = []
-        mockSessionStore.forEach((meta, _id) => {
-            if (meta.isActive) sessions.push(meta as TrainingSession)
+        mockSessionStore.forEach((meta) => {
+            if (isJoinable(meta as TrainingSession)) sessions.push(meta as TrainingSession)
         })
         return sessions
     }
     const collRef = collection(db, 'sessions')
     const snap = await getDocs(query(collRef, where('isActive', '==', true)))
-    return snap.docs.map(doc => doc.data() as TrainingSession)
+    return snap.docs
+        .map(d => d.data() as TrainingSession)
+        .filter(isJoinable)
+}
+
+// ------------------------------------------------------------------
+// 管理画面用：全セッション一覧（準備中・訓練中・一時停止・終了済み）を取得
+// ------------------------------------------------------------------
+export async function fetchManageableSessions(): Promise<TrainingSession[]> {
+    let sessions: TrainingSession[] = []
+    if (USE_MOCK || !db) {
+        mockSessionStore.forEach((meta) => {
+            sessions.push(meta as TrainingSession)
+        })
+    } else {
+        const snap = await getDocs(collection(db, 'sessions'))
+        sessions = snap.docs.map(d => d.data() as TrainingSession)
+    }
+    sessions.forEach(updateSessionCache)
+    return sessions.sort((a, b) => {
+        const ta = new Date(a.createdAt || a.date || 0).getTime()
+        const tb = new Date(b.createdAt || b.date || 0).getTime()
+        return tb - ta
+    })
 }
 
 // ------------------------------------------------------------------
@@ -921,27 +1071,222 @@ export async function fetchActiveSessions(): Promise<TrainingSession[]> {
 // ------------------------------------------------------------------
 export async function fetchTrainingSession(sessionId: string): Promise<TrainingSession | null> {
     if (USE_MOCK || !db) {
-        // モックストアから取得
         const meta = mockSessionStore.get(sessionId)
-        if (meta) return meta as TrainingSession
+        if (meta) {
+            updateSessionCache(meta as TrainingSession)
+            return meta as TrainingSession
+        }
         return null
     }
     const docRef = doc(db, 'sessions', sessionId)
     const snap = await getDoc(docRef)
     if (snap.exists()) {
-        return snap.data() as TrainingSession
+        const data = snap.data() as TrainingSession
+        updateSessionCache(data)
+        return data
     }
     return null
+}
+
+// ------------------------------------------------------------------
+// セッション情報をリアルタイム購読する（一時停止・再開・開始状態の同期用）
+// ------------------------------------------------------------------
+export function subscribeToTrainingSession(
+    sessionId: string,
+    callback: (session: TrainingSession | null) => void
+): Unsubscribe {
+    if (USE_MOCK || !db) {
+        const current = mockSessionStore.get(sessionId) || null
+        updateSessionCache(current)
+        callback(current ? { ...current } : null)
+
+        if (!mockSessionListeners.has(sessionId)) {
+            mockSessionListeners.set(sessionId, new Set())
+        }
+        const wrapped = (s: TrainingSession | null) => {
+            updateSessionCache(s)
+            callback(s)
+        }
+        mockSessionListeners.get(sessionId)!.add(wrapped)
+        return () => {
+            mockSessionListeners.get(sessionId)?.delete(wrapped)
+        }
+    }
+
+    const docRef = doc(db, 'sessions', sessionId)
+    return onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+            const data = snap.data() as TrainingSession
+            updateSessionCache(data)
+            callback(data)
+        } else {
+            callback(null)
+        }
+    })
+}
+
+// ------------------------------------------------------------------
+// 準備中のセッションを開始する（この瞬間からプレイヤー選択可能＆悪化開始）
+// ------------------------------------------------------------------
+export async function startTrainingSession(sessionId: string): Promise<void> {
+    const now = Date.now()
+    const updates = {
+        status: 'active' as const,
+        isActive: true,
+        sessionStartMs: now,
+        pausedAtMs: null,
+        totalPausedDurationMs: 0,
+    }
+
+    if (USE_MOCK || !db) {
+        const meta = mockSessionStore.get(sessionId)
+        if (meta) {
+            const updated = { ...meta, ...updates }
+            mockSessionStore.set(sessionId, updated)
+            updateSessionCache(updated)
+            notifyMockSessionListeners(sessionId)
+        }
+        mockStore.forEach((p, id) => {
+            if (p.session_id === sessionId) {
+                p.reception_time_ms = now
+                notifyMockListeners(id)
+            }
+        })
+        setActiveSession(sessionId)
+        return
+    }
+
+    await updateDoc(doc(db, 'sessions', sessionId), updates)
+    const updatedSession = await fetchTrainingSession(sessionId)
+    if (updatedSession) updateSessionCache(updatedSession)
+
+    const q = query(collection(db, 'patients'), where('session_id', '==', sessionId))
+    const snap = await getDocs(q)
+    for (let i = 0; i < snap.docs.length; i += 450) {
+        const batch = writeBatch(db)
+        snap.docs.slice(i, i + 450).forEach(d => {
+            batch.update(d.ref, { reception_time_ms: now })
+        })
+        await batch.commit()
+    }
+    setActiveSession(sessionId)
+}
+
+// ------------------------------------------------------------------
+// 進行中のセッションを一時停止する
+// ------------------------------------------------------------------
+export async function pauseTrainingSession(sessionId: string): Promise<void> {
+    const now = Date.now()
+    const updates = {
+        status: 'paused' as const,
+        isActive: true,
+        pausedAtMs: now,
+    }
+
+    if (USE_MOCK || !db) {
+        const meta = mockSessionStore.get(sessionId)
+        if (meta) {
+            const updated = { ...meta, ...updates }
+            mockSessionStore.set(sessionId, updated)
+            updateSessionCache(updated)
+            notifyMockSessionListeners(sessionId)
+        }
+        return
+    }
+
+    await updateDoc(doc(db, 'sessions', sessionId), updates)
+    const updatedSession = await fetchTrainingSession(sessionId)
+    if (updatedSession) updateSessionCache(updatedSession)
+}
+
+// ------------------------------------------------------------------
+// 一時停止中のセッションを再開する（停止していた時間分だけ各種開始時刻をスライド）
+// ------------------------------------------------------------------
+export async function resumeTrainingSession(sessionId: string): Promise<void> {
+    const now = Date.now()
+    const currentSession = await fetchTrainingSession(sessionId)
+    if (!currentSession) return
+
+    const deltaMs = currentSession.pausedAtMs ? Math.max(0, now - currentSession.pausedAtMs) : 0
+    const nextSessionStartMs = currentSession.sessionStartMs ? currentSession.sessionStartMs + deltaMs : now
+    const nextTotalPaused = (currentSession.totalPausedDurationMs || 0) + deltaMs
+
+    const sessionUpdates = {
+        status: 'active' as const,
+        isActive: true,
+        pausedAtMs: null,
+        sessionStartMs: nextSessionStartMs,
+        totalPausedDurationMs: nextTotalPaused,
+    }
+
+    const slidePatientTiming = (p: Patient) => {
+        const pUpdates: Partial<Patient> = {}
+        if (p.reception_time_ms && p.reception_time_ms > 0) {
+            pUpdates.reception_time_ms = p.reception_time_ms + deltaMs
+        }
+        if (p.timer_started_at != null) {
+            pUpdates.timer_started_at = p.timer_started_at + deltaMs
+        }
+        if (p.active_treatments && p.active_treatments.length > 0) {
+            pUpdates.active_treatments = p.active_treatments.map(at => ({
+                ...at,
+                started_at: at.started_at + deltaMs,
+            }))
+        }
+        return pUpdates
+    }
+
+    if (USE_MOCK || !db) {
+        const meta = mockSessionStore.get(sessionId)
+        if (meta) {
+            const updated = { ...meta, ...sessionUpdates }
+            mockSessionStore.set(sessionId, updated)
+            updateSessionCache(updated)
+            notifyMockSessionListeners(sessionId)
+        }
+        mockStore.forEach((p, id) => {
+            if (p.session_id === sessionId) {
+                Object.assign(p, slidePatientTiming(p))
+                notifyMockListeners(id)
+            }
+        })
+        return
+    }
+
+    await updateDoc(doc(db, 'sessions', sessionId), sessionUpdates)
+    const updatedSession = await fetchTrainingSession(sessionId)
+    if (updatedSession) updateSessionCache(updatedSession)
+
+    if (deltaMs > 0) {
+        const q = query(collection(db, 'patients'), where('session_id', '==', sessionId))
+        const snap = await getDocs(q)
+        for (let i = 0; i < snap.docs.length; i += 450) {
+            const batch = writeBatch(db)
+            snap.docs.slice(i, i + 450).forEach(d => {
+                const pData = d.data() as Patient
+                const pUpdates = slidePatientTiming(pData)
+                if (Object.keys(pUpdates).length > 0) {
+                    batch.update(d.ref, pUpdates as Record<string, unknown>)
+                }
+            })
+            await batch.commit()
+        }
+    }
 }
 
 // ------------------------------------------------------------------
 // セッションを終了する
 // ------------------------------------------------------------------
 export async function endTrainingSession(sessionId: string): Promise<void> {
+    const updates = { isActive: false, status: 'ended' as const, pausedAtMs: null }
     if (USE_MOCK || !db) {
-        // モックストアでも isActive を false に更新
         const meta = mockSessionStore.get(sessionId)
-        if (meta) mockSessionStore.set(sessionId, { ...meta, isActive: false })
+        if (meta) {
+            const updated = { ...meta, ...updates }
+            mockSessionStore.set(sessionId, updated)
+            updateSessionCache(updated)
+            notifyMockSessionListeners(sessionId)
+        }
         if (activeSessionId === sessionId) {
             activeSessionId = null
             localStorage.removeItem(STORAGE_KEY_SESSION)
@@ -949,7 +1294,9 @@ export async function endTrainingSession(sessionId: string): Promise<void> {
         return
     }
     const docRef = doc(db, 'sessions', sessionId)
-    await updateDoc(docRef, { isActive: false })
+    await updateDoc(docRef, updates)
+    const updatedSession = await fetchTrainingSession(sessionId)
+    if (updatedSession) updateSessionCache(updatedSession)
     if (activeSessionId === sessionId) {
         activeSessionId = null
         localStorage.removeItem(STORAGE_KEY_SESSION)

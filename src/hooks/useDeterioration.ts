@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Patient, VitalSignStruct } from '../types/patient'
+import { Patient, TrainingSession, VitalSignStruct } from '../types/patient'
+import { subscribeToTrainingSession, activeSessionId } from '../lib/firestore'
 
 interface DeteriorationResult {
     currentVitalsText: string
@@ -139,6 +140,19 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
     const [currentVitalsStruct, setCurrentVitalsStruct] = useState<VitalSignStruct | null>(null)
     const [progressPercent, setProgressPercent] = useState(0)
     const [isDeteriorating, setIsDeteriorating] = useState(false)
+    const [session, setSession] = useState<TrainingSession | null>(null)
+
+    const targetSessionId = patient?.session_id || activeSessionId
+    useEffect(() => {
+        if (!targetSessionId) {
+            setSession(null)
+            return
+        }
+        const unsub = subscribeToTrainingSession(targetSessionId, (s) => setSession(s))
+        return () => unsub()
+    }, [targetSessionId])
+
+    const isPaused = session?.status === 'paused'
 
     useEffect(() => {
         if (!patient) return
@@ -214,7 +228,7 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
         const startMs = patient.reception_time_ms
 
         const updateTimer = () => {
-            const now = Date.now()
+            const now = isPaused && session?.pausedAtMs ? session.pausedAtMs : Date.now()
             const elapsed = Math.max(0, now - startMs)
             
             // 進行度合い (0.0 〜 1.0)
@@ -253,17 +267,21 @@ export function useDeterioration(patient: Patient | null): DeteriorationResult {
             setCurrentVitalsStruct(currentStruct)
             setCurrentVitalsText(formatVitals(currentStruct))
             setProgressPercent(Math.round(progress * 100))
-            setIsDeteriorating(true)
+            setIsDeteriorating(!isPaused)
         }
 
         // 即時実行
         updateTimer()
 
+        if (isPaused) {
+            return
+        }
+
         // 1秒ごとに更新
         const intervalId = setInterval(updateTimer, 1000)
 
         return () => clearInterval(intervalId)
-    }, [patient])
+    }, [patient, isPaused, session?.pausedAtMs])
 
     return { currentVitalsText, currentVitalsStruct, progressPercent, isDeteriorating }
 }

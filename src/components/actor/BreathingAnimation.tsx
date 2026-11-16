@@ -12,6 +12,9 @@ const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose })
     useWakeLock(true)
 
     useEffect(() => {
+        if (cpm <= 0) {
+            return
+        }
         // AudioContextの初期化
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext
         audioCtxRef.current = new AudioContext()
@@ -80,7 +83,7 @@ const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose })
         }
     }, [cpm])
 
-    const durationSeconds = 60 / cpm
+    const durationSeconds = cpm > 0 ? 60 / cpm : 0
 
     useEffect(() => {
         // 表示時にスクロール位置を最上部に固定
@@ -92,21 +95,27 @@ const BreathingAnimation: React.FC<BreathingAnimationProps> = ({ cpm, onClose })
             <button className="actor-animation-overlay__close" onClick={onClose} aria-label="閉じる">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <div className="breathing-container" style={{ animationDuration: `${durationSeconds}s` }}>
-                <div className="wind-wave wind-wave--left" style={{ animationDuration: `${durationSeconds}s` }}></div>
-                <div className="wind-wave wind-wave--right" style={{ animationDuration: `${durationSeconds}s` }}></div>
-                
-                <div className="breathing-particles" style={{ animationDuration: `${durationSeconds}s` }}>
-                    {/* 小さな空気のパーティクル（CSSで表現）*/}
-                    <div className="particle"></div>
-                    <div className="particle"></div>
-                    <div className="particle"></div>
-                    <div className="particle"></div>
-                    <div className="particle"></div>
-                </div>
+            {cpm > 0 ? (
+                <div className="breathing-container" style={{ animationDuration: `${durationSeconds}s` }}>
+                    <div className="wind-wave wind-wave--left" style={{ animationDuration: `${durationSeconds}s` }}></div>
+                    <div className="wind-wave wind-wave--right" style={{ animationDuration: `${durationSeconds}s` }}></div>
+                    
+                    <div className="breathing-particles" style={{ animationDuration: `${durationSeconds}s` }}>
+                        {/* 小さな空気のパーティクル（CSSで表現）*/}
+                        <div className="particle"></div>
+                        <div className="particle"></div>
+                        <div className="particle"></div>
+                        <div className="particle"></div>
+                        <div className="particle"></div>
+                    </div>
 
-                <div className="breathing-text">RR: {cpm} 回/分</div>
-            </div>
+                    <div className="breathing-text">RR: {cpm} 回/分</div>
+                </div>
+            ) : (
+                <div className="breathing-container">
+                    <div className="breathing-text" style={{ color: '#fca5a5' }}>RR: 0 回/分（自発呼吸停止）</div>
+                </div>
+            )}
             <button
                 onClick={onClose}
                 className="button button--secondary"

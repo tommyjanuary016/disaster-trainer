@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Patient } from '../types/patient'
-import { endTrainingSession, activeSessionId, fetchTrainingSession } from '../lib/firestore'
-import { exportCSV } from '../lib/csv'
+import { Patient, TrainingSession } from '../types/patient'
+import {
+    endTrainingSession,
+    startTrainingSession,
+    pauseTrainingSession,
+    resumeTrainingSession,
+    activeSessionId,
+    subscribeToTrainingSession,
+} from '../lib/firestore'
 import { PROCEDURE_NAMES } from '../pages/TreatmentScanPage'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
 
 interface DashboardTabProps {
     patients: Patient[]
+    sessionId?: string | null
     isSessionEndedParent?: boolean
 }
 
@@ -168,7 +175,7 @@ const CircularTTDGauge: React.FC<{
     )
 }
 
-const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedParent }) => {
+const DashboardTab: React.FC<DashboardTabProps> = ({ patients, sessionId, isSessionEndedParent }) => {
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [nowMs, setNowMs] = useState<number>(() => Date.now())
     const [isSessionEnded, setIsSessionEnded] = useState(isSessionEndedParent || false)
@@ -176,8 +183,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
     const [showSummary, setShowSummary] = useState(false)
     const [sessionStartMs, setSessionStartMs] = useState<number | null>(null)
     const [sessionTitle, setSessionTitle] = useState<string>('DISASTER LOGIC HQ')
+    const [sessionMeta, setSessionMeta] = useState<TrainingSession | null>(null)
     const [viewMode, setViewMode] = useState<'command' | 'table'>('command')
     const [isCompactView, setIsCompactView] = useState(false)
+    const [isUpdatingState, setIsUpdatingState] = useState(false)
+
+    const targetSessionId = sessionId ?? activeSessionId
 
     // 災害対策本部ダッシュボード表示中はモニターの画面スリープを自動防止
     useWakeLock(true)
@@ -199,35 +210,61 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
         }
     }, [isSessionEndedParent])
 
-    // セッション開始時刻をFirestoreメタデータから取得
+    // セッションメタデータ（開始時刻・一時停止・タイトル）をリアルタイム購読
     useEffect(() => {
-        if (!activeSessionId) {
+        if (!targetSessionId) {
+            setSessionMeta(null)
             setSessionStartMs(null)
             return
         }
-        fetchTrainingSession(activeSessionId).then(session => {
-            if (session?.sessionStartMs) {
+        const unsub = subscribeToTrainingSession(targetSessionId, session => {
+            setSessionMeta(session)
+            if (session?.sessionStartMs && session.sessionStartMs > 0) {
                 setSessionStartMs(session.sessionStartMs)
+            } else {
+                setSessionStartMs(null)
             }
             if (session?.title) {
                 setSessionTitle(session.title)
             }
-        }).catch(() => {})
-    }, [activeSessionId])
+            if (session?.status === 'ended' || session?.isActive === false) {
+                setIsSessionEnded(true)
+            } else if (session?.status === 'active' || session?.status === 'paused' || session?.status === 'preparing') {
+                setIsSessionEnded(false)
+            }
+        })
+        return () => unsub()
+    }, [targetSessionId])
+
+    const sessionStatus = sessionMeta?.status || (isSessionEnded ? 'ended' : sessionMeta?.isActive ? 'active' : 'active')
+    const isPreparing = sessionStatus === 'preparing'
+    const isPaused = sessionStatus === 'paused'
 
     // 1秒ごとのリアルタイムクロック更新（経過時間＋各患者のTTDカウントダウン同期用）
     useEffect(() => {
         const tick = () => {
+            if (isPaused && sessionMeta?.pausedAtMs) {
+                setNowMs(sessionMeta.pausedAtMs)
+                if (sessionStartMs && targetSessionId) {
+                    setElapsedSeconds(Math.max(0, Math.floor((sessionMeta.pausedAtMs - sessionStartMs) / 1000)))
+                }
+                return
+            }
             const current = Date.now()
             setNowMs(current)
-            if (!isSessionEnded && sessionStartMs && activeSessionId) {
-                setElapsedSeconds(Math.floor((current - sessionStartMs) / 1000))
+            if (isPreparing) {
+                setElapsedSeconds(0)
+                return
+            }
+            if (!isSessionEnded && sessionStartMs && targetSessionId) {
+                setElapsedSeconds(Math.max(0, Math.floor((current - sessionStartMs) / 1000)))
             }
         }
         tick()
+        if (isPaused || isPreparing) return
         const intervalId = setInterval(tick, 1000)
         return () => clearInterval(intervalId)
-    }, [sessionStartMs, isSessionEnded])
+    }, [sessionStartMs, isSessionEnded, isPaused, isPreparing, sessionMeta?.pausedAtMs, targetSessionId])
 
     // 患者データ変化の監視 → ライブ・アクティビティ・ティッカーの自動生成 ＆ 急変アラーム音
     useEffect(() => {
@@ -386,16 +423,55 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
 
     const displaySec = isSessionEnded && frozenElapsedSec !== null ? frozenElapsedSec : elapsedSeconds
     const formattedTime = msToDisplay(displaySec * 1000)
-    const showTimer = !!activeSessionId && sessionStartMs !== null
+    const showTimer = !!targetSessionId && (sessionStartMs !== null || isPreparing)
+
+    const handleStartSession = async () => {
+        if (!targetSessionId || isUpdatingState) return
+        if (!window.confirm('訓練を開始しますか？\n（この瞬間からプレイヤーがセッションを選択でき、経過時間と急変カウントダウンが始まります）')) return
+        setIsUpdatingState(true)
+        try {
+            await startTrainingSession(targetSessionId)
+            soundEngine.playVitalMonitorBeep()
+        } catch (e) {
+            console.error('Failed to start session', e)
+        } finally {
+            setIsUpdatingState(false)
+        }
+    }
+
+    const handlePauseSession = async () => {
+        if (!targetSessionId || isUpdatingState) return
+        setIsUpdatingState(true)
+        try {
+            await pauseTrainingSession(targetSessionId)
+        } catch (e) {
+            console.error('Failed to pause session', e)
+        } finally {
+            setIsUpdatingState(false)
+        }
+    }
+
+    const handleResumeSession = async () => {
+        if (!targetSessionId || isUpdatingState) return
+        setIsUpdatingState(true)
+        try {
+            await resumeTrainingSession(targetSessionId)
+            soundEngine.playVitalMonitorBeep()
+        } catch (e) {
+            console.error('Failed to resume session', e)
+        } finally {
+            setIsUpdatingState(false)
+        }
+    }
 
     const handleEndSession = async () => {
         if (window.confirm('訓練を終了しますか？タイマーを停止し、セッションを完了状態にします。')) {
             setFrozenElapsedSec(elapsedSeconds)
             setIsSessionEnded(true)
             soundEngine.playTreatmentComplete()
-            if (activeSessionId) {
+            if (targetSessionId) {
                 try {
-                    await endTrainingSession(activeSessionId)
+                    await endTrainingSession(targetSessionId)
                 } catch (e) {
                     console.error('Failed to end session', e)
                 }
@@ -527,16 +603,56 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
 
                 {/* 中央：SESSION ACTIVE & Elapsed Mission Timer */}
                 <div className="hq-topbar__mission">
-                    <div className="hq-topbar__status-badge">
-                        <span className={`hq-topbar__dot ${isSessionEnded ? 'hq-topbar__dot--ended' : ''}`} />
-                        {isSessionEnded ? 'MISSION COMPLETED' : 'SESSION ACTIVE'}
+                    <div className="hq-topbar__status-badge" style={
+                        isPreparing ? { background: 'rgba(59, 130, 246, 0.2)', borderColor: '#60a5fa', color: '#93c5fd' } :
+                        isPaused ? { background: 'rgba(245, 158, 11, 0.2)', borderColor: '#f59e0b', color: '#fcd34d' } :
+                        undefined
+                    }>
+                        <span className={`hq-topbar__dot ${isSessionEnded || isPaused || isPreparing ? 'hq-topbar__dot--ended' : ''}`}
+                            style={
+                                isPaused ? { background: '#f59e0b' } :
+                                isPreparing ? { background: '#60a5fa' } :
+                                undefined
+                            }
+                        />
+                        {isSessionEnded ? 'MISSION COMPLETED' : isPreparing ? 'PREPARING (未開始)' : isPaused ? 'PAUSED (一時停止中)' : 'SESSION ACTIVE'}
                     </div>
                     <div className="hq-topbar__timer">
                         <span className="hq-topbar__timer-label">Elapsed mission:</span>
                         <span className="hq-topbar__timer-val">{showTimer ? formattedTime : '00:00'}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.4rem', marginLeft: '0.5rem' }}>
-                        {showTimer && !isSessionEnded && (
+                    <div style={{ display: 'flex', gap: '0.4rem', marginLeft: '0.5rem', flexWrap: 'wrap' }}>
+                        {isPreparing && !isSessionEnded && (
+                            <button
+                                onClick={handleStartSession}
+                                disabled={isUpdatingState}
+                                className="hq-btn hq-btn--primary"
+                                style={{ background: '#10b981', borderColor: '#10b981', color: '#ffffff', fontWeight: 'bold' }}
+                            >
+                                ▶️ 訓練開始
+                            </button>
+                        )}
+                        {!isPreparing && !isSessionEnded && !isPaused && (
+                            <button
+                                onClick={handlePauseSession}
+                                disabled={isUpdatingState}
+                                className="hq-btn"
+                                style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#0f172a', fontWeight: 'bold' }}
+                            >
+                                ⏸️ 一時停止
+                            </button>
+                        )}
+                        {!isPreparing && !isSessionEnded && isPaused && (
+                            <button
+                                onClick={handleResumeSession}
+                                disabled={isUpdatingState}
+                                className="hq-btn"
+                                style={{ background: '#10b981', borderColor: '#10b981', color: '#ffffff', fontWeight: 'bold' }}
+                            >
+                                ▶️ 再開する
+                            </button>
+                        )}
+                        {showTimer && !isSessionEnded && !isPreparing && (
                             <button
                                 onClick={handleEndSession}
                                 className="hq-btn hq-btn--danger"
@@ -773,9 +889,17 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, isSessionEndedPar
                                                         {/* 処置ステータス＆プログレスバー */}
                                                         <div className="hq-patient-card__progress-meta">
                                                             <span>
-                                                                {p.status === '処置中' && p.applied_treatment_id
-                                                                    ? `💉 ${PROCEDURE_NAMES[p.applied_treatment_id] || p.applied_treatment_id}`
-                                                                    : `処置進捗 (${doneReqCount}/${reqList.length})`}
+                                                                {(() => {
+                                                                    const running = (p.active_treatments || []).filter(at => nowMs < at.started_at + at.duration_ms)
+                                                                    if (running.length > 0) {
+                                                                        const first = PROCEDURE_NAMES[running[0].treatment_id] || running[0].treatment_id
+                                                                        return running.length > 1 ? `💉 ${first} 他${running.length - 1}件` : `💉 ${first}`
+                                                                    }
+                                                                    if (p.status === '処置中' && p.applied_treatment_id) {
+                                                                        return `💉 ${PROCEDURE_NAMES[p.applied_treatment_id] || p.applied_treatment_id}`
+                                                                    }
+                                                                    return `処置進捗 (${doneReqCount}/${reqList.length})`
+                                                                })()}
                                                             </span>
                                                             <span>{progressRatio}%</span>
                                                         </div>

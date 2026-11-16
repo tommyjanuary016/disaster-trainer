@@ -25,6 +25,14 @@ export interface RequiredTreatment {
     lock_timer_minutes: number
 }
 
+// 同時進行中の処置・診察アクション（診療エリアでの並行アクション対応）
+export interface ActiveTreatment {
+    action_id: string
+    treatment_id: string
+    started_at: number
+    duration_ms: number
+}
+
 export interface VitalSignStruct {
     sbp: number;     // 収縮期血圧 (mmHg)
     dbp: number;     // 拡張期血圧 (mmHg)
@@ -96,6 +104,7 @@ export interface Patient {
     timer_duration_ms: number | null // ロックタイマー合計時間（ms）
     applied_treatment_id: string | null // 実施された処置ID
     completed_treatments?: string[] // 完了した処置IDのリスト
+    active_treatments?: ActiveTreatment[] // 同時進行中の診察・処置リスト
     
     // 新しいフラグ
     tests_completed?: boolean // 放射線・検査科での検査が完了したか
@@ -126,16 +135,23 @@ export interface PatientDisposition {
     disposition_by: 'staff' | 'actor'     // 医療スタッフ入力か、模擬患者本人入力か
 }
 
+// セッションの進行状態
+export type SessionStatus = 'preparing' | 'active' | 'paused' | 'ended'
+
 // 訓練セッションの型定義
 export interface TrainingSession {
     id: string;
     title: string;
     date: string;
+    createdAt?: string;
     isActive: boolean;
+    status?: SessionStatus;        // 準備中 / 訓練中 / 一時停止 / 終了（未定義時は isActive で判定）
+    pausedAtMs?: number | null;    // 一時停止した時刻（UNIX ms）
+    totalPausedDurationMs?: number; // 累計の一時停止時間（ms）
     totalPatients: number;
     examLockTimeMinutes?: number;
     treatmentLockTimeMinutes?: number;
     isTestMode?: boolean;         // 動作確認モード（全拘束時間5秒）
-    sessionStartMs?: number;      // セッション作成時のUNIXタイムスタンプ（ms）
+    sessionStartMs?: number;      // セッション開始時のUNIXタイムスタンプ（ms）
     config?: any;                 // セッションの設定全体
 }

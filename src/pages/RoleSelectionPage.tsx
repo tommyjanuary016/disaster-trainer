@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRole, Role } from '../hooks/useRole'
-import { activeSessionId } from '../lib/firestore'
+import { activeSessionId, subscribeToTrainingSession } from '../lib/firestore'
+import { TrainingSession } from '../types/patient'
 import { generateInlineQrSvg } from '../lib/inlineQr'
 
 // 各ロールの定義
@@ -87,6 +88,13 @@ const RoleSelectionPage: React.FC = () => {
     const [showShareModal, setShowShareModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
     const [hoveredRole, setHoveredRole] = useState<string | null>(null)
+    const [sessionMeta, setSessionMeta] = useState<TrainingSession | null>(null)
+
+    useEffect(() => {
+        if (!activeSessionId) return
+        const unsub = subscribeToTrainingSession(activeSessionId, (s) => setSessionMeta(s))
+        return () => unsub()
+    }, [])
 
     const handleSelectRole = (role: Role | '模擬患者', path: string) => {
         if (role !== '模擬患者') {
@@ -95,7 +103,9 @@ const RoleSelectionPage: React.FC = () => {
         navigate(path)
     }
 
-    if (!activeSessionId) {
+    const sessionStatus = sessionMeta?.status || (sessionMeta?.isActive === false ? 'ended' : 'active')
+
+    if (!activeSessionId || sessionStatus === 'ended') {
         return (
             <div className="role-selection-page" style={{ padding: '2rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
                 <div className="card card--elevated" style={{ maxWidth: '420px', width: '100%', textAlign: 'center', padding: '2rem', borderRadius: '16px' }}>
@@ -113,6 +123,28 @@ const RoleSelectionPage: React.FC = () => {
                         </button>
                         <button className="button button--secondary" onClick={() => navigate('/admin')}>
                             ⚙️ 管理者画面へ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (sessionStatus === 'preparing') {
+        return (
+            <div className="role-selection-page" style={{ padding: '2rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="card card--elevated" style={{ maxWidth: '420px', width: '100%', textAlign: 'center', padding: '2rem', borderRadius: '16px' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '0.5rem' }}>
+                        訓練開始を待機中...
+                    </h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--gray-600)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                        セッション「<strong>{sessionMeta?.title || activeSessionId}</strong>」は現在準備中です。<br />
+                        管理者が訓練を開始すると、自動的に役割選択画面へ切り替わります。
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <button className="button button--secondary" onClick={() => navigate('/')}>
+                            🏠 アプリトップに戻る
                         </button>
                     </div>
                 </div>

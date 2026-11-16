@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { parseQRCode } from '../types/qr'
-import { fetchPatientFlexible, activeSessionId, fetchTrainingSession, fetchActiveSessions, setActiveSession, subscribeToAllPatients } from '../lib/firestore'
+import { fetchPatientFlexible, activeSessionId, subscribeToTrainingSession, fetchActiveSessions, setActiveSession, subscribeToAllPatients } from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
 import QRConfirmModal from '../components/QRConfirmModal'
 import { startRobustQRScanner } from '../lib/qrScannerHelper'
@@ -31,6 +31,7 @@ const QRScannerPage: React.FC = () => {
     const [sessionPatients, setSessionPatients] = useState<Patient[]>([])
     const [isLoadingPatients, setIsLoadingPatients] = useState(false)
     const [isTestMode, setIsTestMode] = useState(false)
+    const [sessionStatus, setSessionStatus] = useState<string>('active')
     const [recentPatients, setRecentPatients] = useState<Patient[]>([])
     const STORAGE_KEY = 'recent_scanned_patients'
 
@@ -40,12 +41,13 @@ const QRScannerPage: React.FC = () => {
             return
         }
 
-        fetchTrainingSession(activeSessionId).then(session => {
+        const unsubSession = subscribeToTrainingSession(activeSessionId, session => {
             if (session) {
                 setSessionTitle(session.title)
                 setIsTestMode(!!session.isTestMode)
+                setSessionStatus(session.status || (session.isActive ? 'active' : 'ended'))
             }
-        }).catch(e => console.error(e))
+        })
 
         setIsLoadingPatients(true)
         const unsub = subscribeToAllPatients((patients) => {
@@ -53,7 +55,10 @@ const QRScannerPage: React.FC = () => {
             setIsLoadingPatients(false)
         }, true)
 
-        return () => unsub()
+        return () => {
+            unsubSession()
+            unsub()
+        }
     }, [activeSessionId])
 
     useEffect(() => {
@@ -228,6 +233,22 @@ const QRScannerPage: React.FC = () => {
                     </span>
                 )}
             </div>
+
+            {sessionStatus === 'paused' && (
+                <div style={{
+                    margin: '0.75rem 1rem 0',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#fef3c7',
+                    border: '2px solid #f59e0b',
+                    borderRadius: '10px',
+                    color: '#92400e',
+                    fontWeight: 'bold',
+                    fontSize: '0.88rem',
+                    textAlign: 'center',
+                }}>
+                    ⏸️ 現在、訓練は一時停止中です（再開までしばらくお待ちください）
+                </div>
+            )}
 
             <div className="admin-tabs" style={{ margin: '1rem 1rem 0.5rem', display: 'flex', gap: '0.5rem' }}>
                 <button

@@ -5,19 +5,24 @@ import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
 import { ClinicalKnowledgeBox } from './ClinicalKnowledgeBox'
 import { TEAM_REQUIRED_PROCEDURES } from '../pages/TreatmentScanPage'
+import { getMyActiveAction } from '../lib/firestore'
 
 interface LockTimerOverlayProps {
     remainingDisplay: string // "MM:SS" 形式
     treatmentName: string    // 実施中の処置名
+    treatmentId?: string | null // 自端末が実施中の処置ID
     patientId: string | number | null // 患者ID（遷移用）
     patient?: any // 患者データ（段階的所見表示用）
+    isPaused?: boolean // セッション一時停止中かどうか
 }
 
 const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
     remainingDisplay,
     treatmentName,
+    treatmentId,
     patientId,
     patient,
+    isPaused = false,
 }) => {
     const navigate = useNavigate()
     const hasPlayedCompleteRef = useRef(false)
@@ -31,16 +36,24 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
         }
     }, [remainingDisplay, patientId])
 
-    // タイマー進行度（0% 〜 100%）の計算
+    const appliedId = treatmentId ?? patient?.applied_treatment_id
+
+    // タイマー進行度（0% 〜 100%）の計算（自端末のアクションを優先）
     const getProgressPct = (): number => {
-        if (!patient || !patient.timer_started_at || !patient.timer_duration_ms) return 0
-        const elapsed = Date.now() - patient.timer_started_at
-        const total = patient.timer_duration_ms
+        if (!patient) return 0
+        const numericId = typeof patient.id === 'number' ? patient.id : parseInt(String(patientId || 0), 10)
+        const myLocal = numericId ? getMyActiveAction(numericId) : null
+        const matchedServer = myLocal && Array.isArray(patient.active_treatments)
+            ? patient.active_treatments.find((at: any) => at.action_id === myLocal.action_id)
+            : null
+        const startedAt = matchedServer?.started_at ?? myLocal?.started_at ?? patient.timer_started_at
+        const total = matchedServer?.duration_ms ?? myLocal?.duration_ms ?? patient.timer_duration_ms
+        if (!startedAt || !total) return 0
+        const elapsed = Date.now() - startedAt
         return Math.min(100, Math.max(0, Math.floor((elapsed / total) * 100)))
     }
 
     const pct = getProgressPct()
-    const appliedId = patient?.applied_treatment_id
 
     // 該当する診察部位のフル所見テキストを取得
     const getFullFindingText = (): string => {
@@ -96,8 +109,22 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                         <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                 </div>
-                <h2 className="lock-overlay__title">処置実行中</h2>
+                <h2 className="lock-overlay__title">{isPaused ? '訓練一時停止中' : '処置実行中'}</h2>
                 <p className="lock-overlay__treatment">{treatmentName}</p>
+                {isPaused && (
+                    <div style={{
+                        margin: '0.5rem 0',
+                        padding: '0.5rem 0.9rem',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                        border: '1px solid rgba(251, 191, 36, 0.6)',
+                        color: '#fde68a',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                    }}>
+                        ⏸️ 管理者が訓練を一時停止中です（再開すると残り時間から続行します）
+                    </div>
+                )}
                 {remainingDisplay === '00:00' ? (
                     <div style={{ margin: '1rem 0' }}>
                         <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.8rem' }}>
@@ -131,7 +158,7 @@ const LockTimerOverlay: React.FC<LockTimerOverlayProps> = ({
                 )}
 
                 {/* 2人以上必須処置の場合は人員確認・拘束表示 */}
-                {patient?.applied_treatment_id && TEAM_REQUIRED_PROCEDURES.includes(patient.applied_treatment_id) && (
+                {appliedId && TEAM_REQUIRED_PROCEDURES.includes(appliedId) && (
                     <div style={{
                         margin: '0.75rem 0',
                         padding: '0.85rem 1rem',

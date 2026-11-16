@@ -55,8 +55,15 @@ const PatientDetailPage: React.FC = () => {
     }, [fetchedPatient])
 
     const patient = overridePatient || fetchedPatient
-    const { isLocked, remainingDisplay } = useTimer(patient)
+    const { isLocked, remainingDisplay, myTreatmentId, isPaused } = useTimer(patient)
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
+    const [nowMs, setNowMs] = useState<number>(() => Date.now())
+
+    useEffect(() => {
+        if (!patient?.active_treatments || patient.active_treatments.length === 0 || isPaused) return
+        const id = setInterval(() => setNowMs(Date.now()), 1000)
+        return () => clearInterval(id)
+    }, [patient?.active_treatments?.length, isPaused])
 
     if (loading) return <LoadingScreen message="患者データを取得中" subMessage="しばらくお待ちください..." />
     if (error || !patient) return (
@@ -129,14 +136,28 @@ const PatientDetailPage: React.FC = () => {
         return null
     }
 
+    const activeOverlayTreatmentId = myTreatmentId || patient.applied_treatment_id
+    const runningActions = (patient.active_treatments && patient.active_treatments.length > 0)
+        ? patient.active_treatments.filter(at => nowMs < at.started_at + at.duration_ms)
+        : (patient.status === '処置中' && patient.timer_started_at && patient.timer_duration_ms && patient.applied_treatment_id && nowMs < patient.timer_started_at + patient.timer_duration_ms)
+            ? [{
+                action_id: 'legacy',
+                treatment_id: patient.applied_treatment_id,
+                started_at: patient.timer_started_at,
+                duration_ms: patient.timer_duration_ms,
+            }]
+            : []
+
     return (
         <div className="page patient-detail-page">
             {isLocked && (
                 <LockTimerOverlay
                     remainingDisplay={remainingDisplay}
-                    treatmentName={(patient.applied_treatment_id && PROCEDURE_NAMES[patient.applied_treatment_id]) || patient.applied_treatment_id || '処置'}
+                    treatmentName={(activeOverlayTreatmentId && PROCEDURE_NAMES[activeOverlayTreatmentId]) || activeOverlayTreatmentId || '処置'}
+                    treatmentId={activeOverlayTreatmentId}
                     patientId={patientId}
                     patient={patient}
+                    isPaused={isPaused}
                 />
             )}
 
@@ -157,6 +178,59 @@ const PatientDetailPage: React.FC = () => {
             </header>
 
             <main className="page__content">
+                {isPaused && (
+                    <div style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem 1rem',
+                        backgroundColor: '#fef3c7',
+                        border: '2px solid #f59e0b',
+                        borderRadius: '10px',
+                        color: '#92400e',
+                        fontWeight: 'bold',
+                        fontSize: '0.88rem',
+                        textAlign: 'center',
+                    }}>
+                        ⏸️ 訓練が一時停止中です（管理画面から再開されるまでタイマー・状態進行は停止しています）
+                    </div>
+                )}
+
+                {runningActions.length > 0 && (
+                    <div style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem 1rem',
+                        backgroundColor: '#eff6ff',
+                        border: '1px solid #93c5fd',
+                        borderRadius: '10px',
+                    }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1d4ed8', marginBottom: '0.4rem' }}>
+                            ⏳ 現在この患者で進行中の診察・処置（同時対応可）
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {runningActions.map(act => {
+                                const remSec = Math.max(0, Math.ceil((act.started_at + act.duration_ms - nowMs) / 1000))
+                                const mm = String(Math.floor(remSec / 60)).padStart(2, '0')
+                                const ss = String(remSec % 60).padStart(2, '0')
+                                const label = PROCEDURE_NAMES[act.treatment_id] || PROCEDURE_LABELS[act.treatment_id] || act.treatment_id
+                                return (
+                                    <span key={act.action_id} style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        padding: '0.25rem 0.6rem',
+                                        borderRadius: '999px',
+                                        backgroundColor: '#dbeafe',
+                                        color: '#1e40af',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 'bold',
+                                    }}>
+                                        <span>🔄 {label}</span>
+                                        <span style={{ fontFamily: 'monospace' }}>({mm}:{ss})</span>
+                                    </span>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* ===== 次のステップ ガイドバナー ===== */}
                 {renderNextStepGuide()}

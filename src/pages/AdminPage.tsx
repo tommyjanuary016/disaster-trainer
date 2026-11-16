@@ -1,12 +1,33 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import ReactDOM from 'react-dom'
-import { createPatient, createTrainingSession, setActiveSession, activeSessionId, endTrainingSession, subscribeToAllPatients, SessionConfig, seedPatientsToFirestore, fetchTrainingSession, fetchActiveSessions, deleteAllCustomPatients, deleteSessionWithPatients, deleteOrphanedSessionPatients } from '../lib/firestore'
+import {
+    createPatient,
+    createTrainingSession,
+    setActiveSession,
+    activeSessionId,
+    endTrainingSession,
+    startTrainingSession,
+    pauseTrainingSession,
+    resumeTrainingSession,
+    subscribeToAllPatients,
+    subscribeToTrainingSession,
+    SessionConfig,
+    seedPatientsToFirestore,
+    fetchManageableSessions,
+    fetchCustomPatients,
+    fetchAllPatients,
+    deleteAllCustomPatients,
+    deleteSessionWithPatients,
+    deleteOrphanedSessionPatients,
+} from '../lib/firestore'
 import { Patient, TrainingSession } from '../types/patient'
+import { mockPatients } from '../data/mockData'
 import PatientForm from '../components/PatientForm'
 import { DataCleanupModal } from '../components/DataCleanupModal'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { parseCSV, mapCSVToPatients, exportCSV, exportMasterCSV } from '../lib/csv'
 import DashboardTab from '../components/DashboardTab'
+import { SessionPatientSheetTab } from '../components/SessionPatientSheetTab'
 import { exportToGoogleSheets } from '../lib/sheetsExport'
 import { PROCEDURE_NAMES } from './TreatmentScanPage'
 import { generateInlineQrSvg } from '../lib/inlineQr'
@@ -16,6 +37,8 @@ const AdminPage: React.FC = () => {
     const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
     const [isFormVisible, setIsFormVisible] = useState(false)
     const [isSessionModalOpen, setIsSessionModalOpen] = useState(false)
+    const [selectionMode, setSelectionMode] = useState<'ratio' | 'scenario_all' | 'manual'>('ratio')
+    const [customAndFirestorePool, setCustomAndFirestorePool] = useState<Patient[]>([])
     const [sessionConfig, setSessionConfig] = useState<SessionConfig>({
         title: '',
         totalPatients: 20,
@@ -25,20 +48,23 @@ const AdminPage: React.FC = () => {
         blackRatio: 0,
         sortBySeverity: true,
         useBasePatients: true,
-        examLockTimeMinutes: 3,
+        examLockTimeMinutes: 1,
         treatmentLockTimeMinutes: 5,
         isTestMode: false,
         selectedScenarios: [],
         useExactScenarioMatch: false,
+        selectedPatientIds: [],
+        startImmediately: false,
     })
     const navigate = useNavigate()
-    const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'settings'>(() => activeSessionId ? 'dashboard' : 'patients')
+    const [activeTab, setActiveTab] = useState<'patients' | 'dashboard' | 'sheet' | 'settings'>(() => activeSessionId ? 'dashboard' : 'patients')
     const [webhookUrl, setWebhookUrl] = useState(localStorage.getItem('gas_webhook_url') || '')
     const [isExporting, setIsExporting] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(activeSessionId)
-    // 訓練終了後もそのセッションの患者のみ表示するために保持するID
+    // 訓練終了後や準備中セッションの表示用ID
     const [displaySessionId, setDisplaySessionId] = useState<string | null>(activeSessionId)
     const [currentSessionTitle, setCurrentSessionTitle] = useState<string | null>(null)
+    const [currentSessionMeta, setCurrentSessionMeta] = useState<TrainingSession | null>(null)
     const [sessionEnded, setSessionEnded] = useState(false) // 訓練終了状態フラグ
     const [showShareModal, setShowShareModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
@@ -51,12 +77,41 @@ const AdminPage: React.FC = () => {
 
     const loadActiveSessions = async () => {
         try {
-            const sessions = await fetchActiveSessions()
+            const sessions = await fetchManageableSessions()
             setActiveSessionsList(sessions)
         } catch (e) {
-            console.error('Failed to fetch active sessions', e)
+            console.error('Failed to fetch sessions', e)
         }
     }
+
+    const openSessionModal = async () => {
+        setIsSessionModalOpen(true)
+        try {
+            const [customs, allMaster] = await Promise.all([
+                fetchCustomPatients(),
+                fetchAllPatients(false),
+            ])
+            const mockIds = new Set(mockPatients.map(p => p.id))
+            const firestoreOnly = allMaster.filter(p => !p.session_id && !mockIds.has(p.id))
+            const map = new Map<number, Patient>()
+            customs.forEach(p => map.set(p.id, p))
+            firestoreOnly.forEach(p => { if (!map.has(p.id)) map.set(p.id, p) })
+            setCustomAndFirestorePool(Array.from(map.values()))
+        } catch (e) {
+            console.error('Failed to load patient pool for modal', e)
+        }
+    }
+
+    // モーダル内で個別選択・シナリオ候補に使う患者プール
+    const modalCandidatePool = useMemo(() => {
+        const base = sessionConfig.useBasePatients ? mockPatients : []
+        const seen = new Set(base.map(p => p.id))
+        const combined = [...base, ...customAndFirestorePool.filter(p => !seen.has(p.id))]
+        if (sessionConfig.selectedScenarios && sessionConfig.selectedScenarios.length > 0) {
+            return combined.filter(p => sessionConfig.selectedScenarios!.includes(p.scenario_tag || '基本'))
+        }
+        return combined
+    }, [sessionConfig.useBasePatients, sessionConfig.selectedScenarios, customAndFirestorePool])
 
     useEffect(() => {
         loadActiveSessions()
@@ -65,11 +120,11 @@ const AdminPage: React.FC = () => {
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search)
         const tabParam = queryParams.get('tab')
-        if (tabParam === 'patients' || tabParam === 'dashboard' || tabParam === 'settings') {
+        if (tabParam === 'patients' || tabParam === 'dashboard' || tabParam === 'sheet' || tabParam === 'settings') {
             setActiveTab(tabParam)
         }
         if (queryParams.get('new_session') === '1') {
-            setIsSessionModalOpen(true)
+            openSessionModal()
         }
         if (queryParams.get('auth') === '1' || sessionStorage.getItem('admin_authenticated') === 'true') {
             sessionStorage.setItem('admin_authenticated', 'true')
@@ -142,7 +197,7 @@ const AdminPage: React.FC = () => {
         if (location.state && (location.state as any).action) {
             const action = (location.state as any).action
             if (action === 'new_session') {
-                setIsSessionModalOpen(true)
+                openSessionModal()
             } else if (action === 'master') {
                 setShowMasterAll(true)
                 setDisplaySessionId(null)
@@ -171,12 +226,22 @@ const AdminPage: React.FC = () => {
 
     useEffect(() => {
         if (displaySessionId) {
-            fetchTrainingSession(displaySessionId).then(session => {
+            const unsub = subscribeToTrainingSession(displaySessionId, session => {
+                setCurrentSessionMeta(session)
                 if (session) {
                     setCurrentSessionTitle(session.title)
+                    const st = session.status || (session.isActive ? 'active' : 'ended')
+                    setSessionEnded(st === 'ended')
+                    if (st === 'active' || st === 'paused') {
+                        setCurrentSessionId(session.id)
+                    } else if (st === 'preparing' || st === 'ended') {
+                        setCurrentSessionId(null)
+                    }
                 }
-            }).catch(e => console.error(e))
+            })
+            return () => unsub()
         } else {
+            setCurrentSessionMeta(null)
             setCurrentSessionTitle(null)
         }
     }, [displaySessionId])
@@ -379,35 +444,91 @@ const AdminPage: React.FC = () => {
     }
 
     const handleCreateSession = async () => {
-        const totalRatio = sessionConfig.redRatio + sessionConfig.yellowRatio + sessionConfig.greenRatio + sessionConfig.blackRatio
-        if (totalRatio !== 100) {
-            alert('重症度の割合の合計は100%にしてください')
-            return
+        if (selectionMode === 'manual') {
+            if (!sessionConfig.selectedPatientIds || sessionConfig.selectedPatientIds.length === 0) {
+                alert('個別選択モードでは、使用する患者を1名以上選択してください。')
+                return
+            }
+        } else if (selectionMode === 'ratio') {
+            const totalRatio = sessionConfig.redRatio + sessionConfig.yellowRatio + sessionConfig.greenRatio + sessionConfig.blackRatio
+            if (totalRatio !== 100) {
+                alert('重症度の割合の合計は100%にしてください')
+                return
+            }
         }
-        if (window.confirm('新しい訓練セッションを開始しますか？（現在のセッションも保持されます）')) {
+
+        const isStartingNow = sessionConfig.startImmediately === true
+        const confirmMsg = isStartingNow
+            ? '新しい訓練セッションを作成し、今すぐ訓練を開始しますか？'
+            : '新しい訓練セッションを「事前準備（未開始）」として作成しますか？\n（※後から管理画面の「訓練を開始する」を押すまでプレイヤーには表示されません）'
+
+        if (window.confirm(confirmMsg)) {
             document.body.style.cursor = 'wait'
-            const newSessionId = await createTrainingSession(sessionConfig)
-            setCurrentSessionId(newSessionId)
+            const payload: SessionConfig = {
+                ...sessionConfig,
+                useExactScenarioMatch: selectionMode === 'scenario_all',
+                selectedPatientIds: selectionMode === 'manual' ? sessionConfig.selectedPatientIds : undefined,
+                startImmediately: isStartingNow,
+            }
+            const newSessionId = await createTrainingSession(payload)
+            await loadActiveSessions()
             setDisplaySessionId(newSessionId)
             setShowMasterAll(false)
             setSessionEnded(false)
+            setAdminView('session')
             document.body.style.cursor = 'default'
             setIsSessionModalOpen(false)
-            setActiveTab('dashboard') // セッション開始直後に災害対策本部コマンドセンターを表示
-            setShowShareModal(true) // セッション作成直後に自動で招待モーダルを開く
-            alert('新しいセッションを作成しました。プレイヤーを招待できます。')
+
+            if (isStartingNow) {
+                setCurrentSessionId(newSessionId)
+                setActiveTab('dashboard')
+                setShowShareModal(true)
+                alert('新しいセッションを作成して開始しました。プレイヤーを招待できます。')
+            } else {
+                setCurrentSessionId(null)
+                setActiveTab('sheet') // 事前準備直後は患者一覧表・指導書印刷を表示
+                alert('訓練セッションを「準備中」として事前作成しました。\n患者一覧表の確認・印刷を行い、訓練本番に「▶️ 訓練を開始する」を押してください。')
+            }
         }
+    }
+
+    const handleStartPreparedSession = async (sessionId: string) => {
+        if (!window.confirm('この訓練セッションを開始しますか？\n（この瞬間からプレイヤーが選択できるようになり、タイマーと悪化判定が動き始めます）')) return
+        document.body.style.cursor = 'wait'
+        try {
+            await startTrainingSession(sessionId)
+            await loadActiveSessions()
+            setCurrentSessionId(sessionId)
+            setDisplaySessionId(sessionId)
+            setSessionEnded(false)
+            setAdminView('session')
+            setActiveTab('dashboard')
+            setShowShareModal(true)
+        } finally {
+            document.body.style.cursor = 'default'
+        }
+    }
+
+    const handlePauseSession = async (sessionId: string) => {
+        await pauseTrainingSession(sessionId)
+        await loadActiveSessions()
+    }
+
+    const handleResumeSession = async (sessionId: string) => {
+        await resumeTrainingSession(sessionId)
+        await loadActiveSessions()
     }
 
     const handleClearSession = async () => {
         if (window.confirm('訓練を終了しますか？\n（訓練のダッシュボードと結果表示へ遷移します）')) {
-            if (activeSessionId) {
-                await endTrainingSession(activeSessionId)
+            const targetId = currentSessionId || displaySessionId || activeSessionId
+            if (targetId) {
+                await endTrainingSession(targetId)
             }
-            // displaySessionIdはそのまま保持（終了後ダッシュボードも同セッションのみ表示）
             setActiveSession(null)
             setCurrentSessionId(null)
             setSessionEnded(true)
+            await loadActiveSessions()
             setActiveTab('dashboard') // 訓練終了時にダッシュボード結果画面へ遷移
         }
     }
@@ -417,8 +538,10 @@ const AdminPage: React.FC = () => {
         setAdminView('home')
         setDisplaySessionId(null)
         setCurrentSessionId(null)
+        setCurrentSessionMeta(null)
         setSessionEnded(false)
         setCurrentSessionTitle(null)
+        loadActiveSessions()
     }
 
     const handleOpenCleanupModal = () => {
@@ -585,7 +708,7 @@ const AdminPage: React.FC = () => {
 
     return (
         <div className="page admin-page">
-            <header className="admin-header" style={{flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem', padding: '1rem', width: '100%'}}>
+            <header className="admin-header no-print" style={{flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem', padding: '1rem', width: '100%'}}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button onClick={() => navigate('/')} className="button button--secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -614,67 +737,76 @@ const AdminPage: React.FC = () => {
                 <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'}}>
                     <div>
                         <h1 style={{ fontSize: '1.4rem', margin: 0, whiteSpace: 'nowrap' }}>管理画面 (Admin)</h1>
-                        {currentSessionId ? (
-                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap'}}>
-                                <span style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                                    padding: '0.25rem 0.75rem',
-                                    borderRadius: '999px',
-                                    backgroundColor: 'rgba(5, 150, 105, 0.12)',
-                                    border: '1px solid rgba(5, 150, 105, 0.4)',
-                                    fontSize: '0.82rem', fontWeight: '600', color: '#065f46',
-                                    whiteSpace: 'nowrap'
-                                }}>
-                                    <span style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse-beat 1.5s ease-in-out infinite', flexShrink: 0}} />
-                                    訓練中
-                                </span>
-                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)', whiteSpace: 'nowrap'}}>
-                                    {currentSessionTitle || '（タイトルなし）'}
-                                </span>
-                                <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace', whiteSpace: 'nowrap'}}>
-                                    ID: {currentSessionId.replace('session_', '')}
-                                </span>
-                                <button
-                                    onClick={() => setShowShareModal(true)}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.3rem',
-                                        padding: '0.25rem 0.65rem',
-                                        borderRadius: '999px',
-                                        fontSize: '0.78rem',
-                                        fontWeight: '600',
-                                        color: '#1d4ed8',
-                                        background: 'rgba(37, 99, 235, 0.1)',
-                                        border: '1px solid rgba(37, 99, 235, 0.3)',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    📱 プレイヤーを招待
-                                </button>
-                            </div>
-                        ) : sessionEnded && displaySessionId ? (
-                            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap'}}>
-                                <span style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                                    padding: '0.25rem 0.75rem',
-                                    borderRadius: '999px',
-                                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                    border: '1px solid rgba(37, 99, 235, 0.3)',
-                                    fontSize: '0.82rem', fontWeight: '600', color: '#1d4ed8',
-                                    whiteSpace: 'nowrap'
-                                }}>
-                                    訓練終了
-                                </span>
-                                <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)', whiteSpace: 'nowrap'}}>
-                                    {currentSessionTitle || '（タイトルなし）'}
-                                </span>
-                                <span style={{fontSize: '0.75rem', color: 'var(--gray-500)', marginLeft: '0.3rem'}}>
-                                    — このセッションのまとめを表示中
-                                </span>
-                            </div>
-                         ) : (
+                        {displaySessionId && currentSessionMeta ? (
+                            (() => {
+                                const st = currentSessionMeta.status || (currentSessionMeta.isActive ? 'active' : 'ended')
+                                return (
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap'}}>
+                                        {st === 'preparing' && (
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.25rem 0.75rem', borderRadius: '999px',
+                                                backgroundColor: '#dbeafe', border: '1px solid #60a5fa',
+                                                fontSize: '0.82rem', fontWeight: '700', color: '#1e40af', whiteSpace: 'nowrap',
+                                            }}>
+                                                📝 準備中（プレイヤー非公開）
+                                            </span>
+                                        )}
+                                        {st === 'active' && (
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.25rem 0.75rem', borderRadius: '999px',
+                                                backgroundColor: 'rgba(5, 150, 105, 0.12)', border: '1px solid rgba(5, 150, 105, 0.4)',
+                                                fontSize: '0.82rem', fontWeight: '600', color: '#065f46', whiteSpace: 'nowrap',
+                                            }}>
+                                                <span style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse-beat 1.5s ease-in-out infinite', flexShrink: 0}} />
+                                                訓練中
+                                            </span>
+                                        )}
+                                        {st === 'paused' && (
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.25rem 0.75rem', borderRadius: '999px',
+                                                backgroundColor: '#fef3c7', border: '1px solid #f59e0b',
+                                                fontSize: '0.82rem', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap',
+                                            }}>
+                                                ⏸️ 一時停止中
+                                            </span>
+                                        )}
+                                        {st === 'ended' && (
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.25rem 0.75rem', borderRadius: '999px',
+                                                backgroundColor: 'rgba(37, 99, 235, 0.1)', border: '1px solid rgba(37, 99, 235, 0.3)',
+                                                fontSize: '0.82rem', fontWeight: '600', color: '#1d4ed8', whiteSpace: 'nowrap',
+                                            }}>
+                                                訓練終了
+                                            </span>
+                                        )}
+                                        <span style={{fontSize: '0.9rem', fontWeight: '700', color: 'var(--gray-800)', whiteSpace: 'nowrap'}}>
+                                            {currentSessionTitle || '（タイトルなし）'}
+                                        </span>
+                                        <span style={{fontSize: '0.72rem', color: 'var(--gray-400)', fontFamily: 'monospace', whiteSpace: 'nowrap'}}>
+                                            ID: {displaySessionId.replace('session_', '')}
+                                        </span>
+                                        {(st === 'active' || st === 'paused') && (
+                                            <button
+                                                onClick={() => setShowShareModal(true)}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                                    padding: '0.25rem 0.65rem', borderRadius: '999px',
+                                                    fontSize: '0.78rem', fontWeight: '600', color: '#1d4ed8',
+                                                    background: 'rgba(37, 99, 235, 0.1)', border: '1px solid rgba(37, 99, 235, 0.3)',
+                                                    cursor: 'pointer', whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                📱 プレイヤーを招待
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })()
+                        ) : (
                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
                                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
                                      {showMasterAll ? '全登録患者（マスター・過去ログ全件）' : '表示セッション:'}
@@ -690,24 +822,26 @@ const AdminPage: React.FC = () => {
                                              } else {
                                                  setShowMasterAll(false)
                                                  setDisplaySessionId(val || null)
-                                                 setCurrentSessionId(val || null)
+                                                 const target = activeSessionsList.find(s => s.id === val)
+                                                 const st = target ? (target.status || (target.isActive ? 'active' : 'ended')) : null
+                                                 setCurrentSessionId((st === 'active' || st === 'paused') ? val : null)
                                              }
                                          }}
                                          style={{
-                                             padding: '0.3rem 0.6rem',
-                                             borderRadius: '6px',
-                                             border: '1px solid var(--gray-300)',
-                                             fontSize: '0.85rem',
-                                             fontWeight: 'bold',
-                                             backgroundColor: '#fff'
+                                             padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--gray-300)',
+                                             fontSize: '0.85rem', fontWeight: 'bold', backgroundColor: '#fff',
                                          }}
                                      >
                                          <option value="">-- セッションを選択 --</option>
-                                         {activeSessionsList.map(s => (
-                                             <option key={s.id} value={s.id}>
-                                                 {s.title || '無題セッション'} ({s.id.replace('session_', '')})
-                                             </option>
-                                         ))}
+                                         {activeSessionsList.map(s => {
+                                             const st = s.status || (s.isActive ? 'active' : 'ended')
+                                             const stTag = st === 'preparing' ? '[準備中]' : st === 'paused' ? '[一時停止]' : st === 'active' ? '[訓練中]' : '[終了]'
+                                             return (
+                                                 <option key={s.id} value={s.id}>
+                                                     {stTag} {s.title || '無題セッション'} ({s.id.replace('session_', '')})
+                                                 </option>
+                                             )
+                                         })}
                                          <option value="ALL_MASTER">🌐 過去ログ・マスター全件表示</option>
                                      </select>
                                  ) : showMasterAll ? (
@@ -718,10 +852,10 @@ const AdminPage: React.FC = () => {
                                          ← セッション別表示に戻る
                                      </button>
                                  ) : (
-                                     <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>アクティブセッションなし</span>
+                                     <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>セッション未選択（マスターモード）</span>
                                  )}
                              </div>
-                         )}
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => navigate('/role-select')} className="app-header__back" style={{position: 'static', transform: 'none', background: 'var(--gray-100)'}}>
@@ -733,28 +867,82 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {currentSessionId ? (
-                        <>
-                            <button
-                                onClick={handleClearSession}
-                                className="button button--secondary"
-                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#ef4444', color: '#b91c1c' }}
-                            >
-                                訓練終了
-                            </button>
-                        </>
-                    ) : sessionEnded && displaySessionId ? (
-                        <>
-                            <button
-                                onClick={handleReturnToMaster}
-                                className="button button--secondary"
-                                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                            >
-                                全マスターデータに戻る
-                            </button>
-                        </>
-                    ) : null}
-                    {!currentSessionId && (
+                    {displaySessionId && currentSessionMeta && (() => {
+                        const st = currentSessionMeta.status || (currentSessionMeta.isActive ? 'active' : 'ended')
+                        if (st === 'preparing') {
+                            return (
+                                <>
+                                    <button
+                                        onClick={() => handleStartPreparedSession(displaySessionId)}
+                                        className="button button--primary"
+                                        style={{ width: 'auto', padding: '0.5rem 1.1rem', fontSize: '0.88rem', backgroundColor: '#10b981', borderColor: '#10b981' }}
+                                    >
+                                        ▶️ 訓練を開始する（プレイヤーに公開）
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('sheet')}
+                                        className="button button--secondary"
+                                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#2563eb', color: '#1d4ed8' }}
+                                    >
+                                        🖨️ 患者一覧・指導表を印刷
+                                    </button>
+                                </>
+                            )
+                        }
+                        if (st === 'active') {
+                            return (
+                                <>
+                                    <button
+                                        onClick={() => handlePauseSession(displaySessionId)}
+                                        className="button button--secondary"
+                                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#f59e0b', color: '#92400e', backgroundColor: '#fef3c7' }}
+                                    >
+                                        ⏸️ 一時停止
+                                    </button>
+                                    <button
+                                        onClick={handleClearSession}
+                                        className="button button--secondary"
+                                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#ef4444', color: '#b91c1c' }}
+                                    >
+                                        訓練終了
+                                    </button>
+                                </>
+                            )
+                        }
+                        if (st === 'paused') {
+                            return (
+                                <>
+                                    <button
+                                        onClick={() => handleResumeSession(displaySessionId)}
+                                        className="button button--primary"
+                                        style={{ width: 'auto', padding: '0.5rem 1.1rem', fontSize: '0.88rem', backgroundColor: '#10b981', borderColor: '#10b981' }}
+                                    >
+                                        ▶️ 訓練を再開する
+                                    </button>
+                                    <button
+                                        onClick={handleClearSession}
+                                        className="button button--secondary"
+                                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem', borderColor: '#ef4444', color: '#b91c1c' }}
+                                    >
+                                        訓練終了
+                                    </button>
+                                </>
+                            )
+                        }
+                        if (st === 'ended') {
+                            return (
+                                <button
+                                    onClick={handleReturnToMaster}
+                                    className="button button--secondary"
+                                    style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                >
+                                    管理画面トップに戻る
+                                </button>
+                            )
+                        }
+                        return null
+                    })()}
+                    {!displaySessionId && (
                         <button
                             onClick={handleDeleteAllCustom}
                             className="button button--secondary"
@@ -814,30 +1002,66 @@ const AdminPage: React.FC = () => {
                                     <label className="form-label">訓練タイトル</label>
                                     <input type="text" placeholder="例: 2026年度 災害時BCP訓練" value={sessionConfig.title} onChange={e => setSessionConfig({...sessionConfig, title: e.target.value})} className="input" />
                                 </div>
+
+                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                    <label className="form-label">開始タイミング</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
+                                        <label style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.65rem 0.75rem',
+                                            borderRadius: '8px', cursor: 'pointer',
+                                            border: !sessionConfig.startImmediately ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                            backgroundColor: !sessionConfig.startImmediately ? '#eff6ff' : '#ffffff',
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="startImmediately"
+                                                checked={!sessionConfig.startImmediately}
+                                                onChange={() => setSessionConfig({ ...sessionConfig, startImmediately: false })}
+                                                style={{ marginTop: '0.2rem' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '0.86rem', color: '#1e3a8a' }}>📝 事前準備として作成（おすすめ）</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
+                                                    指導表の印刷や事前準備を先に済ませ、本番当日に管理画面から開始します（開始までプレイヤーには非表示）。
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <label style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.65rem 0.75rem',
+                                            borderRadius: '8px', cursor: 'pointer',
+                                            border: sessionConfig.startImmediately ? '2px solid #10b981' : '1px solid #cbd5e1',
+                                            backgroundColor: sessionConfig.startImmediately ? '#ecfdf5' : '#ffffff',
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="startImmediately"
+                                                checked={sessionConfig.startImmediately === true}
+                                                onChange={() => setSessionConfig({ ...sessionConfig, startImmediately: true })}
+                                                style={{ marginTop: '0.2rem' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '0.86rem', color: '#065f46' }}>🚀 作成してすぐ訓練開始</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
+                                                    作成した瞬間からプレイヤーが参加でき、タイマーと悪化判定が動き出します。
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div className="form-group">
-                                    <label className="form-label">対象患者数</label>
-                                    <input type="number" min="1" value={sessionConfig.totalPatients} onChange={e => setSessionConfig({...sessionConfig, totalPatients: parseInt(e.target.value) || 10})} className="input" />
+                                    <label className="form-label">身体診察・評価デフォルト拘束時間 (分)</label>
+                                    <input type="number" min="0" step="0.5" value={sessionConfig.examLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, examLockTimeMinutes: parseFloat(e.target.value) || 0})} className="input" />
+                                    <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>頭頸部・胸部・腹骨盤・四肢・FAST・問診に適用（標準1分）</span>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">搬入順 (トリアージ優先)</label>
-                                    <select value={sessionConfig.sortBySeverity ? 'yes' : 'no'} onChange={e => setSessionConfig({...sessionConfig, sortBySeverity: e.target.value === 'yes'})} className="input">
-                                        <option value="yes">重症度順（優先度高い順）</option>
-                                        <option value="no">完全ランダム</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">検査デフォルト拘束時間 (分)</label>
-                                    <input type="number" min="0" value={sessionConfig.examLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, examLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
-                                    <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>X線, CT, 採血などに適用</span>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">手技デフォルト拘束時間 (分)</label>
-                                    <input type="number" min="0" value={sessionConfig.treatmentLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, treatmentLockTimeMinutes: parseInt(e.target.value) || 0})} className="input" />
+                                    <label className="form-label">治療処置デフォルト拘束時間 (分)</label>
+                                    <input type="number" min="0" step="0.5" value={sessionConfig.treatmentLockTimeMinutes} onChange={e => setSessionConfig({...sessionConfig, treatmentLockTimeMinutes: parseFloat(e.target.value) || 0})} className="input" />
                                     <span style={{fontSize: '0.75rem', color: 'var(--gray-500)'}}>点滴や外科処置などに適用</span>
                                 </div>
 
                                 {/* 手技別個別時間設定アコーディオン */}
-                                <div className="form-group" style={{gridColumn: 'span 2', marginTop: '0.5rem'}}>
+                                <div className="form-group" style={{gridColumn: 'span 2', marginTop: '0.25rem'}}>
                                     <details style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                         <summary style={{ fontWeight: 'bold', fontSize: '0.88rem', cursor: 'pointer', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                             ⚙️ 手技別の個別拘束時間をカスタマイズする（任意）
@@ -876,7 +1100,7 @@ const AdminPage: React.FC = () => {
                                     </details>
                                 </div>
 
-                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <div className="form-group">
                                     <label className="form-label">基礎患者（25名）の使用</label>
                                     <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0'}}>
                                         <input
@@ -885,15 +1109,10 @@ const AdminPage: React.FC = () => {
                                             onChange={e => setSessionConfig({...sessionConfig, useBasePatients: e.target.checked})}
                                             style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                         />
-                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>アプリ内蔵の基礎患者25名をプールに含める</span>
+                                        <span style={{fontSize: '0.85rem', color: 'var(--gray-700)'}}>内蔵基礎患者25名を含める</span>
                                     </label>
-                                    {!sessionConfig.useBasePatients && (
-                                        <p style={{fontSize: '0.78rem', color: 'var(--warning)', marginTop: '0.2rem'}}>
-                                            ⚠ Firestoreのカスタム患者のみが対象になります
-                                        </p>
-                                    )}
                                 </div>
-                                <div className="form-group" style={{gridColumn: 'span 2'}}>
+                                <div className="form-group">
                                     <label className="form-label">動作確認モード（検証用）</label>
                                     <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
                                         <input
@@ -902,9 +1121,10 @@ const AdminPage: React.FC = () => {
                                             onChange={e => setSessionConfig({...sessionConfig, isTestMode: e.target.checked})}
                                             style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                         />
-                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>検証用モードを有効にする</span>
+                                        <span style={{fontSize: '0.85rem', color: 'var(--gray-700)'}}>全拘束時間を5秒に短縮</span>
                                     </label>
                                 </div>
+
                                 <div className="form-group" style={{gridColumn: 'span 2'}}>
                                     <label className="form-label">対象シナリオ (空欄で全て)</label>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
@@ -927,49 +1147,146 @@ const AdminPage: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
+
                                 <div className="form-group" style={{gridColumn: 'span 2'}}>
-                                    <label className="form-label">抽出モード</label>
-                                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0', background: 'var(--gray-50)', borderRadius: '4px'}}>
-                                        <input
-                                            type="checkbox"
-                                            checked={sessionConfig.useExactScenarioMatch || false}
-                                            onChange={e => setSessionConfig({...sessionConfig, useExactScenarioMatch: e.target.checked})}
-                                            style={{width: '18px', height: '18px', cursor: 'pointer'}}
-                                        />
-                                        <span style={{fontSize: '0.9rem', color: 'var(--gray-700)'}}>プールにある対象患者を「そのまま全員」使う (割合・人数指定を無視)</span>
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div style={{ opacity: sessionConfig.useExactScenarioMatch ? 0.4 : 1, pointerEvents: sessionConfig.useExactScenarioMatch ? 'none' : 'auto' }}>
-                                <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
-                                <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
-                                    <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
-                                    <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
-                                    <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
-                                    <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
-                                </div>
-                                <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
-                                        <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
-                                        <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
-                                        <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
-                                        <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
+                                    <label className="form-label">使用する患者の選び方</label>
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                        {[
+                                            { id: 'ratio' as const, label: '🎲 割合で自動抽出' },
+                                            { id: 'scenario_all' as const, label: '📦 対象シナリオ全員を使用' },
+                                            { id: 'manual' as const, label: '✅ 患者を個別にチェック選択' },
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => setSelectionMode(opt.id)}
+                                                style={{
+                                                    flex: 1, minWidth: '140px', padding: '0.5rem 0.6rem',
+                                                    borderRadius: '8px', fontSize: '0.82rem', fontWeight: 'bold', cursor: 'pointer',
+                                                    border: selectionMode === opt.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                                    backgroundColor: selectionMode === opt.id ? '#eff6ff' : '#ffffff',
+                                                    color: selectionMode === opt.id ? '#1d4ed8' : '#334155',
+                                                }}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
+
+                            {selectionMode === 'manual' ? (
+                                <div style={{ marginTop: '0.5rem', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.75rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a' }}>
+                                            選択中: {(sessionConfig.selectedPatientIds || []).length} / {modalCandidatePool.length} 名
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSessionConfig({ ...sessionConfig, selectedPatientIds: modalCandidatePool.map(p => p.id) })}
+                                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                                            >
+                                                すべて選択
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSessionConfig({ ...sessionConfig, selectedPatientIds: [] })}
+                                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+                                            >
+                                                選択解除
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                        {modalCandidatePool.map(p => {
+                                            const checked = (sessionConfig.selectedPatientIds || []).includes(p.id)
+                                            return (
+                                                <label
+                                                    key={p.id}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.6rem',
+                                                        borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem',
+                                                        backgroundColor: checked ? '#eff6ff' : '#ffffff',
+                                                        border: checked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={e => {
+                                                            const cur = sessionConfig.selectedPatientIds || []
+                                                            const next = e.target.checked
+                                                                ? [...cur, p.id]
+                                                                : cur.filter(id => id !== p.id)
+                                                            setSessionConfig({ ...sessionConfig, selectedPatientIds: next })
+                                                        }}
+                                                    />
+                                                    <span style={{
+                                                        padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
+                                                        backgroundColor: p.triage_color === '赤' ? '#dc2626' : p.triage_color === '黄' ? '#d97706' : p.triage_color === '緑' ? '#059669' : '#334155',
+                                                    }}>
+                                                        {p.triage_color}
+                                                    </span>
+                                                    <span style={{ fontWeight: 'bold', color: '#0f172a' }}>No.{p.id} {p.name}</span>
+                                                    <span style={{ color: '#475569' }}>({p.age}歳)</span>
+                                                    <span style={{ color: '#1d4ed8', marginLeft: 'auto', fontSize: '0.75rem' }}>{p.diagnosis}</span>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            ) : selectionMode === 'ratio' ? (
+                                <div>
+                                    <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
+                                        <div className="form-group">
+                                            <label className="form-label">対象患者数</label>
+                                            <input type="number" min="1" value={sessionConfig.totalPatients} onChange={e => setSessionConfig({...sessionConfig, totalPatients: parseInt(e.target.value) || 10})} className="input" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">搬入順 (トリアージ優先)</label>
+                                            <select value={sessionConfig.sortBySeverity ? 'yes' : 'no'} onChange={e => setSessionConfig({...sessionConfig, sortBySeverity: e.target.value === 'yes'})} className="input">
+                                                <option value="yes">重症度順（優先度高い順）</option>
+                                                <option value="no">完全ランダム</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <h4 style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>重症度割合 (合計100%)</h4>
+                                    <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem', backgroundColor: '#e5e7eb', gap: '1px' }}>
+                                        <div style={{ width: `${sessionConfig.redRatio}%`, backgroundColor: '#dc2626', transition: 'width 0.3s', minWidth: sessionConfig.redRatio > 0 ? '2px' : '0' }} title={`赤: ${sessionConfig.redRatio}%`} />
+                                        <div style={{ width: `${sessionConfig.yellowRatio}%`, backgroundColor: '#f59e0b', transition: 'width 0.3s', minWidth: sessionConfig.yellowRatio > 0 ? '2px' : '0' }} title={`黄: ${sessionConfig.yellowRatio}%`} />
+                                        <div style={{ width: `${sessionConfig.greenRatio}%`, backgroundColor: '#059669', transition: 'width 0.3s', minWidth: sessionConfig.greenRatio > 0 ? '2px' : '0' }} title={`緑: ${sessionConfig.greenRatio}%`} />
+                                        <div style={{ width: `${sessionConfig.blackRatio}%`, backgroundColor: '#1e293b', transition: 'width 0.3s', minWidth: sessionConfig.blackRatio > 0 ? '2px' : '0' }} title={`黒: ${sessionConfig.blackRatio}%`} />
+                                    </div>
+                                    <div className="form-grid form-grid--2col" style={{marginBottom: '1rem'}}>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{color: 'var(--status-red)'}}>赤 (%)</label>
+                                            <input type="number" min="0" value={sessionConfig.redRatio} onChange={e => setSessionConfig({...sessionConfig, redRatio: parseInt(e.target.value) || 0})} className="input" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{color: '#d97706'}}>黄 (%)</label>
+                                            <input type="number" min="0" value={sessionConfig.yellowRatio} onChange={e => setSessionConfig({...sessionConfig, yellowRatio: parseInt(e.target.value) || 0})} className="input" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{color: 'var(--status-green)'}}>緑 (%)</label>
+                                            <input type="number" min="0" value={sessionConfig.greenRatio} onChange={e => setSessionConfig({...sessionConfig, greenRatio: parseInt(e.target.value) || 0})} className="input" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{color: 'var(--status-black)'}}>黒 (%)</label>
+                                            <input type="number" min="0" value={sessionConfig.blackRatio} onChange={e => setSessionConfig({...sessionConfig, blackRatio: parseInt(e.target.value) || 0})} className="input" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ padding: '0.65rem 0.8rem', backgroundColor: '#eff6ff', borderRadius: '8px', fontSize: '0.82rem', color: '#1e40af', marginTop: '0.5rem' }}>
+                                    📦 選択した条件（現在 {modalCandidatePool.length} 名）の患者を全員使用してセッションを作成します。
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                                <button onClick={handleCreateSession} className="button button--primary" style={{ flex: 1 }}>生成実行</button>
+                                <button onClick={handleCreateSession} className="button button--primary" style={{ flex: 1 }}>
+                                    {sessionConfig.startImmediately ? '🚀 作成してすぐ開始' : '📝 事前準備として作成'}
+                                </button>
                                 <button onClick={() => setIsSessionModalOpen(false)} className="button button--secondary" style={{ flex: 1 }}>キャンセル</button>
                             </div>
                         </div>
@@ -983,15 +1300,16 @@ const AdminPage: React.FC = () => {
                         onCancel={handleFormCancel}
                     />
                 ) : adminView === 'home' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
-                        {activeSessionsList.filter(s => s.isActive).map(active => (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                        {/* 準備中セッション一覧 */}
+                        {activeSessionsList.filter(s => s.status === 'preparing').map(prep => (
                             <div
-                                key={active.id}
+                                key={prep.id}
                                 style={{
                                     padding: '1.25rem',
                                     borderRadius: '12px',
-                                    border: '2px solid #10b981',
-                                    backgroundColor: '#ecfdf5',
+                                    border: '2px solid #3b82f6',
+                                    backgroundColor: '#eff6ff',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'space-between',
@@ -999,28 +1317,122 @@ const AdminPage: React.FC = () => {
                                 }}
                             >
                                 <div>
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#065f46' }}>🟢 進行中の訓練セッション</div>
-                                    <h3 style={{ margin: '0.25rem 0', fontSize: '1.1rem', color: '#064e3b' }}>
-                                        {active.title || '進行中のセッション'}
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1d4ed8' }}>📝 準備中（未開始・プレイヤー非公開）</div>
+                                    <h3 style={{ margin: '0.25rem 0', fontSize: '1.1rem', color: '#1e3a8a' }}>
+                                        {prep.title || '準備中のセッション'}
                                     </h3>
+                                    <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+                                        患者数: {prep.totalPatients}名
+                                    </div>
                                 </div>
-                                <button
-                                    className="button button--primary"
-                                    style={{ backgroundColor: '#059669' }}
-                                    onClick={() => {
-                                        setActiveSession(active.id)
-                                        setCurrentSessionId(active.id)
-                                        setDisplaySessionId(active.id)
-                                        setCurrentSessionTitle(active.title)
-                                        setSessionEnded(false)
-                                        setAdminView('session')
-                                        setActiveTab('dashboard')
-                                    }}
-                                >
-                                    セッション運用画面を開く →
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                    <button
+                                        className="button button--primary"
+                                        style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
+                                        onClick={() => handleStartPreparedSession(prep.id)}
+                                    >
+                                        ▶️ 訓練を開始する（本番スタート）
+                                    </button>
+                                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                        <button
+                                            className="button button--secondary"
+                                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.5rem', backgroundColor: '#ffffff' }}
+                                            onClick={() => {
+                                                setCurrentSessionId(null)
+                                                setDisplaySessionId(prep.id)
+                                                setCurrentSessionTitle(prep.title)
+                                                setSessionEnded(false)
+                                                setAdminView('session')
+                                                setActiveTab('sheet')
+                                            }}
+                                        >
+                                            🖨️ 指導表・印刷
+                                        </button>
+                                        <button
+                                            className="button button--secondary"
+                                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.5rem', backgroundColor: '#ffffff' }}
+                                            onClick={() => {
+                                                setCurrentSessionId(null)
+                                                setDisplaySessionId(prep.id)
+                                                setCurrentSessionTitle(prep.title)
+                                                setSessionEnded(false)
+                                                setAdminView('session')
+                                                setActiveTab('dashboard')
+                                            }}
+                                        >
+                                            運用画面 →
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         ))}
+
+                        {/* 進行中・一時停止中セッション一覧 */}
+                        {activeSessionsList.filter(s => {
+                            const st = s.status || (s.isActive ? 'active' : 'ended')
+                            return st === 'active' || st === 'paused'
+                        }).map(active => {
+                            const isPausedCard = active.status === 'paused'
+                            return (
+                                <div
+                                    key={active.id}
+                                    style={{
+                                        padding: '1.25rem',
+                                        borderRadius: '12px',
+                                        border: `2px solid ${isPausedCard ? '#f59e0b' : '#10b981'}`,
+                                        backgroundColor: isPausedCard ? '#fffbeb' : '#ecfdf5',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        gap: '0.75rem',
+                                    }}
+                                >
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: isPausedCard ? '#92400e' : '#065f46' }}>
+                                            {isPausedCard ? '⏸️ 一時停止中の訓練セッション' : '🟢 進行中の訓練セッション'}
+                                        </div>
+                                        <h3 style={{ margin: '0.25rem 0', fontSize: '1.1rem', color: isPausedCard ? '#78350f' : '#064e3b' }}>
+                                            {active.title || '進行中のセッション'}
+                                        </h3>
+                                        <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+                                            患者数: {active.totalPatients}名
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                        <button
+                                            className="button button--primary"
+                                            style={{ backgroundColor: isPausedCard ? '#d97706' : '#059669' }}
+                                            onClick={() => {
+                                                setActiveSession(active.id)
+                                                setCurrentSessionId(active.id)
+                                                setDisplaySessionId(active.id)
+                                                setCurrentSessionTitle(active.title)
+                                                setSessionEnded(false)
+                                                setAdminView('session')
+                                                setActiveTab('dashboard')
+                                            }}
+                                        >
+                                            セッション運用画面を開く →
+                                        </button>
+                                        <button
+                                            className="button button--secondary"
+                                            style={{ fontSize: '0.8rem', padding: '0.45rem', backgroundColor: '#ffffff' }}
+                                            onClick={() => {
+                                                setActiveSession(active.id)
+                                                setCurrentSessionId(active.id)
+                                                setDisplaySessionId(active.id)
+                                                setCurrentSessionTitle(active.title)
+                                                setSessionEnded(false)
+                                                setAdminView('session')
+                                                setActiveTab('sheet')
+                                            }}
+                                        >
+                                            🖨️ 患者一覧表・指導シートを見る
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
 
                         <div style={{
                             padding: '1.25rem',
@@ -1034,16 +1446,16 @@ const AdminPage: React.FC = () => {
                         }}>
                             <div>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb' }}>🚀 新規訓練</div>
-                                <h3 style={{ margin: '0.25rem 0', fontSize: '1.05rem' }}>新しい訓練セッションを開始</h3>
+                                <h3 style={{ margin: '0.25rem 0', fontSize: '1.05rem' }}>新しい訓練セッションを作成・準備</h3>
                                 <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--gray-600)' }}>
-                                    患者数・トリアージ比率・拘束時間を設定して新しい訓練を開始します。
+                                    使用する患者・トリアージ比率・拘束時間を設定し、事前準備または即座に訓練を開始します。
                                 </p>
                             </div>
                             <button
                                 className="button button--primary"
-                                onClick={() => setIsSessionModalOpen(true)}
+                                onClick={openSessionModal}
                             >
-                                ＋ 新規訓練を開始する
+                                ＋ 新規訓練を作成する
                             </button>
                         </div>
 
@@ -1105,7 +1517,7 @@ const AdminPage: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)' }}>
+                        <div className="no-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)', flexWrap: 'wrap' }}>
                             <button
                                 onClick={() => setActiveTab('patients')}
                                 style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'patients' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'patients' ? 'bold' : 'normal', color: activeTab === 'patients' ? 'var(--primary)' : 'var(--gray-600)' }}
@@ -1118,10 +1530,18 @@ const AdminPage: React.FC = () => {
                             >
                                 🛰️ 災害対策本部 (Command Center)
                             </button>
+                            <button
+                                onClick={() => setActiveTab('sheet')}
+                                style={{ padding: '0.5rem 1rem', borderBottom: activeTab === 'sheet' ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', fontWeight: activeTab === 'sheet' ? 'bold' : 'normal', color: activeTab === 'sheet' ? 'var(--primary)' : 'var(--gray-600)' }}
+                            >
+                                🖨️ 患者一覧表・指導書印刷
+                            </button>
                         </div>
 
                         {activeTab === 'dashboard' ? (
-                            <DashboardTab patients={patients} isSessionEndedParent={sessionEnded} />
+                            <DashboardTab patients={patients} sessionId={displaySessionId} isSessionEndedParent={sessionEnded} />
+                        ) : activeTab === 'sheet' ? (
+                            <SessionPatientSheetTab patients={patients} session={currentSessionMeta} sessionTitle={currentSessionTitle} />
                         ) : activeTab === 'settings' ? (
                             <div className="card card--elevated">
                                 <h3 className="card__title">Google Sheets 連携 (GAS Webhook)</h3>

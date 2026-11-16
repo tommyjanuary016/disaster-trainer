@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatient } from '../hooks/usePatient'
 import { useDeterioration } from '../hooks/useDeterioration'
+import { resolveActorGuidance } from '../lib/actorGuidance'
 import PulseAnimation from '../components/actor/PulseAnimation'
 import BreathingAnimation from '../components/actor/BreathingAnimation'
 import { ActorQRModal } from '../components/actor/ActorQRModal'
@@ -10,120 +11,10 @@ import { useWakeLock } from '../hooks/useWakeLock'
 import { soundEngine } from '../lib/soundEngine'
 import { generateInlineQrSvg } from '../lib/inlineQr'
 
-// 痛みの強度に応じた説明を生成する
-const generateLaymanGuide = (patient: any, isSpeechBlocked: boolean, speechBlockedReason: string): string[] => {
-    const guides: string[] = []
-    const findings = patient?.findings
-
-    if (isSpeechBlocked) {
-        guides.push(`🚨 【最優先】あなたは現在「${speechBlockedReason}」です。声を出して会話することはできません。目を閉じて無反応を保つか、首を振る・うめき声のみの演技をしてください。`)
-    }
-
-    // acting_instructionsがあれば最優先で追加
-    if (patient?.acting_instructions) {
-        guides.push(`⭐ 【演技の特別指示】${patient.acting_instructions}`)
-    }
-    
-    // 受傷機転から状況説明
-    if (findings?.background) {
-        guides.push(`🚌 【あなたの状況】${findings.background.slice(0, 80)}`)
-    }
-
-    // 頭部所見
-    if (findings?.head_and_neck && !findings.head_and_neck.includes('明らかな外傷性変化なし')) {
-        guides.push('🤕 頭部や頸部（首・顔面）を強く打撲しています。顔をしかめて痛そうにし、頭や首を触られたら「痛い！」と反応してください。')
-    }
-
-    // 胸部所見
-    if (findings?.chest && !findings.chest.includes('明らかな外傷性変化なし')) {
-        guides.push('😮‍💨 胸部が痛くて呼吸が苦しい状態です。呼吸のたびに顔をゆがめ、浅く息をしてください。胸部を触られたら「痛い！」と言ってください。')
-    }
-
-    // 腹部・骨盤所見
-    if (findings?.abdomen_and_pelvis && !findings.abdomen_and_pelvis.includes('明らかな外傷性変化なし')) {
-        guides.push('😣 腹部や骨盤周囲が激しく痛む状態です。腹部や骨盤を押されたら「痛い！」「そこが一番痛い！」と言ってください。できるだけ動きたくない様子を演じてください。')
-    }
-
-    // 四肢所見
-    if (findings?.limbs && !findings.limbs.includes('明らかな外傷性変化なし')) {
-        guides.push('🦵 四肢（腕や脚）を強く打撲・骨折しています。患部をできるだけ動かさないようにし、触られたら「痛い！」と言ってください。')
-    }
-
-    if (guides.length === 0 && !isSpeechBlocked) {
-        guides.push('痛みは少なく、比較的落ち着いた様子で座っていてください。質問には普通に答えてください。')
-    }
-
-    return guides
-}
-
 const getAgeGroup = (age: number) => {
     if (age < 6) return '乳幼児'
     if (age < 15) return '小児'
     return `${Math.floor(age / 10) * 10}代`
-}
-
-/**
- * 外見上の明らかな異常所見（初見・視診所見）を簡潔な客観描写で抽出する
- * ※体幹・四肢・触診所見（骨盤動揺、下肢短縮、腹部打撲等）は除外し身体診察手技での発見に委ねる
- */
-const getVisibleFindings = (patient: any, rr: number, isSpeechBlocked: boolean): string[] => {
-    const findings: string[] = []
-
-    // ① 顔面・頭部の露出部外傷（首・気管偏位などの診察所見は除外）
-    const hText = patient?.findings?.head_and_neck || ''
-    if (hText && !hText.includes('明らかな外傷性変化なし') && !hText.includes('特記所見なし') && !hText.includes('特記事項なし')) {
-        const faceKeywords = ['顔面', '額', '鼻', '眼', '口', '頬', '頭部', '耳', '側頭部', '後頭部']
-        const lines = hText.split(/[、。\n・]/).map((s: string) => s.trim()).filter(Boolean)
-        const matched = lines.filter((line: string) => 
-            faceKeywords.some(kw => line.includes(kw)) && 
-            !line.includes('なし') &&
-            !line.includes('気管') &&
-            !line.includes('怒張')
-        )
-        if (matched.length > 0) {
-            matched.forEach((m: string) => findings.push(m))
-        } else if (faceKeywords.some(kw => hText.includes(kw))) {
-            const firstPart = hText.split(/[、。\n]/)[0].trim()
-            if (firstPart) findings.push(firstPart)
-        }
-    }
-
-    // ② 表情・意識の見た目
-    if (patient?.consciousness_level) {
-        const cl = String(patient.consciousness_level).toLowerCase()
-        if (cl.includes('300') || cl.includes('3桁') || cl.includes('深昏睡') || cl.includes('e1v1m1') || cl.includes('jcs 3')) {
-            findings.push('無反応')
-        } else if (cl.includes('100') || cl.includes('200') || cl.includes('2桁') || isSpeechBlocked) {
-            findings.push('うめき声のみ')
-        } else if (cl.includes('1桁') || cl.includes('清明')) {
-            if (patient?.triage_color === '赤' || patient?.triage_color === '黄' || rr >= 24) {
-                findings.push('苦悶表情')
-            }
-        }
-    } else if (isSpeechBlocked) {
-        findings.push('うめき声のみ')
-    } else if (patient?.triage_color === '赤' || patient?.triage_color === '黄' || rr >= 24) {
-        findings.push('苦悶表情')
-    }
-
-    // ③ 呼吸の見た目
-    if (rr === 0) {
-        findings.push('呼吸停止')
-    } else if (rr >= 30) {
-        findings.push('荒い呼吸')
-    } else if (rr >= 24) {
-        findings.push('浅く速い呼吸')
-    } else if (rr > 0 && rr <= 10) {
-        findings.push('微弱な呼吸')
-    }
-
-    // ④ 活動性外出血
-    const allText = `${hText} ${patient?.findings?.limbs || ''} ${patient?.findings?.chest || ''}`
-    if (allText.includes('大量出血') || allText.includes('噴出性出血')) {
-        findings.push('活動性外出血あり')
-    }
-
-    return Array.from(new Set(findings))
 }
 
 const PatientActorPage: React.FC = () => {
@@ -132,22 +23,24 @@ const PatientActorPage: React.FC = () => {
     const patientId = parseInt(id || '0', 10)
     const { patient } = usePatient(patientId)
     const { currentVitalsText, currentVitalsStruct } = useDeterioration(patient)
+
+    // 2階層管理: 'public' = スタッフ提示・QR画面（デフォルト） / 'private' = 模擬患者専用の演技＆状態確認画面
+    const [viewLayer, setViewLayer] = useState<'public' | 'private'>('public')
     const [activeAnimation, setActiveAnimation] = useState<'pulse' | 'breathing' | null>(null)
-    const [activeTab, setActiveTab] = useState<'easy' | 'detail'>('easy')
     const [showActorQRModal, setShowActorQRModal] = useState<boolean>(() => {
         const params = new URLSearchParams(window.location.search)
         return params.get('modal') === '1'
     })
     const [showDispositionModal, setShowDispositionModal] = useState(false)
+
     // 模擬患者としてQRコードを提示して待機中、画面がスリープしないよう自動維持
     useWakeLock(true)
 
-    // リアルタイムアクションログ（演技者向け）
+    // リアルタイムアクションログ（演技者向け・第2階層に表示）
     const [actionLog, setActionLog] = useState<{ time: string; message: string; icon: string }[]>([])
     const [flashNotice, setFlashNotice] = useState<string | null>(null)
     const prevStatus = useRef<string | null>(null)
     const prevTests = useRef<boolean | undefined>(undefined)
-    const prevStabilization = useRef<boolean | undefined>(undefined)
     const prevTreatments = useRef<string[]>([])
 
     useEffect(() => {
@@ -172,8 +65,8 @@ const PatientActorPage: React.FC = () => {
         if (prevStatus.current !== null && prevStatus.current !== patient.status) {
             const messages: Record<string, { msg: string; icon: string; critical?: boolean }> = {
                 '処置中': { msg: '処置が開始されました。演技を続けてください。', icon: '💉' },
-                '悪化': { msg: '悪化しています！バイタルが変化しています。', icon: '🚨', critical: true },
-                '急変': { msg: '急変です！不動の演技をしてください。', icon: '🚨', critical: true },
+                '悪化': { msg: '容体が変化しました！下の状態と演技指示を確認してください。', icon: '🚨', critical: true },
+                '急変': { msg: '急変しました！動かず目を閉じてください。', icon: '🚨', critical: true },
             }
             const m = messages[patient.status]
             if (m) addLog(m.msg, m.icon, !!m.critical)
@@ -186,19 +79,15 @@ const PatientActorPage: React.FC = () => {
         }
         prevTests.current = patient.tests_completed
 
-        // 安定化処置完了（プレイヤーへの正解通知になるため非表示）
-        prevStabilization.current = patient.stabilization_completed
-
         // 処置追加検知
         const currentTreatments = patient.completed_treatments || []
         const prev = prevTreatments.current
         const newOnes = currentTreatments.filter(t => !prev.includes(t))
         if (newOnes.length > 0) {
-            newOnes.forEach(t => addLog(`処置「${t}」が完了しました。`, '🎡'))
+            newOnes.forEach(t => addLog(`処置（${t}）が完了しました。`, '🎡'))
         }
         prevTreatments.current = currentTreatments
-
-    }, [patient?.status, patient?.tests_completed, patient?.stabilization_completed, patient?.completed_treatments])
+    }, [patient?.status, patient?.tests_completed, patient?.completed_treatments])
 
     if (!patient) {
         return (
@@ -209,334 +98,508 @@ const PatientActorPage: React.FC = () => {
         )
     }
 
-    // 会話不能条件のチェック (気管挿管・鎮静・意識障害)
-    const completedTreatments = patient.completed_treatments || []
-    const hasIntubation = completedTreatments.includes('intubation') || completedTreatments.includes('surgical_airway')
-    const hasSedation = completedTreatments.includes('sedation')
-    let isUnconscious = false
-    if (patient.consciousness_level) {
-        const level = String(patient.consciousness_level).toLowerCase()
-        if (level.includes('3桁') || level.includes('200') || level.includes('300') || level.includes('100') || level.includes('20') || level.includes('30')) {
-            isUnconscious = true
-        }
-    }
-    const isSpeechBlocked = hasIntubation || hasSedation || isUnconscious
-    const speechBlockedReason = hasIntubation 
-        ? '気管挿管中' 
-        : hasSedation 
-            ? '鎮静薬投与中' 
-            : '意識障害（JCS 20以上/3桁等）'
+    const guidance = resolveActorGuidance(patient, currentVitalsStruct, currentVitalsText)
 
-    const parseVitals = (text: string) => {
+    const parseHrRr = (text: string) => {
         let hr = 80
         let rr = 15
         if (!text) return { hr, rr }
         const hrMatch = text.match(/HR[\s:：]*(\d+)/i)
         if (hrMatch && hrMatch[1]) hr = parseInt(hrMatch[1], 10)
-        const rMatch = text.match(/(?<![A-Z])(?:R|RR)[\s:：]*(\d+)/i) ||
-                       text.match(/(?:^|\n|・| )(?:R|RR)[\s:：]*(\d+)/i)
-        if (rMatch && (rMatch[1] || rMatch[2])) rr = parseInt(rMatch[1] || rMatch[2], 10)
+        const rMatch = text.match(/(?:^|\n|・| )(?:R|RR)[\s:：]*(\d+)/i)
+        if (rMatch && rMatch[1]) rr = parseInt(rMatch[1], 10)
         return { hr, rr }
     }
 
-    let hr = currentVitalsStruct?.hr ?? 80
-    let rr = currentVitalsStruct?.rr ?? 15
-    if (!currentVitalsStruct) {
-        const parsed = parseVitals(currentVitalsText || patient.vitals_initial || patient.vitals_triage || '')
-        hr = parsed.hr
-        rr = parsed.rr
-    }
+    const parsedFallback = parseHrRr(currentVitalsText || patient.vitals_initial || patient.vitals_triage || '')
+    const hr = currentVitalsStruct?.hr ?? parsedFallback.hr
+    const rr = currentVitalsStruct?.rr ?? parsedFallback.rr
 
-    const laymanGuides = generateLaymanGuide(patient, isSpeechBlocked, speechBlockedReason)
-    const visibleFindings = getVisibleFindings(patient, rr, isSpeechBlocked)
+    /** 脈・呼吸・処置QRボタン群（第1階層・第2階層どちらからでも同じように飛べる共通パーツ） */
+    const renderStaffActionButtons = (compact: boolean = false) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div className="actor-actions" style={{ marginTop: 0 }}>
+                <button
+                    type="button"
+                    className="actor-button actor-button--pulse"
+                    onClick={() => setActiveAnimation('pulse')}
+                    style={compact ? { padding: '0.7rem 0.5rem' } : undefined}
+                >
+                    <div className="button-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+                    </div>
+                    <span>💓 脈（心拍）を見せる</span>
+                </button>
+                <button
+                    type="button"
+                    className="actor-button actor-button--breathing"
+                    onClick={() => setActiveAnimation('breathing')}
+                    style={compact ? { padding: '0.7rem 0.5rem' } : undefined}
+                >
+                    <div className="button-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" /></svg>
+                    </div>
+                    <span>🌬️ 呼吸を見せる</span>
+                </button>
+            </div>
+
+            <button
+                type="button"
+                onClick={() => setShowActorQRModal(true)}
+                style={{
+                    width: '100%',
+                    padding: compact ? '0.75rem' : '0.9rem',
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    fontSize: compact ? '0.92rem' : '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                    cursor: 'pointer',
+                }}
+            >
+                <span style={{ fontSize: '1.15rem' }}>📱</span>
+                <span>処置・手技・物品のQRを提示する</span>
+            </button>
+        </div>
+    )
 
     return (
         <div className="actor-page">
             <header className="actor-page__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <button className="actor-page__back" onClick={() => navigate('/training/actor')}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M15 18l-6-6 6-6" />
-                    </svg>
-                    模擬患者選択
-                </button>
-                <h2>模擬患者モード</h2>
-                <div style={{ width: '80px' }} />
+                {viewLayer === 'private' ? (
+                    <button className="actor-page__back" onClick={() => setViewLayer('public')}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        患者QR画面に戻る
+                    </button>
+                ) : (
+                    <button className="actor-page__back" onClick={() => navigate('/training/actor')}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        模擬患者選択
+                    </button>
+                )}
+                <h2 style={{ fontSize: '1rem', margin: 0 }}>
+                    {viewLayer === 'public' ? '模擬患者モード（提示用）' : '模擬患者専用（演技＆状態）'}
+                </h2>
+                <div style={{ width: '60px' }} />
             </header>
 
-            {/* 会話不能状態の強調バナー */}
-            {isSpeechBlocked && (
-                <div style={{
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    padding: '0.875rem 1rem',
-                    margin: '0.5rem 1rem 0',
-                    borderRadius: '12px',
-                    fontWeight: 'bold',
-                    fontSize: '0.95rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.6rem',
-                    boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
-                    animation: 'pulse-ring 2s infinite'
-                }}>
-                    <span style={{ fontSize: '1.4rem' }}>🚨</span>
-                    <div>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>【全画面演技指示】会話不能状態</div>
-                        <div>あなたは現在【{speechBlockedReason}】のため喋れません！問診には答えず無反応または首振り等の演技をしてください。</div>
-                    </div>
-                </div>
-            )}
-
-            {/* フラッシュ通知バナー */}
+            {/* フラッシュ通知バナー（第2階層にいるときのみ詳細文言、第1階層ではネタバレ防止で簡易通知） */}
             {flashNotice && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
                     backgroundColor: '#1d4ed8', color: 'white',
-                    padding: '1rem 1.5rem', fontSize: '1rem', fontWeight: 'bold',
+                    padding: '0.9rem 1.25rem', fontSize: '0.95rem', fontWeight: 'bold',
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    animation: 'slideDown 0.3s ease',
                 }}>
-                    <span style={{ fontSize: '1.4rem' }}>🔔</span>
-                    {flashNotice}
+                    <span style={{ fontSize: '1.3rem' }}>🔔</span>
+                    <span>
+                        {viewLayer === 'private'
+                            ? flashNotice
+                            : '状態・処置に変化がありました（演技確認画面を開いて確認してください）'}
+                    </span>
                 </div>
             )}
 
             <div className="actor-page__content">
+                {/* 患者基本識別表示（ネタバレなし） */}
                 <div className="actor-patient-info">
                     <div className="actor-patient-info__demo" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                        推定 {getAgeGroup(patient.age)} {patient.gender === 'M' ? '男性' : '女性'} <span style={{ fontSize: '0.9rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>(患者ID: {patient.base_patient_id || patient.id})</span>
+                        推定 {getAgeGroup(patient.age)} {patient.gender === 'M' ? '男性' : '女性'}{' '}
+                        <span style={{ fontSize: '0.9rem', color: 'var(--gray-500)', fontWeight: 'normal' }}>
+                            (患者ID: {patient.base_patient_id || patient.id})
+                        </span>
                     </div>
                 </div>
 
-                {/* アクションログ（リアルタイム通知履歴） */}
-                {actionLog.length > 0 && (
-                    <div style={{ margin: '0.5rem 0 0.5rem', padding: '0.75rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-                        <h4 style={{ fontSize: '0.85rem', margin: '0 0 0.5rem', color: '#1d4ed8' }}>📳 リアルタイム通知</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '130px', overflowY: 'auto' }}>
-                            {actionLog.map((log, i) => (
-                                <div key={i} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.82rem', color: i === 0 ? '#1e3a8a' : 'var(--gray-600)', fontWeight: i === 0 ? 'bold' : 'normal' }}>
-                                    <span style={{ opacity: 0.6, flexShrink: 0 }}>{log.time}</span>
-                                    <span>{log.icon} {log.message}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* QRコードカード */}
-                <div className="card card--elevated" style={{ textAlign: 'center', margin: '1rem 0' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--gray-700)' }}>あなたの患者QRコード</h3>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
-                        👩‍⚕️ 医療スタッフが「スキャンします」と言ったらこの画面を見せてください
-                    </p>
-                    <img
-                        src={generateInlineQrSvg(`patient:${patient.id}`, 160)}
-                        alt="患者QR"
-                        style={{ width: '160px', height: '160px', margin: '0 auto', display: 'block' }}
-                    />
-                    <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '0.05em' }}>
-                        ID: {patient.base_patient_id || patient.id}
-                    </div>
-
-                    {/* 外見上の明らかな異常所見 */}
-                    {visibleFindings.length > 0 && (
-                        <div style={{
-                            marginTop: '1rem',
-                            padding: '0.75rem 1rem',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            textAlign: 'left'
-                        }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#334155', marginBottom: '0.35rem' }}>
-                                外見上の明らかな異常所見
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.6' }}>
-                                {visibleFindings.map((f, i) => (
-                                    <li key={i}>{f}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-
-                {/* タブ切り替え */}
-                <div style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0 0.5rem' }}>
-                    <button
-                        onClick={() => setActiveTab('easy')}
-                        style={{
-                            flex: 1, padding: '0.7rem',
-                            borderRadius: '8px', border: '2px solid',
-                            borderColor: activeTab === 'easy' ? '#f97316' : 'var(--gray-200)',
-                            backgroundColor: activeTab === 'easy' ? '#fff7ed' : 'white',
-                            color: activeTab === 'easy' ? '#ea580c' : 'var(--gray-600)',
-                            fontWeight: activeTab === 'easy' ? 'bold' : 'normal',
-                            cursor: 'pointer', fontSize: '0.9rem',
-                        }}
-                    >
-                        📋 かんたんガイド
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('detail')}
-                        style={{
-                            flex: 1, padding: '0.7rem',
-                            borderRadius: '8px', border: '2px solid',
-                            borderColor: activeTab === 'detail' ? 'var(--primary)' : 'var(--gray-200)',
-                            backgroundColor: activeTab === 'detail' ? '#eff6ff' : 'white',
-                            color: activeTab === 'detail' ? 'var(--primary)' : 'var(--gray-600)',
-                            fontWeight: activeTab === 'detail' ? 'bold' : 'normal',
-                            cursor: 'pointer', fontSize: '0.9rem',
-                        }}
-                    >
-                        🩺 詳細（医療者向け）
-                    </button>
-                </div>
-
-                {/* かんたんガイドタブ */}
-                {activeTab === 'easy' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        {/* 演技者用控え（氏名・実年齢） */}
-                        <div style={{
-                            backgroundColor: '#f1f5f9',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '10px',
-                            padding: '0.75rem 1rem',
-                            fontSize: '0.85rem',
-                            color: '#475569'
-                        }}>
-                            <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '0.2rem' }}>
-                                🎭 演技者控え情報
-                            </div>
-                            <div>患者氏名: <strong>{patient.name}</strong> 様（実年齢: {patient.age}歳）</div>
-                        </div>
-
-                        {/* やること手順カード */}
-                        <div style={{
-                            backgroundColor: '#fff7ed',
-                            border: '2px solid #fb923c',
-                            borderRadius: '12px',
-                            padding: '1rem',
-                        }}>
-                            <h3 style={{ margin: '0 0 0.8rem 0', color: '#c2410c', fontSize: '1rem' }}>
-                                📌 やること（手順）
+                {/* =========================================================
+                    第1階層：医療スタッフに提示する画面（QRコード・外見・脈・呼吸）
+                    ※演技指示や背景、バイタル詳細などネタバレ情報はここに出さない
+                   ========================================================= */}
+                {viewLayer === 'public' ? (
+                    <>
+                        {/* QRコードカード */}
+                        <div className="card card--elevated" style={{ textAlign: 'center', margin: '0.75rem 0 1rem' }}>
+                            <h3 style={{ fontSize: '0.95rem', marginBottom: '0.35rem', color: 'var(--gray-700)' }}>
+                                患者QRコード（医療スタッフ提示用）
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                {[
-                                    { step: '1', text: 'このアプリを開いた状態で待機してください' },
-                                    { step: '2', text: isSpeechBlocked ? `【注意】現在は「${speechBlockedReason}」です。医療スタッフに声をかけられても喋らず無反応・うめき声のみの演技をしてください。` : '医療スタッフが近づいてきたら「どこが痛いですか？」などと聞かれます。あなたの役の状況に合わせて答えてください（下の「演技のポイント」を参考に）' },
-                                    { step: '3', text: '「スキャンします」と言われたら、このQRコード画面をかざしてください' },
-                                    { step: '4', text: '「脈をみます」「呼吸をみます」と言われたら下のボタンを押してスタッフに端末を見せてください' },
-                                ].map(({ step, text }) => (
-                                    <div key={step} style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start' }}>
-                                        <span style={{
-                                            minWidth: '28px', height: '28px', borderRadius: '50%',
-                                            backgroundColor: '#f97316', color: 'white',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0,
-                                        }}>{step}</span>
-                                        <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.6', color: '#431407' }}>{text}</p>
-                                    </div>
-                                ))}
+                            <p style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginBottom: '0.85rem' }}>
+                                👩‍⚕️ 医療スタッフが「スキャンします」と言ったらこの画面を見せてください
+                            </p>
+                            <img
+                                src={generateInlineQrSvg(`patient:${patient.id}`, 170)}
+                                alt="患者QR"
+                                style={{ width: '170px', height: '170px', margin: '0 auto', display: 'block' }}
+                            />
+                            <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.15rem', letterSpacing: '0.05em' }}>
+                                ID: {patient.base_patient_id || patient.id}
                             </div>
-                        </div>
 
-                        {/* 演技のポイント */}
-                        <div style={{
-                            backgroundColor: '#fef9f0',
-                            border: '1px solid #fde68a',
-                            borderRadius: '12px',
-                            padding: '1rem',
-                        }}>
-                            <h3 style={{ margin: '0 0 0.8rem 0', color: '#92400e', fontSize: '1rem' }}>
-                                🎭 演技のポイント
-                            </h3>
-                            {laymanGuides.map((guide, i) => (
-                                <div key={i} style={{
-                                    backgroundColor: 'white',
+                            {/* 外見上の明らかな異常所見（視診所見のみ） */}
+                            {guidance.visibleFindings.length > 0 && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    padding: '0.75rem 1rem',
+                                    backgroundColor: '#f8fafc',
                                     borderRadius: '8px',
-                                    padding: '0.8rem',
-                                    marginBottom: i < laymanGuides.length - 1 ? '0.5rem' : 0,
-                                    fontSize: '0.9rem',
-                                    lineHeight: '1.6',
-                                    color: '#1c1917',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    border: '1px solid #e2e8f0',
+                                    textAlign: 'left',
                                 }}>
-                                    {guide}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* 答え方のヒント */}
-                        <div style={{
-                            backgroundColor: isSpeechBlocked ? '#fef2f2' : '#f0fdf4',
-                            border: `1px solid ${isSpeechBlocked ? '#fca5a5' : '#86efac'}`,
-                            borderRadius: '12px',
-                            padding: '1rem',
-                        }}>
-                            <h3 style={{ margin: '0 0 0.8rem 0', color: isSpeechBlocked ? '#991b1b' : '#166534', fontSize: '1rem' }}>
-                                💬 よく聞かれる質問と答え方
-                            </h3>
-                            {isSpeechBlocked ? (
-                                <div style={{ color: '#991b1b', fontSize: '0.9rem', fontWeight: 'bold', lineHeight: 1.6 }}>
-                                    ⚠️【問診不可状態】現在は「{speechBlockedReason}」のため質問に答えることはできません。<br/>
-                                    質問に対して声を出さず、目を閉じて無反応、または首を横に振る・うめき声のみの演技をしてください。
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
-                                    <div>
-                                        <strong>「アレルギーはありますか？」</strong><br/>
-                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/アレルギー[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#334155', marginBottom: '0.35rem' }}>
+                                        外見上の明らかな異常所見
                                     </div>
-                                    <div>
-                                        <strong>「飲んでいるお薬はありますか？」</strong><br/>
-                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.ample?.match(/内服薬[：:]\s*(.+)/)?.[1] || 'ありません'}」</span>
-                                    </div>
-                                    <div>
-                                        <strong>「いつ怪我をしましたか？」「何があったんですか？」</strong><br/>
-                                        <span style={{ color: '#166534' }}>→ 「{patient.findings.background?.slice(0, 60) || '交通事故に遭いました'}」</span>
-                                    </div>
+                                    <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.6' }}>
+                                        {guidance.visibleFindings.map((f, i) => (
+                                            <li key={i}>{f}</li>
+                                        ))}
+                                    </ul>
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
 
-                {/* 詳細（医療者向け）タブ */}
-                {activeTab === 'detail' && (
-                    <div className="actor-instruction">
-                        <div className="instruction-card">
-                            <h4>患者氏名・実年齢（演技者控え）</h4>
-                            <p style={{ fontWeight: 'bold', fontSize: '0.95rem', margin: '0 0 1rem', color: '#1e293b' }}>
-                                {patient.name} 様（実年齢: {patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}）
-                            </p>
-
-                            <h4>状況・受傷機転</h4>
-                            <p>{patient.findings.background || '特記事項なし'}</p>
-
-                            <h4>バイタルサイン・全身所見</h4>
-                            <p className="instruction-vitals" style={{ whiteSpace: 'pre-line' }}>{currentVitalsText || patient.vitals_initial}</p>
-
-                            <div style={{ padding: '0.8rem', backgroundColor: 'var(--gray-50)', borderRadius: '4px', fontSize: '0.9rem', marginBottom: '1rem', border: '1px solid var(--gray-200)' }}>
-                                <p><strong>頭頚部:</strong> {patient.findings.head_and_neck || '特記事項なし'}</p>
-                                <p><strong>胸部:</strong> {patient.findings.chest || '特記事項なし'}</p>
-                                <p><strong>腹部・骨盤:</strong> {patient.findings.abdomen_and_pelvis || '特記事項なし'}</p>
-                                <p><strong>四肢:</strong> {patient.findings.limbs || '特記事項なし'}</p>
-                                <p><strong>FAST:</strong> {patient.findings.fast || '特記事項なし'}</p>
+                        {/* 第2階層（模擬患者専用・演技＆状態確認）へ入るボタン */}
+                        <button
+                            type="button"
+                            onClick={() => setViewLayer('private')}
+                            style={{
+                                width: '100%',
+                                padding: '1rem 1.1rem',
+                                marginBottom: '1rem',
+                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '14px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                                boxShadow: '0 6px 16px rgba(234, 88, 12, 0.28)',
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span>🎭</span>
+                                    <span>演技のしかた・今の自分の状態を見る</span>
+                                </div>
+                                <div style={{ fontSize: '0.76rem', opacity: 0.92, marginTop: '0.2rem' }}>
+                                    ※模擬患者さん専用画面（目・声・動きの指示や今の血圧・脈拍が見られます）
+                                </div>
                             </div>
+                            <span style={{ fontSize: '1.3rem', fontWeight: 'bold', flexShrink: 0 }}>→</span>
+                        </button>
 
-                            <h4>既往歴 (AMPLE)</h4>
-                            <p style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--gray-50)', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--gray-200)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                                {patient.findings.ample || '特記事項なし'}
-                            </p>
-
-                            <h4>演技のポイント</h4>
-                            <p className="instruction-highlight">
-                                {patient.acting_instructions || '特になし'}
-                                <br/><br/>
-                                診察役が「脈をみます」「呼吸をみます」と言ったら、下のボタンをタップして端末を診察役に見せ（聞かせ）てください。
-                            </p>
+                        {/* スタッフ提示ボタン（脈・呼吸・処置QR） */}
+                        {!patient.disposition && (
+                            <div style={{ marginBottom: '1.25rem' }}>
+                                <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0 0 0.5rem' }}>
+                                    「脈をみます」「呼吸をみます」「処置QRを見せて」と言われたらタップ
+                                </p>
+                                {renderStaffActionButtons(false)}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    /* =========================================================
+                        第2階層：模擬患者専用画面（演技指示・今の状態確認）
+                        ※ここから直接「脈」「呼吸」「処置QR」「患者QRへ戻る」へ飛べる
+                       ========================================================= */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                        {/* 上部ナビ＆クイックアクションバー */}
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            border: '2px solid #cbd5e1',
+                            borderRadius: '14px',
+                            padding: '0.85rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.65rem',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }}>
+                                    🔒 模擬患者専用画面（スタッフには見せない）
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewLayer('public')}
+                                    style={{
+                                        padding: '0.45rem 0.85rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #94a3b8',
+                                        backgroundColor: '#ffffff',
+                                        color: '#1e293b',
+                                        fontWeight: 'bold',
+                                        fontSize: '0.82rem',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    ← 患者QR画面に戻る
+                                </button>
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                                スタッフに頼まれたらここからそのまま脈・呼吸・処置QR画面へ飛べます：
+                            </div>
+                            {renderStaffActionButtons(true)}
                         </div>
+
+                        {/* 無言・完全無反応の強調バナー（必要なときのみ自動表示） */}
+                        {guidance.isSpeechBlocked && (
+                            <div style={{
+                                backgroundColor: '#dc2626',
+                                color: 'white',
+                                padding: '0.9rem 1rem',
+                                borderRadius: '12px',
+                                fontWeight: 'bold',
+                                fontSize: '0.95rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
+                            }}>
+                                <span style={{ fontSize: '1.5rem' }}>🤫</span>
+                                <div>
+                                    <div style={{ fontSize: '0.78rem', opacity: 0.9 }}>【最重要ルール】</div>
+                                    <div>{guidance.verbal.headline} — {guidance.verbal.detail}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🎯 あなたが今やる演技（目・声・動きの具体的ルール） */}
+                        <div style={{
+                            backgroundColor: '#fff7ed',
+                            border: '2px solid #fb923c',
+                            borderRadius: '14px',
+                            padding: '1rem',
+                        }}>
+                            <h3 style={{ margin: '0 0 0.75rem', color: '#9a3412', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>🎭</span>
+                                <span>あなたの今の演技ルール（そのままやってください）</span>
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                                {/* 👁️ 目 */}
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    borderLeft: '5px solid #2563eb',
+                                    borderRadius: '10px',
+                                    padding: '0.75rem 0.9rem',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#1d4ed8', marginBottom: '0.2rem' }}>
+                                        👁️ 目の開け方
+                                    </div>
+                                    <div style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.25rem' }}>
+                                        {guidance.eye.headline}
+                                    </div>
+                                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: '1.55' }}>
+                                        {guidance.eye.detail}
+                                    </div>
+                                </div>
+
+                                {/* 🗣️ 声・話し方 */}
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    borderLeft: '5px solid #dc2626',
+                                    borderRadius: '10px',
+                                    padding: '0.75rem 0.9rem',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#b91c1c', marginBottom: '0.2rem' }}>
+                                        🗣️ 声・話し方
+                                    </div>
+                                    <div style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.25rem' }}>
+                                        {guidance.verbal.headline}
+                                    </div>
+                                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: '1.55' }}>
+                                        {guidance.verbal.detail}
+                                    </div>
+                                </div>
+
+                                {/* 💪 体の動き */}
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    borderLeft: '5px solid #059669',
+                                    borderRadius: '10px',
+                                    padding: '0.75rem 0.9rem',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#047857', marginBottom: '0.2rem' }}>
+                                        💪 体の動かし方・触られたときの反応
+                                    </div>
+                                    <div style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.25rem' }}>
+                                        {guidance.motor.headline}
+                                    </div>
+                                    <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: '1.55' }}>
+                                        {guidance.motor.detail}
+                                    </div>
+                                </div>
+
+                                {/* 特別演技指示 */}
+                                {guidance.specialInstruction && (
+                                    <div style={{
+                                        backgroundColor: '#fef3c7',
+                                        border: '1px solid #f59e0b',
+                                        borderRadius: '10px',
+                                        padding: '0.75rem 0.9rem',
+                                        fontSize: '0.9rem',
+                                        color: '#78350f',
+                                        lineHeight: '1.55',
+                                    }}>
+                                        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>⭐ 特別な演技ポイント</div>
+                                        <div>{guidance.specialInstruction}</div>
+                                    </div>
+                                )}
+
+                                {/* 部位別の痛み反応・呼吸の様子 */}
+                                {guidance.painGuides.length > 0 && (
+                                    <div style={{
+                                        backgroundColor: '#ffffff',
+                                        borderRadius: '10px',
+                                        padding: '0.75rem 0.9rem',
+                                        border: '1px solid #fed7aa',
+                                    }}>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#c2410c', marginBottom: '0.35rem' }}>
+                                            🩺 触られたとき・息づかいの演技
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.88rem', color: '#1c1917', lineHeight: '1.55' }}>
+                                            {guidance.painGuides.map((g, i) => (
+                                                <div key={i}>{g}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 💬 質問されたときの答え方（V5のときのみ患者背景等を提示、V4は曖昧回答のみ、V1〜3は非表示） */}
+                        {guidance.canAnswerQuestions && guidance.qaItems.length > 0 && (
+                            <div style={{
+                                backgroundColor: '#f0fdf4',
+                                border: '2px solid #86efac',
+                                borderRadius: '14px',
+                                padding: '1rem',
+                            }}>
+                                <h3 style={{ margin: '0 0 0.75rem', color: '#166534', fontSize: '1rem' }}>
+                                    💬 医療スタッフに質問されたときの答え方
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.9rem' }}>
+                                    {guidance.qaItems.map((qa, i) => (
+                                        <div key={i} style={{ backgroundColor: '#ffffff', padding: '0.65rem 0.8rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                            <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '0.15rem' }}>{qa.question}</div>
+                                            <div style={{ color: '#15803d', fontWeight: '600' }}>→ {qa.answer}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {!guidance.canAnswerQuestions && guidance.v4FallbackReply && (
+                            <div style={{
+                                backgroundColor: '#fffbeb',
+                                border: '2px solid #fcd34d',
+                                borderRadius: '14px',
+                                padding: '0.9rem 1rem',
+                                fontSize: '0.92rem',
+                                color: '#92400e',
+                                fontWeight: 'bold',
+                                lineHeight: '1.55',
+                            }}>
+                                💬 何か質問されたら：<br />
+                                {guidance.v4FallbackReply}
+                            </div>
+                        )}
+
+                        {/* 📊 あなたの今の状態（リアルタイムバイタルサイン） */}
+                        <div style={{
+                            backgroundColor: '#eff6ff',
+                            border: '2px solid #93c5fd',
+                            borderRadius: '14px',
+                            padding: '1rem',
+                        }}>
+                            <h3 style={{ margin: '0 0 0.35rem', color: '#1e40af', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>📊</span>
+                                <span>あなたの今の体の状態（現在の数値）</span>
+                            </h3>
+                            <p style={{ margin: '0 0 0.75rem', fontSize: '0.78rem', color: '#3b82f6' }}>
+                                ※時間経過や処置によって変化した最新のあなたの状態です（スタッフには見せないでください）
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.55rem' }}>
+                                {guidance.vitalsCards.map((vc) => (
+                                    <div key={vc.label} style={{
+                                        backgroundColor: '#ffffff',
+                                        borderRadius: '10px',
+                                        padding: '0.65rem 0.75rem',
+                                        border: vc.isAbnormal ? '1.5px solid #fca5a5' : '1px solid #bfdbfe',
+                                    }}>
+                                        <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 'bold' }}>{vc.label}</div>
+                                        <div style={{
+                                            fontSize: '1.25rem',
+                                            fontWeight: '800',
+                                            color: vc.isAbnormal ? '#dc2626' : '#0f172a',
+                                            margin: '0.15rem 0',
+                                        }}>
+                                            {vc.value} <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#64748b' }}>{vc.unit}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.74rem', color: vc.isAbnormal ? '#b91c1c' : '#334155', lineHeight: '1.35' }}>
+                                            {vc.statusText}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* アクションログ（リアルタイム通知履歴） */}
+                        {actionLog.length > 0 && (
+                            <div style={{ padding: '0.75rem', background: '#f1f5f9', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                <h4 style={{ fontSize: '0.85rem', margin: '0 0 0.5rem', color: '#334155' }}>📳 あなたへの処置・通知履歴</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '130px', overflowY: 'auto' }}>
+                                    {actionLog.map((log, i) => (
+                                        <div key={i} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.82rem', color: i === 0 ? '#0f172a' : 'var(--gray-600)', fontWeight: i === 0 ? 'bold' : 'normal' }}>
+                                            <span style={{ opacity: 0.6, flexShrink: 0 }}>{log.time}</span>
+                                            <span>{log.icon} {log.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 指導スタッフ・医療者向け参考情報（通常は折りたたみ） */}
+                        <details style={{
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '10px',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.85rem',
+                            color: '#475569',
+                        }}>
+                            <summary style={{ cursor: 'pointer', fontWeight: 'bold', color: '#334155' }}>
+                                🩺 指導スタッフ用：医療設定データを開く（模擬患者役は普段見なくてOK）
+                            </summary>
+                            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div><strong>患者氏名・実年齢:</strong> {patient.name} 様（{patient.age}歳 {patient.gender === 'M' ? '男性' : '女性'}）</div>
+                                <div><strong>診断名:</strong> {patient.diagnosis}</div>
+                                <div><strong>計算GCS:</strong> E{guidance.gcs.e} V{guidance.gcs.v} M{guidance.gcs.m}</div>
+                                <div><strong>頭頸部:</strong> {patient.findings.head_and_neck || '特記事項なし'}</div>
+                                <div><strong>胸部:</strong> {patient.findings.chest || '特記事項なし'}</div>
+                                <div><strong>腹部・骨盤:</strong> {patient.findings.abdomen_and_pelvis || '特記事項なし'}</div>
+                                <div><strong>四肢:</strong> {patient.findings.limbs || '特記事項なし'}</div>
+                                <div><strong>FAST:</strong> {patient.findings.fast || '特記事項なし'}</div>
+                                <div><strong>AMPLE:</strong> {patient.findings.ample || '特記事項なし'}</div>
+                                <div><strong>背景:</strong> {patient.findings.background || '特記事項なし'}</div>
+                            </div>
+                        </details>
                     </div>
                 )}
 
@@ -544,7 +607,7 @@ const PatientActorPage: React.FC = () => {
                 {patient.disposition ? (
                     <div
                         style={{
-                            marginTop: '1.5rem',
+                            marginTop: '1.25rem',
                             padding: '1.25rem',
                             backgroundColor: '#ecfdf5',
                             border: '2px solid #10b981',
@@ -578,89 +641,38 @@ const PatientActorPage: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        <p style={{ margin: '0.8rem 0 0', fontSize: '0.8rem', color: '#6ee7b7' }}>
+                        <p style={{ margin: '0.8rem 0 0', fontSize: '0.8rem', color: '#059669' }}>
                             指示に従って待機または退場口へ移動してください。お疲れ様でした！
                         </p>
                     </div>
                 ) : (
-                    /* 処置・物品QR提示 ＆ 脈・呼吸ボタン ＆ 目的地到着ボタン (常時表示) */
-                    <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {/* スマホ完結・処置QR提示ボタン */}
+                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--gray-300)' }}>
+                        <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', margin: '0 0 0.5rem' }}>
+                            ※案内された病棟・手術室・退場口等に到着したら以下をタップ
+                        </p>
                         <button
-                            onClick={() => setShowActorQRModal(true)}
+                            type="button"
+                            onClick={() => setShowDispositionModal(true)}
                             style={{
                                 width: '100%',
-                                padding: '0.9rem',
-                                backgroundColor: '#2563eb',
+                                padding: '0.85rem',
+                                backgroundColor: '#10b981',
                                 color: '#ffffff',
                                 border: 'none',
-                                borderRadius: '12px',
+                                borderRadius: '10px',
                                 fontWeight: 'bold',
-                                fontSize: '1rem',
+                                fontSize: '0.95rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '0.6rem',
-                                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                                gap: '0.5rem',
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
                                 cursor: 'pointer',
                             }}
                         >
-                            <span style={{ fontSize: '1.25rem' }}>📱</span>
-                            <span>処置・手技・物品のQRを提示する</span>
+                            <span style={{ fontSize: '1.2rem' }}>🏁</span>
+                            <span>目的地（病棟・手術室・退場口等）に到着した</span>
                         </button>
-
-                        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0.25rem 0 0' }}>
-                            「脈をみます」「呼吸をみます」と言われたら以下をタップ
-                        </p>
-                        <div className="actor-actions" style={{ marginTop: '0' }}>
-                            <button
-                                className="actor-button actor-button--pulse"
-                                onClick={() => setActiveAnimation('pulse')}
-                            >
-                                <div className="button-icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                </div>
-                                <span>💓 脈（心拍）を見せる</span>
-                            </button>
-                            <button
-                                className="actor-button actor-button--breathing"
-                                onClick={() => setActiveAnimation('breathing')}
-                            >
-                                <div className="button-icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
-                                </div>
-                                <span>🌬️ 呼吸を見せる</span>
-                            </button>
-                        </div>
-
-                        {/* 最下部：目的地到着ボタン（移動・搬送完了時にタップ） */}
-                        <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px dashed var(--gray-300)' }}>
-                            <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', margin: '0 0 0.5rem' }}>
-                                ※案内された病棟・手術室・退場口等に到着したら以下をタップ
-                            </p>
-                            <button
-                                onClick={() => setShowDispositionModal(true)}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.85rem',
-                                    backgroundColor: '#10b981',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '10px',
-                                    fontWeight: 'bold',
-                                    fontSize: '0.95rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <span style={{ fontSize: '1.2rem' }}>🏁</span>
-                                <span>目的地（病棟・手術室・退場口等）に到着した</span>
-                            </button>
-                        </div>
                     </div>
                 )}
             </div>

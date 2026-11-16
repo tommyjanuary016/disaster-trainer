@@ -14,6 +14,9 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
     useWakeLock(true)
 
     useEffect(() => {
+        if (bpm <= 0) {
+            return
+        }
         // AudioContextの初期化（マスターコンプレッサー付きでスマホでの音圧を増強）
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext
         const ctx: AudioContext = new AudioContext()
@@ -94,7 +97,7 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
     }, [bpm])
 
     // CSSのanimation-durationをBPMに合わせて計算
-    const durationSeconds = 60 / bpm
+    const durationSeconds = bpm > 0 ? 60 / bpm : 0
 
     useEffect(() => {
         // 表示時にスクロール位置を最上部に固定
@@ -107,26 +110,37 @@ const PulseAnimation: React.FC<PulseAnimationProps> = ({ bpm, onClose }) => {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <div className="pulse-container">
-                <div 
-                    className="pulse-circle pulse-circle--1"
-                    style={{ animationDuration: `${durationSeconds}s` }}
-                ></div>
-                <div 
-                    className="pulse-circle pulse-circle--2"
-                    style={{ animationDuration: `${durationSeconds}s` }}
-                ></div>
-                <div 
-                    className="pulse-circle pulse-circle--3"
-                    style={{ animationDuration: `${durationSeconds}s` }}
-                ></div>
-                <div 
-                    className="pulse-circle pulse-circle--core"
-                    style={{ animationDuration: `${durationSeconds}s` }}
-                ></div>
-                <div className="pulse-text">HR: {bpm} bpm</div>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.06em' }}>
-                    🔊 心拍音と画面の脈動で脈拍（HR）を提示中
-                </div>
+                {bpm > 0 ? (
+                    <>
+                        <div 
+                            className="pulse-circle pulse-circle--1"
+                            style={{ animationDuration: `${durationSeconds}s` }}
+                        ></div>
+                        <div 
+                            className="pulse-circle pulse-circle--2"
+                            style={{ animationDuration: `${durationSeconds}s` }}
+                        ></div>
+                        <div 
+                            className="pulse-circle pulse-circle--3"
+                            style={{ animationDuration: `${durationSeconds}s` }}
+                        ></div>
+                        <div 
+                            className="pulse-circle pulse-circle--core"
+                            style={{ animationDuration: `${durationSeconds}s` }}
+                        ></div>
+                        <div className="pulse-text">HR: {bpm} bpm</div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.06em' }}>
+                            🔊 心拍音と画面の脈動で脈拍（HR）を提示中
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="pulse-text" style={{ color: '#fca5a5' }}>HR: 0 bpm（脈拍触知不能）</div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.04em' }}>
+                            心停止状態のため脈拍・心拍音はありません
+                        </div>
+                    </>
+                )}
             </div>
             <button
                 onClick={onClose}

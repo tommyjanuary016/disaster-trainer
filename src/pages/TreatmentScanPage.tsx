@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchPatient, startTreatmentTimer, updatePatientFlags, activeSessionId, fetchTrainingSession } from '../lib/firestore'
+import { fetchPatient, startTreatmentTimer, updatePatientFlags, activeSessionId, subscribeToTrainingSession } from '../lib/firestore'
 import { Patient } from '../types/patient'
 import { parseQRCode, ParsedQRCode } from '../types/qr'
 import { getMedicalItemById } from '../data/items'
@@ -157,14 +157,15 @@ const TreatmentScanPage: React.FC = () => {
     const [sessionMeta, setSessionMeta] = useState<any>(null)
 
     useEffect(() => {
-        // セッションのメタデータおよび isTestMode フラグを取得
+        // セッションのメタデータおよび isTestMode / 一時停止状態をリアルタイム購読
         if (activeSessionId) {
-            fetchTrainingSession(activeSessionId).then(session => {
+            const unsub = subscribeToTrainingSession(activeSessionId, session => {
                 if (session) {
                     setSessionMeta(session)
                     if (session.isTestMode) setIsTestMode(true)
                 }
-            }).catch(e => console.error(e))
+            })
+            return () => unsub()
         }
     }, [])
 
@@ -268,7 +269,7 @@ const TreatmentScanPage: React.FC = () => {
         if (customLockTimes && customLockTimes[treatmentId] !== undefined) {
             initialMinutes = isTestMode ? TEST_LOCK_MIN : customLockTimes[treatmentId]
         } else if (EXAM_IDS.includes(treatmentId)) {
-            initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.examLockTimeMinutes ?? 3)
+            initialMinutes = isTestMode ? TEST_LOCK_MIN : (sessionMeta?.examLockTimeMinutes ?? 1)
         } else if (isTreatmentOption(treatmentId)) {
             initialMinutes = isTestMode ? TEST_LOCK_MIN : getDefaultTreatmentMinutes(treatmentId, sessionMeta?.treatmentLockTimeMinutes ?? 2)
         }
@@ -325,10 +326,24 @@ const TreatmentScanPage: React.FC = () => {
             return
         }
 
-        // 治療処置（点滴・挿管・手術等）が既に完了している場合は重複実施不可
+        // セッション一時停止中の操作ブロック
+        if (sessionMeta?.status === 'paused') {
+            setError('⏸️ 現在訓練が一時停止中のため、新しい診察・処置を開始できません。管理者の再開をお待ちください。')
+            return
+        }
+
+        // 治療処置（点滴・挿管・手術等）が既に完了している場合、または他スタッフが実施中の場合は重複実施不可
         const completed = patient.completed_treatments || []
         if (isTreatmentOption(resolved.treatment_id) && completed.includes(resolved.treatment_id)) {
             setError('※ この治療処置は既に完了しています。同じ治療処置を重複して行うことはできません。')
+            return
+        }
+        const nowMs = Date.now()
+        const isAlreadyInProgressByOther = (patient.active_treatments || []).some(
+            at => at.treatment_id === resolved.treatment_id && nowMs < at.started_at + at.duration_ms
+        )
+        if (isTreatmentOption(resolved.treatment_id) && isAlreadyInProgressByOther) {
+            setError('※ この治療処置は現在他のスタッフが実施中です。重複して実施することはできません。')
             return
         }
 
@@ -402,13 +417,17 @@ const TreatmentScanPage: React.FC = () => {
                 await updatePatientFlags(pid, updates)
                 latest = patient ? { ...patient, ...updates } : null
             } else {
-                await startTreatmentTimer(pid, treatId, timerMinutes)
+                const newAction = await startTreatmentTimer(pid, treatId, timerMinutes)
+                const existingActives = (patient?.active_treatments || []).filter(
+                    at => now < at.started_at + at.duration_ms
+                )
                 latest = patient ? {
                     ...patient,
                     status: '処置中',
                     timer_started_at: now,
                     timer_duration_ms: timerMinutes * 60 * 1000,
-                    applied_treatment_id: treatId
+                    applied_treatment_id: treatId,
+                    active_treatments: [...existingActives, newAction],
                 } : null
             }
 
@@ -471,6 +490,21 @@ const TreatmentScanPage: React.FC = () => {
             </header>
 
             <main className="page__content">
+                {sessionMeta?.status === 'paused' && (
+                    <div style={{
+                        marginBottom: '1rem',
+                        padding: '0.85rem 1rem',
+                        backgroundColor: '#fef3c7',
+                        border: '2px solid #f59e0b',
+                        borderRadius: '10px',
+                        color: '#92400e',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        textAlign: 'center',
+                    }}>
+                        ⏸️ 訓練が一時停止中です（管理画面から再開されるまで新しい処置は開始できません）
+                    </div>
+                )}
                 {/* タイマー時間調整（モーダルは上に出るが、念のため確認後の調整UIも残す） */}
                 {showModal && pendingProcedure && (
                     <div className="card card--elevated" style={{ marginBottom: '1rem' }}>

@@ -2353,16 +2353,47 @@ select.input {
 }
 
 @media print {
+  body {
+    background: #ffffff !important;
+  }
+  .app-container,
+  .app-container--wide,
+  .app-main,
+  .admin-page,
+  .page__content {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
   .app-header,
   .global-navigation,
   .admin-header,
   .qrgen-tabs,
   .qrgen-print-btn,
-  .qrgen-desc {
+  .qrgen-desc,
+  .no-print {
     display: none !important;
   }
   .qrgen-grid {
     grid-template-columns: repeat(4, 1fr);
+  }
+  .print-master-table {
+    font-size: 9pt !important;
+    width: 100% !important;
+  }
+  .print-master-table th,
+  .print-master-table td {
+    padding: 4pt 5pt !important;
+    border-color: #94a3b8 !important;
+  }
+  .print-actor-card {
+    box-shadow: none !important;
+    margin-bottom: 10pt !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
 

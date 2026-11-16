@@ -572,12 +572,12 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, sessionId, isSess
 
     const pct = (n: number) => totalCount > 0 ? Math.round((n / totalCount) * 100) : 0
 
-    // 4エリアカンバン定義
+    // 想定トリアージ区分別ボード定義
     const KANBAN_ZONES = [
-        { key: '赤', title: 'Red Area', subTitle: '赤エリア（最優先治療群）', color: '#ef4444', headerBg: 'rgba(185, 28, 28, 0.35)', borderColor: 'rgba(239, 68, 68, 0.5)', list: redPatients },
-        { key: '黄', title: 'Yellow Area', subTitle: '黄エリア（待機的治療群）', color: '#f59e0b', headerBg: 'rgba(180, 83, 9, 0.35)', borderColor: 'rgba(245, 158, 11, 0.5)', list: yellowPatients },
-        { key: '緑', title: 'Green Area', subTitle: '緑エリア（軽症群）', color: '#10b981', headerBg: 'rgba(4, 120, 87, 0.35)', borderColor: 'rgba(16, 185, 129, 0.5)', list: greenPatients },
-        { key: '黒', title: 'Black Area', subTitle: '黒エリア（不処置・救命困難群）', color: '#94a3b8', headerBg: 'rgba(30, 41, 59, 0.7)', borderColor: 'rgba(148, 163, 184, 0.35)', list: blackPatients },
+        { key: '赤', title: '想定 赤', subTitle: '最優先治療群', color: '#ef4444', headerBg: 'rgba(185, 28, 28, 0.35)', borderColor: 'rgba(239, 68, 68, 0.5)', list: redPatients },
+        { key: '黄', title: '想定 黄', subTitle: '待機的治療群', color: '#f59e0b', headerBg: 'rgba(180, 83, 9, 0.35)', borderColor: 'rgba(245, 158, 11, 0.5)', list: yellowPatients },
+        { key: '緑', title: '想定 緑', subTitle: '軽症群', color: '#10b981', headerBg: 'rgba(4, 120, 87, 0.35)', borderColor: 'rgba(16, 185, 129, 0.5)', list: greenPatients },
+        { key: '黒', title: '想定 黒', subTitle: '不処置・救命困難群', color: '#94a3b8', headerBg: 'rgba(30, 41, 59, 0.7)', borderColor: 'rgba(148, 163, 184, 0.35)', list: blackPatients },
     ]
 
     return (
@@ -749,7 +749,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, sessionId, isSess
                         onClick={() => setViewMode('command')}
                         className={`hq-view-switch__btn ${viewMode === 'command' ? 'hq-view-switch__btn--active' : ''}`}
                     >
-                        🛰️ エリア別状況
+                        🏷️ 想定トリアージ別
                     </button>
                     <button
                         type="button"

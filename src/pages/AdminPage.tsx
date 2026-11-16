@@ -737,7 +737,7 @@ const AdminPage: React.FC = () => {
                 <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'}}>
                     <div>
                         <h1 style={{ fontSize: '1.4rem', margin: 0, whiteSpace: 'nowrap' }}>管理画面 (Admin)</h1>
-                        {displaySessionId && currentSessionMeta ? (
+                        {adminView === 'session' && displaySessionId && currentSessionMeta ? (
                             (() => {
                                 const st = currentSessionMeta.status || (currentSessionMeta.isActive ? 'active' : 'ended')
                                 return (
@@ -867,7 +867,7 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {displaySessionId && currentSessionMeta && (() => {
+                    {adminView === 'session' && displaySessionId && currentSessionMeta && (() => {
                         const st = currentSessionMeta.status || (currentSessionMeta.isActive ? 'active' : 'ended')
                         if (st === 'preparing') {
                             return (

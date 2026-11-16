@@ -749,7 +749,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ patients, sessionId, isSess
                         onClick={() => setViewMode('command')}
                         className={`hq-view-switch__btn ${viewMode === 'command' ? 'hq-view-switch__btn--active' : ''}`}
                     >
-                        🛰️ 4エリア戦術カンバン
+                        🛰️ エリア別状況
                     </button>
                     <button
                         type="button"
